@@ -194,22 +194,20 @@ class UserController extends Controller
 
     public function data()
     {
-        $users = User::whereHas('roles', function ($query) {
-                $query->where('guard_name', 'api');
-            })
+        $users = User::whereHas('roles')
             ->with(['roles' => function ($query) {
-                $query->select('id', 'name', 'guard_name')
-                    ->where('guard_name', 'api');
+                $query->select('id', 'name', 'guard_name');
             }])
-            ->select('id', 'name', 'email', 'mobile', 'department')
+            ->select('id', 'first_name', 'email', 'mobile', 'department')
             ->get()
             ->map(function ($user) {
                 return [
                     'id'         => $user->id,
-                    'name'       => $user->name,
+                    'first_name' => $user->first_name,
+                    'last_name'  => $user->last_name,
                     'email'      => $user->email,
                     'mobile'     => $user->mobile,
-                    'department' => $user->department,
+                    'agency_id'  => $user->agency_id,
                     'role'       => $user->roles->map(fn($r) => ucfirst($r->name))->implode(', '),
                 ];
             });

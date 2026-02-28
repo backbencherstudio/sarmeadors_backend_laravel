@@ -45,9 +45,9 @@ class AuthController extends Controller
     {
         $user = auth('api')->user();
 
-        $user->load('roles.permissions');
+        $user->load('roles');
 
-        $permissions = $user->getAllPermissions()->pluck('name');
+        // $permissions = $user->getAllPermissions()->pluck('name');
 
         return response()->json([
             'success' => true,
@@ -56,7 +56,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'roles' => $user->roles->pluck('name'),
-                'permissions' => $permissions,
+                // 'permissions' => $permissions,
             ],
         ]);
     }
@@ -89,62 +89,5 @@ class AuthController extends Controller
             'token_type' => 'bearer',
             'expires_in' => auth('api')->factory()->getTTL() * 60,
         ]);
-    }
-
-    public function register(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'mobile'   => 'nullable|string|max:20',
-            'department' => 'nullable|string|max:100',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Validation failed.',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        $validated = $validator->validated();
-
-        DB::beginTransaction();
-
-        try {
-            $user = User::create([
-                'name'     => $validated['name'],
-                'email'    => $validated['email'],
-                'mobile'   => $validated['mobile'] ?? null,
-                'department' => $validated['department'] ?? null,
-                'password' => bcrypt($validated['password']),
-            ]);
-            // Assign role to user (API guard)
-            $role = Role::where('name','general')
-                        ->where('guard_name', 'api')
-                        ->firstOrFail();
-
-            $user->assignRole($role);
-            DB::commit();
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'User registered successfully.',
-                'data'    => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'roles' => $user->getRoleNames(),
-                ]
-            ], 201);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => false,
-                'message' => 'User registration failed.',
-            ], 500);
-        }
     }
 }
