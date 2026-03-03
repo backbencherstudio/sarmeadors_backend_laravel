@@ -210,9 +210,7 @@ class AgencyController extends Controller
         DB::beginTransaction();
 
         try {
-
             $agency = Agency::findOrFail($id);
-
             $authUser = auth('api')->user();
 
             if ($authUser->agency_id == $agency->id) {
@@ -222,7 +220,13 @@ class AgencyController extends Controller
                 ], 403);
             }
 
-            $agency->users()->forceDelete();
+            $agencyUsers = $agency->users()->get();
+
+            foreach ($agencyUsers as $user) {
+                $user->roles()->detach();
+                $user->delete();
+            }
+
             $agency->delete();
 
             DB::commit();

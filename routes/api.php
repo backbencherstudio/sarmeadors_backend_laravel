@@ -15,20 +15,22 @@ Route::get('/login', function () {
     ], 401);
 })->name('api.login');
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('subdomain')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
 
-Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
-Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
-Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
+    Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
+    Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
+    Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
+});
 
 
 Route::middleware('auth:api')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/logout', [AuthController::class, 'loggout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
 });
 
-Route::middleware(['auth:api', 'role:Super Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Super Admin'])->group(function () {
     Route::get('/users', [UserController::class, 'data']);
     route::get('role-list', [UserController::class, 'roleList']);
     Route::post('/user-store', [UserController::class, 'store']);
@@ -49,18 +51,18 @@ Route::middleware(['auth:api', 'role:Super Admin|Admin Staff'])->group(function 
 
 });
 
-Route::middleware(['auth:api', 'role:Agency Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin'])->group(function () {
 
 });
 
-Route::middleware(['auth:api', 'role:Agency Admin|Agency Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin|Agency Staff'])->group(function () {
 
 });
 
-Route::middleware(['auth:api', 'role:Client'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Client'])->group(function () {
 
 });
 
-Route::middleware(['auth:api', 'role:Candidate'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Candidate'])->group(function () {
 
 });

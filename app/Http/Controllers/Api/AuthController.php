@@ -53,9 +53,12 @@ class AuthController extends Controller
             'success' => true,
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'mobile' => $user->mobile,
                 'email' => $user->email,
-                'roles' => $user->roles->pluck('name'),
+                'agency_id' => $user->agency_id,
+                'role' => $user->getRoleNames()->first(),
                 // 'permissions' => $permissions,
             ],
         ]);

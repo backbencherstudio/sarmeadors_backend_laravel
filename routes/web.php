@@ -17,3 +17,5 @@ Route::get('/clear', function () {
 });
 
 Route::get('/welcome', [DashboardController::class, 'welcome'])->name('welcome');
+
+require __DIR__.'/auth.php';
