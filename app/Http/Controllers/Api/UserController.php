@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -19,32 +20,57 @@ class UserController extends Controller
 
     public function roleList()
     {
-        $roles = Role::where('guard_name', 'api')
-            ->get(['id', 'name'])
-            ->map(function ($role) {
-                return [
-                    'id'   => $role->id,
-                    'name' => Str::ucfirst($role->name),
-                ];
-            });
+        $user = auth('api')->user();
+
+        $allowedRoles = collect();
+
+        if ($user->hasRole('Super Admin')) {
+            $allowedRoles = collect(['Super Admin', 'Admin Staff']);
+        }
+
+        if ($user->hasRole('Agency Admin')) {
+            $allowedRoles = collect(['Agency Admin', 'Agency Staff']);
+        }
+
+        $roles = Role::query()
+            ->where('guard_name', 'api')
+            ->whereIn('name', $allowedRoles)
+            ->select('id', 'name')
+            ->get();
 
         return response()->json([
             'success' => true,
             'message' => 'Roles fetched successfully.',
             'data'    => $roles
-        ], 200);
+        ]);
     }
 
     public function store(Request $request)
     {
-        $validator =Validator::make($request->all(), [
-            'name'       => ['required', 'string', 'max:100'],
+        $authUser = auth('api')->user();
+
+        $allowedRoles = match (true) {
+            $authUser->hasRole('Super Admin')  => ['Super Admin', 'Admin Staff'],
+            $authUser->hasRole('Agency Admin') => ['Agency Admin', 'Agency Staff'],
+            default => [],
+        };
+
+        if (empty($allowedRoles)) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'You are not authorized to create users.'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['nullable', 'string', 'max:100'],
             'mobile'     => ['nullable', 'string', 'max:20'],
-            'department' => ['nullable', 'string', 'max:100'],
             'email'      => ['required', 'email', 'max:255', 'unique:users,email'],
+            'role'       => ['required', 'string', Rule::in($allowedRoles)],
             'password'   => ['required', 'confirmed', Password::defaults()],
-            'role_id'    => ['required', 'exists:roles,id'],
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'status'  => false,
@@ -59,18 +85,15 @@ class UserController extends Controller
 
         try {
             $user = User::create([
-                'name'       => $validated['name'],
+                'first_name' => $validated['first_name'],
+                'last_name'  => $validated['last_name'] ?? null,
                 'email'      => $validated['email'],
                 'mobile'     => $validated['mobile'] ?? null,
-                'department' => $validated['department'] ?? null,
+                'agency_id'  => $authUser->agency_id,
                 'password'   => Hash::make($validated['password']),
             ]);
 
-            $role = Role::where('id', $validated['role_id'])
-                        ->where('guard_name', 'api')
-                        ->firstOrFail();
-
-            $user->assignRole($role);
+            $user->assignRole($validated['role']);
 
             DB::commit();
 
@@ -78,10 +101,12 @@ class UserController extends Controller
                 'status'  => true,
                 'message' => 'User created successfully.',
                 'data'    => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'roles' => $user->getRoleNames(),
+                    'id'         => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name'  => $user->last_name,
+                    'mobile'     => $user->mobile,
+                    'email'      => $user->email,
+                    'roles'      => $user->getRoleNames(),
                 ]
             ], 201);
 
@@ -98,45 +123,63 @@ class UserController extends Controller
 
     public function edit($id)
     {
-        $user = User::with('roles:id,name')->findOrFail($id);
+        $authUser = auth('api')->user();
 
-        $roles = Role::where('guard_name', 'api')
-            ->select('id', 'name')
-            ->get()
-            ->map(function ($role) {
-                return [
-                    'id'   => $role->id,
-                    'name' => ucfirst($role->name),
-                ];
-            });
+        $user = User::with('roles')->findOrFail($id);
+
+        if ($authUser->hasRole('Agency Admin') && $authUser->agency_id !== $user->agency_id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized access.'
+            ], 403);
+        }
 
         return response()->json([
             'status' => true,
-            'data'   => [
-                'user' => [
-                    'id'         => $user->id,
-                    'name'       => $user->name,
-                    'email'      => $user->email,
-                    'mobile'     => $user->mobile,
-                    'department' => $user->department,
-                    'role_id'    => $user->roles->first()?->id,
-                ],
-                'roles' => $roles
+            'data' => [
+                'id'         => $user->id,
+                'first_name' => $user->first_name,
+                'last_name'  => $user->last_name,
+                'mobile'     => $user->mobile,
+                'email'      => $user->email,
+                'role'       => $user->getRoleNames()->first(),
             ]
         ]);
     }
 
     public function update(Request $request, $id)
     {
+        $authUser = auth('api')->user();
+
         $user = User::findOrFail($id);
 
+        if ($authUser->hasRole('Agency Admin') && $authUser->agency_id !== $user->agency_id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized access.'
+            ], 403);
+        }
+
+        $allowedRoles = match (true) {
+            $authUser->hasRole('Super Admin')  => ['Super Admin', 'Admin Staff'],
+            $authUser->hasRole('Agency Admin') => ['Agency Admin', 'Agency Staff'],
+            default => [],
+        };
+
+        if (empty($allowedRoles)) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'You are not authorized to update users.'
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
-            'name'       => ['required', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['nullable', 'string', 'max:100'],
             'mobile'     => ['nullable', 'string', 'max:20'],
-            'department' => ['nullable', 'string', 'max:100'],
-            'email'      => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email'      => ['required','email','max:255', Rule::unique('users', 'email')->ignore($user->id), ],
+            'role'       => ['required', Rule::in($allowedRoles)],
             'password'   => ['nullable', 'confirmed', Password::defaults()],
-            'role_id'    => ['required', 'exists:roles,id'],
         ]);
 
         if ($validator->fails()) {
@@ -153,20 +196,19 @@ class UserController extends Controller
 
         try {
             $user->update([
-                'name'       => $validated['name'],
-                'email'      => $validated['email'],
+                'first_name' => $validated['first_name'],
+                'last_name'  => $validated['last_name'] ?? null,
                 'mobile'     => $validated['mobile'] ?? null,
-                'department' => $validated['department'] ?? null,
-                'password'   => isset($validated['password'])
-                    ? Hash::make($validated['password'])
-                    : $user->password,
+                'email'      => $validated['email'],
             ]);
 
-            $role = Role::where('id', $validated['role_id'])
-                        ->where('guard_name', 'api')
-                        ->firstOrFail();
+            if (!empty($validated['password'])) {
+                $user->update([
+                    'password' => Hash::make($validated['password'])
+                ]);
+            }
 
-            $user->syncRoles([$role]);
+            $user->syncRoles([$validated['role']]);
 
             DB::commit();
 
@@ -174,12 +216,14 @@ class UserController extends Controller
                 'status'  => true,
                 'message' => 'User updated successfully.',
                 'data'    => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'roles' => $user->getRoleNames(),
+                    'id'         => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name'  => $user->last_name,
+                    'mobile'     => $user->mobile,
+                    'email'      => $user->email,
+                    'roles'      => $user->getRoleNames(),
                 ]
-            ], 200);
+            ]);
 
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -195,10 +239,8 @@ class UserController extends Controller
     public function data()
     {
         $users = User::whereHas('roles')
-            ->with(['roles' => function ($query) {
-                $query->select('id', 'name', 'guard_name');
-            }])
-            ->select('id', 'first_name', 'email', 'mobile', 'department')
+            ->with(['roles:id,name'])
+            ->select('id', 'first_name', 'last_name', 'email', 'mobile', 'agency_id')
             ->get()
             ->map(function ($user) {
                 return [
@@ -208,16 +250,16 @@ class UserController extends Controller
                     'email'      => $user->email,
                     'mobile'     => $user->mobile,
                     'agency_id'  => $user->agency_id,
-                    'role'       => $user->roles->map(fn($r) => ucfirst($r->name))->implode(', '),
+                    'role'       => $user->getRoleNames()->first(),
                 ];
             });
 
         return response()->json([
-            'status' => true,
-            'data'   => $users,
+            'status'  => true,
+            'message' => 'Users fetched successfully.',
+            'data'    => $users,
         ]);
     }
-
 
     public function destroy($id)
     {
@@ -280,40 +322,6 @@ class UserController extends Controller
         return response()->json([
             'status'  => true,
             'message' => 'Password updated successfully.',
-        ], 200);
-    }
-
-    public function profileUpdate(Request $request)
-    {
-        $user = Auth::guard('api')->user();
-
-        $validator = Validator::make($request->all(), [
-            'name'       => 'required|string|max:255',
-            'email'      => 'required|email|unique:users,email,' . $user->id,
-            'mobile'     => 'nullable|string|max:20',
-            'department' => 'nullable|string|max:100',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Validation errors',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $user->update($request->only('name', 'email', 'mobile', 'department'));
-
-        return response()->json([
-            'status'  => true,
-            'message' => 'Profile updated successfully.',
-            'data'    => [
-                'id'         => $user->id,
-                'name'       => $user->name,
-                'email'      => $user->email,
-                'mobile'     => $user->mobile,
-                'department' => $user->department,
-            ],
         ], 200);
     }
 

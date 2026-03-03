@@ -1,11 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AgencyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotPasswordController;
-use App\Http\Controllers\Api\RoleController;
 
 
 Route::get('/login', function () {
@@ -30,44 +30,37 @@ Route::middleware('auth:api')->group(function () {
 
 Route::middleware(['auth:api', 'role:Super Admin'])->group(function () {
     Route::get('/users', [UserController::class, 'data']);
-    Route::post('/user-store', [UserController::class, 'store'])->name('api.user.store');
-
+    route::get('role-list', [UserController::class, 'roleList']);
+    Route::post('/user-store', [UserController::class, 'store']);
     Route::get('/user-edit-data/{id}', [UserController::class, 'edit']);
     Route::put('/user-update/{id}', [UserController::class, 'update']);
-
-
     Route::post('/update-password', [UserController::class, 'updatePass']);
-    Route::put('profile-update', [UserController::class, 'profileUpdate']);
-
     Route::delete('/user-delete/{id}', [UserController::class, 'destroy']);
+
+    //Agency
+    Route::get('/agencies', [AgencyController::class, 'data']);
+    Route::post('/agency-store', [AgencyController::class, 'store']);
+    Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
+    Route::put('/agency-update/{id}', [AgencyController::class, 'update']);
+    Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 });
 
-Route::middleware(['auth:api', 'role:agency'])->group(function () {
+Route::middleware(['auth:api', 'role:Super Admin|Admin Staff'])->group(function () {
 
 });
 
-Route::middleware(['auth:api', 'role:client'])->group(function () {
+Route::middleware(['auth:api', 'role:Agency Admin'])->group(function () {
 
 });
 
-Route::middleware(['auth:api', 'role:candidate'])->group(function () {
+Route::middleware(['auth:api', 'role:Agency Admin|Agency Staff'])->group(function () {
 
 });
 
-// Route::middleware(['auth:api', 'role:admin|manager'])->group(function () {
-//     Route::get('/reports', [UserController::class, 'reports']);
-// });
+Route::middleware(['auth:api', 'role:Client'])->group(function () {
 
-// Multiple permissions (OR logic)
-// Route::middleware(['auth:api', 'permission:users.view|users.edit'])->group(function () {
-//     Route::get('/users', [UserController::class, 'index']);
-//     Route::post('/users', [UserController::class, 'store']);
-// });
+});
 
+Route::middleware(['auth:api', 'role:Candidate'])->group(function () {
 
-// Route::prefix('admin')->middleware(['auth:api'])->group(function () {
-//     Route::middleware(['permission:users.view|users.edit'])->group(function () {
-//         Route::get('/test', [UserController::class, 'index']);
-//     });
-
-// });
+});

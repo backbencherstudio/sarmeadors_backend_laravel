@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Agency extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
-        'name',
+        'first_name',
+        'last_name',
         'subdomain',
+        'subdomain_prefix',
         'email',
         'phone',
         'logo',
