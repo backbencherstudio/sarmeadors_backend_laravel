@@ -47,7 +47,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:Super Admin'])->group(function
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 });
 
-Route::middleware(['auth:api', 'role:Super Admin|Admin Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:Super Admin|Admin Staff'])->group(function () {
 
 });
 
@@ -66,3 +66,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:Client'])->group(function () {
 Route::middleware(['subdomain', 'auth:api', 'role:Candidate'])->group(function () {
 
 });
+
+require __DIR__.'/niaz.php';
+require __DIR__.'/mahmudul.php';
