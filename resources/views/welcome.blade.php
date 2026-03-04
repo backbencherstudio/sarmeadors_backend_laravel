@@ -45,7 +45,6 @@
         </div>
         <h1>Sarmeadors Under Development</h1>
         <p>We are working hard to get this page ready for you.<br>Check back soon!</p>
-        <a href="/" class="btn btn-primary btn-back">Go Back to Home</a>
     </div>
 
     <!-- Bootstrap JS Bundle -->
