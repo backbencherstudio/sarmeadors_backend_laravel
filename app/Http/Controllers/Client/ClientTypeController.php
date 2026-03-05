@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\ClientType;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ClientTypeController extends Controller
 {
@@ -13,16 +14,10 @@ class ClientTypeController extends Controller
         return ClientType::where('agency_id', auth('api')->user()->agency_id)->get();
     }
 
-    public function show($id)
+    public function show(ClientType $clientType)
     {
-        $clientType = ClientType::where('id', $id)
-            ->where('agency_id', auth('api')->user()->agency_id)
-            ->first();
-
-        if (!$clientType) {
-            return response()->json([
-                'message' => 'Client Type not found'
-            ], 404);
+        if ($clientType->agency_id !== auth('api')->user()->agency_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         return response()->json($clientType);
@@ -30,15 +25,20 @@ class ClientTypeController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth('api')->user();
+        $agencyId = auth('api')->user()->agency_id;
 
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('client_types')->where(fn($query) => $query->where('agency_id', $agencyId))
+            ],
             'status' => 'required|in:0,1',
         ]);
 
         $clientType = ClientType::create([
-            'agency_id' => $user->agency_id,
+            'agency_id' => $agencyId,
             'name' => $request->name,
             'status' => $request->status,
         ]);
@@ -48,8 +48,17 @@ class ClientTypeController extends Controller
 
     public function update(Request $request, ClientType $clientType)
     {
+        if ($clientType->agency_id !== auth('api')->user()->agency_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('client_types')->ignore($clientType->id)->where(fn($query) => $query->where('agency_id', $clientType->agency_id))
+            ],
             'status' => 'required|in:0,1',
         ]);
 
@@ -60,10 +69,7 @@ class ClientTypeController extends Controller
 
     public function destroy(ClientType $clientType)
     {
-        if (
-            auth('api')->user()->user_type !== 'agency_admin' ||
-            $clientType->agency_id !== auth('api')->user()->agency_id
-        ) {
+        if ($clientType->agency_id !== auth('api')->user()->agency_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
