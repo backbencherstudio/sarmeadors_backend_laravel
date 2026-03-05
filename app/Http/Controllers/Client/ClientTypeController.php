@@ -13,19 +13,19 @@ class ClientTypeController extends Controller
     {
         $perPage = $request->query('per_page', 10);
 
-        $agencyTypes = ClientType::where('agency_id', auth('api')->user()->agency_id)->latest()->paginate($perPage);
+        $clientTypes = ClientType::where('agency_id', auth('api')->user()->agency_id)->latest()->paginate($perPage);
 
         return response()->json([
             'status' => true,
             'message' => 'Client types retrieved successfully',
-            'data' => $agencyTypes->items(),
+            'data' => $clientTypes->items(),
             'meta' => [
-                'current_page' => $agencyTypes->currentPage(),
-                'last_page' => $agencyTypes->lastPage(),
-                'per_page' => $agencyTypes->perPage(),
-                'total' => $agencyTypes->total(),
-                'next_page_url' => $agencyTypes->nextPageUrl(),
-                'prev_page_url' => $agencyTypes->previousPageUrl(),
+                'current_page' => $clientTypes->currentPage(),
+                'last_page' => $clientTypes->lastPage(),
+                'per_page' => $clientTypes->perPage(),
+                'total' => $clientTypes->total(),
+                'next_page_url' => $clientTypes->nextPageUrl(),
+                'prev_page_url' => $clientTypes->previousPageUrl(),
             ]
         ], 200);
     }
@@ -62,13 +62,13 @@ class ClientTypeController extends Controller
                 'max:255',
                 Rule::unique('client_types')->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
-            'status' => 'required|in:0,1',
+            'status' => 'nullable|in:0,1',
         ]);
 
         $clientType = ClientType::create([
             'agency_id' => $agencyId,
             'name' => $request->name,
-            'status' => $request->status,
+            'status' => $request->status ?? 1,
         ]);
 
         return response()->json($clientType, 201);
@@ -93,7 +93,7 @@ class ClientTypeController extends Controller
                 'max:255',
                 Rule::unique('client_types')->ignore($clientType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
-            'status' => 'required|in:0,1',
+            'status' => 'nullable|in:0,1',
         ]);
 
         $clientType->update($request->only('name', 'status'));
