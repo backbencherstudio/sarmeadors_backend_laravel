@@ -25,6 +25,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::get('client-type/{id}', [ClientTypeController::class, 'show']);
     Route::post('client-type-store', [ClientTypeController::class, 'store']);
     Route::put('client-type-update/{id}', [ClientTypeController::class, 'update']);
+    Route::put('client-type-bulk-update', [ClientTypeController::class, 'bulkUpdate']);
     Route::delete('client-type-destroy/{id}', [ClientTypeController::class, 'destroy']);
 
     //client location management route
@@ -43,6 +44,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('client-type/{id}', [ClientTypeController::class, 'show']);
     Route::post('client-type-store', [ClientTypeController::class, 'store']);
     Route::put('client-type-update/{id}', [ClientTypeController::class, 'update']);
+    Route::put('client-type-bulk-update', [ClientTypeController::class, 'bulkUpdate']);
     Route::delete('client-type-destroy/{id}', [ClientTypeController::class, 'destroy']);
 
     //client location management route
