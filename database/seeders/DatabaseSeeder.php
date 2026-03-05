@@ -38,6 +38,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // $admin->assignRole('admin');
-        $adminApi->assignRole(Role::where('name','Super Admin')->where('guard_name','api')->first());
+        $adminApi->assignRole(Role::where('name','super_admin')->where('guard_name','api')->first());
     }
 }
