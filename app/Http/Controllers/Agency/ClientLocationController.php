@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Client;
+namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientLocation;

@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Client\ClientLocationController;
-use App\Http\Controllers\Client\ClientTypeController;
+use App\Http\Controllers\Agency\ClientLocationController;
+use App\Http\Controllers\Agency\ClientTypeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
