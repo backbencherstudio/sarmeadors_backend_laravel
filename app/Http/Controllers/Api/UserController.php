@@ -24,12 +24,12 @@ class UserController extends Controller
 
         $allowedRoles = collect();
 
-        if ($user->hasRole('Super Admin')) {
-            $allowedRoles = collect(['Super Admin', 'Admin Staff']);
+        if ($user->hasRole('super_admin')) {
+            $allowedRoles = collect(['super_admin', 'admin_staff']);
         }
 
-        if ($user->hasRole('Agency Admin')) {
-            $allowedRoles = collect(['Agency Admin', 'Agency Staff']);
+        if ($user->hasRole('agency_admin')) {
+            $allowedRoles = collect(['agency_admin', 'agency_staff']);
         }
 
         $roles = Role::query()
@@ -50,8 +50,8 @@ class UserController extends Controller
         $authUser = auth('api')->user();
 
         $allowedRoles = match (true) {
-            $authUser->hasRole('Super Admin')  => ['Super Admin', 'Admin Staff'],
-            $authUser->hasRole('Agency Admin') => ['Agency Admin', 'Agency Staff'],
+            $authUser->hasRole('super_admin')  => ['super_admin', 'admin_staff'],
+            $authUser->hasRole('agency_admin') => ['agency_admin', 'agency_staff'],
             default => [],
         };
 
@@ -106,7 +106,7 @@ class UserController extends Controller
                     'last_name'  => $user->last_name,
                     'mobile'     => $user->mobile,
                     'email'      => $user->email,
-                    'roles'      => $user->getRoleNames(),
+                    'roles'      => $user->getRoleNames()->first(),
                 ]
             ], 201);
 
@@ -127,7 +127,7 @@ class UserController extends Controller
 
         $user = User::with('roles')->findOrFail($id);
 
-        if ($authUser->hasRole('Agency Admin') && $authUser->agency_id !== $user->agency_id) {
+        if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
             return response()->json([
                 'status' => false,
                 'message' => 'Unauthorized access.'
@@ -153,7 +153,7 @@ class UserController extends Controller
 
         $user = User::findOrFail($id);
 
-        if ($authUser->hasRole('Agency Admin') && $authUser->agency_id !== $user->agency_id) {
+        if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
             return response()->json([
                 'status' => false,
                 'message' => 'Unauthorized access.'
@@ -161,8 +161,8 @@ class UserController extends Controller
         }
 
         $allowedRoles = match (true) {
-            $authUser->hasRole('Super Admin')  => ['Super Admin', 'Admin Staff'],
-            $authUser->hasRole('Agency Admin') => ['Agency Admin', 'Agency Staff'],
+            $authUser->hasRole('super_admin')  => ['super_admin', 'admin_staff'],
+            $authUser->hasRole('agency_admin') => ['agency_admin', 'agency_staff'],
             default => [],
         };
 
@@ -221,7 +221,7 @@ class UserController extends Controller
                     'last_name'  => $user->last_name,
                     'mobile'     => $user->mobile,
                     'email'      => $user->email,
-                    'roles'      => $user->getRoleNames(),
+                    'roles'      => $user->getRoleNames()->first(),
                 ]
             ]);
 
@@ -238,21 +238,27 @@ class UserController extends Controller
 
     public function data()
     {
-        $users = User::whereHas('roles')
+        $authUser = auth('api')->user();
+
+        $query = User::whereHas('roles')
             ->with(['roles:id,name'])
-            ->select('id', 'first_name', 'last_name', 'email', 'mobile', 'agency_id')
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'id'         => $user->id,
-                    'first_name' => $user->first_name,
-                    'last_name'  => $user->last_name,
-                    'email'      => $user->email,
-                    'mobile'     => $user->mobile,
-                    'agency_id'  => $user->agency_id,
-                    'role'       => $user->getRoleNames()->first(),
-                ];
-            });
+            ->select('id', 'first_name', 'last_name', 'email', 'mobile', 'agency_id');
+
+        if (!$authUser->hasRole('super_admin')) {
+            $query->where('agency_id', $authUser->agency_id);
+        }
+
+        $users = $query->get()->map(function ($user) {
+            return [
+                'id'         => $user->id,
+                'first_name' => $user->first_name,
+                'last_name'  => $user->last_name,
+                'email'      => $user->email,
+                'mobile'     => $user->mobile,
+                'agency_id'  => $user->agency_id,
+                'role'       => $user->getRoleNames()->first(),
+            ];
+        });
 
         return response()->json([
             'status'  => true,
@@ -263,7 +269,15 @@ class UserController extends Controller
 
     public function destroy($id)
     {
+        $authUser = auth('api')->user();
+
         $user = User::findOrFail($id);
+        if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized access.'
+            ], 403);
+        }
 
         DB::beginTransaction();
 
@@ -294,7 +308,7 @@ class UserController extends Controller
 
     public function updatePass(Request $request)
     {
-        $user = Auth::guard('api')->user();
+        $user = auth('api')->user();
 
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|string',

@@ -28,17 +28,22 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'loggout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
+    Route::post('/update-password', [UserController::class, 'updatePass']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Super Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|agency_admin'])->group(function () {
     Route::get('/users', [UserController::class, 'data']);
     route::get('role-list', [UserController::class, 'roleList']);
     Route::post('/user-store', [UserController::class, 'store']);
     Route::get('/user-edit-data/{id}', [UserController::class, 'edit']);
     Route::put('/user-update/{id}', [UserController::class, 'update']);
-    Route::post('/update-password', [UserController::class, 'updatePass']);
     Route::delete('/user-delete/{id}', [UserController::class, 'destroy']);
+});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {
 
+});
+
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {
     //Agency
     Route::get('/agencies', [AgencyController::class, 'data']);
     Route::post('/agency-store', [AgencyController::class, 'store']);
@@ -47,23 +52,20 @@ Route::middleware(['subdomain', 'auth:api', 'role:Super Admin'])->group(function
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Super Admin|Admin Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
+
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin|Agency Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Client'])->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:Candidate'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {
 
 });
 
