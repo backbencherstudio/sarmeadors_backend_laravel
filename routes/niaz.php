@@ -21,10 +21,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
 
     Route::get('client-types', [ClientTypeController::class, 'index']);
     Route::get('client-types/{id}', [ClientTypeController::class, 'show']);
-    Route::post('client-types', [ClientTypeController::class, 'store']);
-    Route::put('client-types/{id}', [ClientTypeController::class, 'update']);
-    Route::patch('client-types/{id}', [ClientTypeController::class, 'update']);
-    Route::delete('client-types/{id}', [ClientTypeController::class, 'destroy']);
+    Route::post('client-types-store', [ClientTypeController::class, 'store']);
+    Route::put('client-types-update/{id}', [ClientTypeController::class, 'update']);
+    Route::delete('client-types-destroy/{id}', [ClientTypeController::class, 'destroy']);
 
 });
 
@@ -32,11 +31,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
 
     Route::get('client-types', [ClientTypeController::class, 'index']);
     Route::get('client-types/{id}', [ClientTypeController::class, 'show']);
-    Route::post('client-types', [ClientTypeController::class, 'store']);
-    Route::put('client-types/{id}', [ClientTypeController::class, 'update']);
-    Route::patch('client-types/{id}', [ClientTypeController::class, 'update']);
-    Route::delete('client-types/{id}', [ClientTypeController::class, 'destroy']);
-    
+    Route::post('client-types-store', [ClientTypeController::class, 'store']);
+    Route::put('client-types-update/{id}', [ClientTypeController::class, 'update']);
+    Route::delete('client-types-destroy/{id}', [ClientTypeController::class, 'destroy']);
+
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {
