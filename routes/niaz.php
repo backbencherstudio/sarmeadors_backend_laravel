@@ -33,6 +33,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::get('client-location/{id}', [ClientLocationController::class, 'show']);
     Route::post('client-location-store', [ClientLocationController::class, 'store']);
     Route::put('client-location-update/{id}', [ClientLocationController::class, 'update']);
+    Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
     Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
 
 });
@@ -52,6 +53,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('client-location/{id}', [ClientLocationController::class, 'show']);
     Route::post('client-location-store', [ClientLocationController::class, 'store']);
     Route::put('client-location-update/{id}', [ClientLocationController::class, 'update']);
+    Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
     Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
 
 });
