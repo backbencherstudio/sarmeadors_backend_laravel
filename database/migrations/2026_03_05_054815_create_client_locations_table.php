@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
             $table->string('location');
-            $table->tinyInteger('status')->nullable()->default(1);
+            $table->tinyInteger('status')->default(1);
             $table->timestamps();
             $table->unique(['agency_id', 'location']);
         });
