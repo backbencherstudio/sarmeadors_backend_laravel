@@ -8,26 +8,26 @@ Route::middleware('auth:api')->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Super Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Super Admin|Admin Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Agency Admin|Agency Staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Client'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:Candidate'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {
 
 });

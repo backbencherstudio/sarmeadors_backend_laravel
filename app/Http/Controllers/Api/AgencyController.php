@@ -74,7 +74,7 @@ class AgencyController extends Controller
                 'password'   => Hash::make($data['password']),
             ]);
 
-            $role = Role::where('name', 'Agency Admin')->firstOrFail();
+            $role = Role::where('name', 'agency_admin')->firstOrFail();
             $user->assignRole($role);
 
             DB::commit();
@@ -124,24 +124,16 @@ class AgencyController extends Controller
             $agency = Agency::findOrFail($id);
 
             $user = User::where('agency_id', $agency->id)
-                        ->role('Agency Admin')
+                        ->role('agency_admin')
                         ->firstOrFail();
 
             $validator = Validator::make($request->all(), [
                 'first_name' => 'required|string|max:100',
                 'last_name'  => 'nullable|string|max:100',
-                'email'      => [
-                    'required',
-                    'email',
-                    Rule::unique('users', 'email')->ignore($user->id),
-                ],
+                'email'      => ['required','email', Rule::unique('users', 'email')->ignore($user->id), ],
                 'phone'      => 'nullable|string|max:20',
                 'password'   => 'nullable|min:6|confirmed',
-                'subdomain'  => [
-                    'required',
-                    'string',
-                    Rule::unique('agencies', 'subdomain')->ignore($agency->id),
-                ],
+                'subdomain'  => ['required','string', Rule::unique('agencies', 'subdomain')->ignore($agency->id), ],
             ]);
 
             if ($validator->fails()) {
