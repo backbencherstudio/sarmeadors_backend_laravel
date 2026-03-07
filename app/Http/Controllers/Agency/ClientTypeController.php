@@ -14,7 +14,14 @@ class ClientTypeController extends Controller
     {
         $perPage = $request->query('per_page', 10);
 
-        $clientTypes = ClientType::where('agency_id', auth('api')->user()->agency_id)->latest()->paginate($perPage);
+        $search = $request->query('search');
+
+        $clientTypes = ClientType::where('agency_id', auth('api')->user()->agency_id)
+            ->when($search, function ($query, $search) {
+                return $query->where('name', 'like', '%' . $search . '%');
+            })->latest()->paginate($perPage);
+
+        $clientTypes->appends(['search' => $search, 'per_page' => $perPage]);
 
         return response()->json([
             'status' => true,

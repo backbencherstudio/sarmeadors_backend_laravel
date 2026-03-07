@@ -14,7 +14,14 @@ class ClientLocationController extends Controller
     {
         $perPage = $request->query('per_page', 10);
 
-        $clientLocations = ClientLocation::where('agency_id', auth('api')->user()->agency_id)->latest()->paginate($perPage);
+        $search = $request->query('search');
+
+        $clientLocations = ClientLocation::where('agency_id', auth('api')->user()->agency_id)
+            ->when($search, function ($query, $search) {
+                return $query->where('location', 'like', '%' . $search . '%');
+            })->latest()->paginate($perPage);
+
+        $clientLocations->appends(['search' => $search, 'per_page' => $perPage]);
 
         return response()->json([
             'status' => true,
