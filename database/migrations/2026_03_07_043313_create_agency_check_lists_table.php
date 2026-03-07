@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('client_locations', function (Blueprint $table) {
+        Schema::create('agency_check_lists', function (Blueprint $table) {
             $table->id();
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
-            $table->string('location');
+            $table->string('name');
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
-            $table->unique(['agency_id', 'location']);
+            $table->unique(['agency_id', 'name']);
         });
     }
 
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('client_locations');
+        Schema::dropIfExists('agency_check_lists');
     }
 };

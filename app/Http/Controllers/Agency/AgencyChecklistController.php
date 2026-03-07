@@ -3,38 +3,38 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientTag;
+use App\Models\AgencyCheckList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class ClientTagController extends Controller
+class AgencyChecklistController extends Controller
 {
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
         $search = $request->query('search');
 
-        $clientTag = ClientTag::where('agency_id', auth('api')->user()->agency_id)
+        $agencyCheckList = AgencyCheckList::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
             })
             ->latest()
             ->paginate($perPage);
 
-        $clientTag->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyCheckList->appends(['search' => $search, 'per_page' => $perPage]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Client tags retrieved successfully',
-            'data' => $clientTag->items(),
+            'message' => 'Agency checklist retrieved successfully',
+            'data' => $agencyCheckList->items(),
             'meta' => [
-                'current_page' => $clientTag->currentPage(),
-                'last_page' => $clientTag->lastPage(),
-                'per_page' => $clientTag->perPage(),
-                'total' => $clientTag->total(),
-                'next_page_url' => $clientTag->nextPageUrl(),
-                'prev_page_url' => $clientTag->previousPageUrl(),
+                'current_page' => $agencyCheckList->currentPage(),
+                'last_page' => $agencyCheckList->lastPage(),
+                'per_page' => $agencyCheckList->perPage(),
+                'total' => $agencyCheckList->total(),
+                'next_page_url' => $agencyCheckList->nextPageUrl(),
+                'prev_page_url' => $agencyCheckList->previousPageUrl(),
             ]
         ], 200);
     }
@@ -43,20 +43,20 @@ class ClientTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientTag = ClientTag::where('id', $id)
+        $agencyCheckList = AgencyCheckList::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientTag) {
+        if (!$agencyCheckList) {
             return response()->json([
                 'status' => false,
-                'message' => 'Client tag not found or unauthorized'
+                'message' => 'Agency Checklist not found or unauthorized'
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $clientTag
+            'data' => $agencyCheckList
         ], 200);
     }
 
@@ -82,11 +82,11 @@ class ClientTagController extends Controller
         if ($names->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one tag using "name" or "names".'
+                'message' => 'Please provide at least one checklist using "name" or "names".'
             ], 422);
         }
 
-        $existingNames = ClientTag::where('agency_id', $agencyId)
+        $existingNames = AgencyCheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -94,7 +94,7 @@ class ClientTagController extends Controller
         if (!empty($existingNames)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Some tag already exist.',
+                'message' => 'Some checklist already exist.',
                 'duplicates' => $existingNames
             ], 422);
         }
@@ -109,9 +109,9 @@ class ClientTagController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        ClientTag::insert($rows);
+        AgencyCheckList::insert($rows);
 
-        $created = ClientTag::where('agency_id', $agencyId)
+        $created = AgencyCheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -123,7 +123,7 @@ class ClientTagController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client tag created successfully',
+            'message' => 'Agency checklist created successfully',
             'data' => $created,
         ], 201);
     }
@@ -132,11 +132,11 @@ class ClientTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientTag = ClientTag::where('id', $id)
+        $agencyCheckList = AgencyCheckList::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientTag) {
+        if (!$agencyCheckList) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -145,17 +145,17 @@ class ClientTagController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('client_check_lists')->ignore($clientTag->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('agency_check_lists')->ignore($agencyCheckList->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
 
-        $clientTag->update($request->only('name', 'status'));
+        $agencyCheckList->update($request->only('name', 'status'));
 
         return response()->json([
             'status' => true,
-            'message' => 'Client tag updated successfully',
-            'data' => $clientTag
+            'message' => 'Agency checklist updated successfully',
+            'data' => $agencyCheckList
         ], 200);
     }
 
@@ -184,22 +184,22 @@ class ClientTagController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $clientTags = ClientTag::where('agency_id', $agencyId)
+        $agencyCheckLists = AgencyCheckList::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
 
-        if ($clientTags->count() !== count($ids)) {
-            $missingIds = collect($ids)->diff($clientTags->keys())->values()->all();
+        if ($agencyCheckLists->count() !== count($ids)) {
+            $missingIds = collect($ids)->diff($agencyCheckLists->keys())->values()->all();
 
             return response()->json([
                 'status' => false,
-                'message' => 'Some client tag were not found or unauthorized.',
+                'message' => 'Some agency checklist were not found or unauthorized.',
                 'missing_ids' => $missingIds
             ], 404);
         }
 
-        $nameConflicts = ClientTag::where('agency_id', $agencyId)
+        $nameConflicts = AgencyCheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -213,19 +213,19 @@ class ClientTagController extends Controller
             ], 422);
         }
 
-        $updated = DB::transaction(function () use ($updates, $clientTags) {
+        $updated = DB::transaction(function () use ($updates, $agencyCheckLists) {
             $result = [];
 
             foreach ($updates as $item) {
-                $clientTag = $clientTags[$item['id']];
+                $agencyCheckList = $agencyCheckLists[$item['id']];
 
                 $payload = ['name' => $item['name']];
                 if (array_key_exists('status', $item)) {
                     $payload['status'] = $item['status'];
                 }
 
-                $clientTag->update($payload);
-                $result[] = $clientTag->fresh();
+                $agencyCheckList->update($payload);
+                $result[] = $agencyCheckList->fresh();
             }
 
             return $result;
@@ -233,23 +233,23 @@ class ClientTagController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client tag updated successfully',
+            'message' => 'Agency checklist updated successfully',
             'data' => $updated
         ], 200);
     }
 
     public function destroy($id)
     {
-        $clientTag = ClientTag::where('id', $id)
+        $agencyCheckList = AgencyCheckList::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$clientTag) {
+        if (!$agencyCheckList) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
-        $clientTag->delete();
+        $agencyCheckList->delete();
 
-        return response()->json(['message' => 'Client tag deleted successfully']);
+        return response()->json(['message' => 'Agency checklist deleted successfully']);
     }
 }

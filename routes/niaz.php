@@ -1,101 +1,89 @@
 <?php
 
-use App\Http\Controllers\Agency\ClientChecklistController;
-use App\Http\Controllers\Agency\ClientLocationController;
-use App\Http\Controllers\Agency\ClientTagController;
-use App\Http\Controllers\Agency\ClientTypeController;
+use App\Http\Controllers\Agency\AgencyChecklistController;
+use App\Http\Controllers\Agency\AgencyLocationController;
+use App\Http\Controllers\Agency\AgencyTagController;
+use App\Http\Controllers\Agency\AgencyTypeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware('auth:api')->group(function () {});
 
-});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {
-
-});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {});
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
 
-    //client type management route
-    Route::get('client-types', [ClientTypeController::class, 'index']);
-    Route::get('client-type/{id}', [ClientTypeController::class, 'show']);
-    Route::post('client-type-store', [ClientTypeController::class, 'store']);
-    Route::put('client-type-update/{id}', [ClientTypeController::class, 'update']);
-    Route::put('client-type-bulk-update', [ClientTypeController::class, 'bulkUpdate']);
-    Route::delete('client-type-destroy/{id}', [ClientTypeController::class, 'destroy']);
+    //agency type management route
+    Route::get('agency-types', [AgencyTypeController::class, 'index']);
+    Route::get('agency-type/{id}', [AgencyTypeController::class, 'show']);
+    Route::post('agency-type-store', [AgencyTypeController::class, 'store']);
+    Route::put('agency-type-update/{id}', [AgencyTypeController::class, 'update']);
+    Route::put('agency-type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);  
+    Route::delete('agency-type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
 
-    //client location management route
-    Route::get('client-locations', [ClientLocationController::class, 'index']);
-    Route::get('client-location/{id}', [ClientLocationController::class, 'show']);
-    Route::post('client-location-store', [ClientLocationController::class, 'store']);
-    Route::put('client-location-update/{id}', [ClientLocationController::class, 'update']);
-    Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
-    Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
+    //agency location management route
+    Route::get('agency-locations', [AgencyLocationController::class, 'index']);
+    Route::get('agency-location/{id}', [AgencyLocationController::class, 'show']);
+    Route::post('agency-location-store', [AgencyLocationController::class, 'store']);
+    Route::put('agency-location-update/{id}', [AgencyLocationController::class, 'update']);
+    Route::put('agency-location-bulk-update', [AgencyLocationController::class, 'bulkUpdate']);
+    Route::delete('agency-location-destroy/{id}', [AgencyLocationController::class, 'destroy']);
 
-    //client checklist management route
-    Route::get('client-checklist', [ClientChecklistController::class, 'index']);
-    Route::get('client-checklist/{id}', [ClientChecklistController::class, 'show']);
-    Route::post('client-checklist-store', [ClientChecklistController::class, 'store']);
-    Route::put('client-checklist-update/{id}', [ClientChecklistController::class, 'update']);
-    Route::put('client-checklist-bulk-update', [ClientChecklistController::class, 'bulkUpdate']);
-    Route::delete('client-checklist-destroy/{id}', [ClientChecklistController::class, 'destroy']);
+    //agency checklist management route
+    Route::get('agency-checklist', [AgencyChecklistController::class, 'index']);
+    Route::get('agency-checklist/{id}', [AgencyChecklistController::class, 'show']);
+    Route::post('agency-checklist-store', [AgencyChecklistController::class, 'store']);
+    Route::put('agency-checklist-update/{id}', [AgencyChecklistController::class, 'update']);
+    Route::put('agency-checklist-bulk-update', [AgencyChecklistController::class, 'bulkUpdate']);
+    Route::delete('agency-checklist-destroy/{id}', [AgencyChecklistController::class, 'destroy']);
 
-    //client tags management route
-    Route::get('client-tags', [ClientTagController::class, 'index']);
-    Route::get('client-tag/{id}', [ClientTagController::class, 'show']);
-    Route::post('client-tag-store', [ClientTagController::class, 'store']);
-    Route::put('client-tag-update/{id}', [ClientTagController::class, 'update']);
-    Route::put('client-tag-bulk-update', [ClientTagController::class, 'bulkUpdate']);
-    Route::delete('client-tag-destroy/{id}', [ClientTagController::class, 'destroy']);
-
+    //agency tags management route
+    Route::get('agency-tags', [AgencyTagController::class, 'index']);
+    Route::get('agency-tag/{id}', [AgencyTagController::class, 'show']);
+    Route::post('agency-tag-store', [AgencyTagController::class, 'store']);
+    Route::put('agency-tag-update/{id}', [AgencyTagController::class, 'update']);
+    Route::put('agency-tag-bulk-update', [AgencyTagController::class, 'bulkUpdate']);
+    Route::delete('agency-tag-destroy/{id}', [AgencyTagController::class, 'destroy']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
 
-    //client type management route
-    Route::get('client-types', [ClientTypeController::class, 'index']);
-    Route::get('client-type/{id}', [ClientTypeController::class, 'show']);
-    Route::post('client-type-store', [ClientTypeController::class, 'store']);
-    Route::put('client-type-update/{id}', [ClientTypeController::class, 'update']);
-    Route::put('client-type-bulk-update', [ClientTypeController::class, 'bulkUpdate']);
-    Route::delete('client-type-destroy/{id}', [ClientTypeController::class, 'destroy']);
+    //agency type management route
+    Route::get('agency-types', [AgencyTypeController::class, 'index']);
+    Route::get('agency-type/{id}', [AgencyTypeController::class, 'show']);
+    Route::post('agency-type-store', [AgencyTypeController::class, 'store']);
+    Route::put('agency-type-update/{id}', [AgencyTypeController::class, 'update']);
+    Route::put('agency-type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
+    Route::delete('agency-type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
 
-    //client location management route
-    Route::get('client-locations', [ClientLocationController::class, 'index']);
-    Route::get('client-location/{id}', [ClientLocationController::class, 'show']);
-    Route::post('client-location-store', [ClientLocationController::class, 'store']);
-    Route::put('client-location-update/{id}', [ClientLocationController::class, 'update']);
-    Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
-    Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
+    //agency location management route
+    Route::get('agency-locations', [AgencyLocationController::class, 'index']);
+    Route::get('agency-location/{id}', [AgencyLocationController::class, 'show']);
+    Route::post('agency-location-store', [AgencyLocationController::class, 'store']);
+    Route::put('agency-location-update/{id}', [AgencyLocationController::class, 'update']);
+    Route::put('agency-location-bulk-update', [AgencyLocationController::class, 'bulkUpdate']);
+    Route::delete('agency-location-destroy/{id}', [AgencyLocationController::class, 'destroy']);
 
-    //client checklist management route
-    Route::get('client-checklist', [ClientChecklistController::class, 'index']);
-    Route::get('client-checklist/{id}', [ClientChecklistController::class, 'show']);
-    Route::post('client-checklist-store', [ClientChecklistController::class, 'store']);
-    Route::put('client-checklist-update/{id}', [ClientChecklistController::class, 'update']);
-    Route::put('client-checklist-bulk-update', [ClientChecklistController::class, 'bulkUpdate']);
-    Route::delete('client-checklist-destroy/{id}', [ClientChecklistController::class, 'destroy']);
+    //agency checklist management route
+    Route::get('agency-checklist', [AgencyChecklistController::class, 'index']);
+    Route::get('agency-checklist/{id}', [AgencyChecklistController::class, 'show']);
+    Route::post('agency-checklist-store', [AgencyChecklistController::class, 'store']);
+    Route::put('agency-checklist-update/{id}', [AgencyChecklistController::class, 'update']);
+    Route::put('agency-checklist-bulk-update', [AgencyChecklistController::class, 'bulkUpdate']);
+    Route::delete('agency-checklist-destroy/{id}', [AgencyChecklistController::class, 'destroy']);
 
-    //client tags management route
-    Route::get('client-tags', [ClientTagController::class, 'index']);
-    Route::get('client-tag/{id}', [ClientTagController::class, 'show']);
-    Route::post('client-tag-store', [ClientTagController::class, 'store']);
-    Route::put('client-tag-update/{id}', [ClientTagController::class, 'update']);
-    Route::put('client-tag-bulk-update', [ClientTagController::class, 'bulkUpdate']);
-    Route::delete('client-tag-destroy/{id}', [ClientTagController::class, 'destroy']);
-
+    //agency tags management route
+    Route::get('agency-tags', [AgencyTagController::class, 'index']);
+    Route::get('agency-tag/{id}', [AgencyTagController::class, 'show']);
+    Route::post('agency-tag-store', [AgencyTagController::class, 'store']);
+    Route::put('agency-tag-update/{id}', [AgencyTagController::class, 'update']);
+    Route::put('agency-tag-bulk-update', [AgencyTagController::class, 'bulkUpdate']);
+    Route::delete('agency-tag-destroy/{id}', [AgencyTagController::class, 'destroy']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
 
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {
-
-});
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {});
