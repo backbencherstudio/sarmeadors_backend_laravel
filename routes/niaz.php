@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Agency\ClientChecklistController;
 use App\Http\Controllers\Agency\ClientLocationController;
 use App\Http\Controllers\Agency\ClientTypeController;
 use Illuminate\Http\Request;
@@ -36,6 +37,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
     Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
 
+    //client checklist management route
+    Route::get('client-checklist', [ClientChecklistController::class, 'index']);
+    Route::get('client-checklist/{id}', [ClientChecklistController::class, 'show']);
+    Route::post('client-checklist-store', [ClientChecklistController::class, 'store']);
+    Route::put('client-checklist-update/{id}', [ClientChecklistController::class, 'update']);
+    Route::put('client-checklist-bulk-update', [ClientChecklistController::class, 'bulkUpdate']);
+    Route::delete('client-checklist-destroy/{id}', [ClientChecklistController::class, 'destroy']);
+
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
@@ -55,6 +64,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('client-location-update/{id}', [ClientLocationController::class, 'update']);
     Route::put('client-location-bulk-update', [ClientLocationController::class, 'bulkUpdate']);
     Route::delete('client-location-destroy/{id}', [ClientLocationController::class, 'destroy']);
+
+    //client checklist management route
+    Route::get('client-checklist', [ClientChecklistController::class, 'index']);
+    Route::get('client-checklist/{id}', [ClientChecklistController::class, 'show']);
+    Route::post('client-checklist-store', [ClientChecklistController::class, 'store']);
+    Route::put('client-checklist-update/{id}', [ClientChecklistController::class, 'update']);
+    Route::put('client-checklist-bulk-update', [ClientChecklistController::class, 'bulkUpdate']);
+    Route::delete('client-checklist-destroy/{id}', [ClientChecklistController::class, 'destroy']);
 
 });
 
