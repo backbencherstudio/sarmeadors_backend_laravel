@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientLocation;
+use App\Models\AgencyLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class ClientLocationController extends Controller
+class AgencyLocationController extends Controller
 {
     public function index(Request $request)
     {
@@ -16,24 +16,24 @@ class ClientLocationController extends Controller
 
         $search = $request->query('search');
 
-        $clientLocations = ClientLocation::where('agency_id', auth('api')->user()->agency_id)
+        $agencyLocations = AgencyLocation::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('location', 'like', '%' . $search . '%');
             })->latest()->paginate($perPage);
 
-        $clientLocations->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyLocations->appends(['search' => $search, 'per_page' => $perPage]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Client locations retrieved successfully',
-            'data' => $clientLocations->items(),
+            'message' => 'Agency locations retrieved successfully',
+            'data' => $agencyLocations->items(),
             'meta' => [
-                'current_page' => $clientLocations->currentPage(),
-                'last_page' => $clientLocations->lastPage(),
-                'per_page' => $clientLocations->perPage(),
-                'total' => $clientLocations->total(),
-                'next_page_url' => $clientLocations->nextPageUrl(),
-                'prev_page_url' => $clientLocations->previousPageUrl(),
+                'current_page' => $agencyLocations->currentPage(),
+                'last_page' => $agencyLocations->lastPage(),
+                'per_page' => $agencyLocations->perPage(),
+                'total' => $agencyLocations->total(),
+                'next_page_url' => $agencyLocations->nextPageUrl(),
+                'prev_page_url' => $agencyLocations->previousPageUrl(),
             ]
         ], 200);
     }
@@ -42,20 +42,20 @@ class ClientLocationController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientLocation = ClientLocation::where('id', $id)
+        $agencyLocation = AgencyLocation::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientLocation) {
+        if (!$agencyLocation) {
             return response()->json([
                 'status' => false,
-                'message' => 'Client location not found or unauthorized'
+                'message' => 'Agency location not found or unauthorized'
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $clientLocation
+            'data' => $agencyLocation
         ], 200);
     }
 
@@ -85,7 +85,7 @@ class ClientLocationController extends Controller
             ], 422);
         }
 
-        $existingLocations = ClientLocation::where('agency_id', $agencyId)
+        $existingLocations = AgencyLocation::where('agency_id', $agencyId)
             ->whereIn('location', $locations->all())
             ->pluck('location')
             ->toArray();
@@ -108,9 +108,9 @@ class ClientLocationController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        ClientLocation::insert($rows);
+        AgencyLocation::insert($rows);
 
-        $created = ClientLocation::where('agency_id', $agencyId)
+        $created = AgencyLocation::where('agency_id', $agencyId)
             ->whereIn('location', $locations->all())
             ->orderBy('id')
             ->get()
@@ -122,7 +122,7 @@ class ClientLocationController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client locations created successfully',
+            'message' => 'Agency locations created successfully',
             'data' => $created,
         ], 201);
     }
@@ -131,11 +131,11 @@ class ClientLocationController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientLocation = ClientLocation::where('id', $id)
+        $agencyLocation = AgencyLocation::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientLocation) {
+        if (!$agencyLocation) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -144,17 +144,17 @@ class ClientLocationController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('client_locations')->ignore($clientLocation->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('agency_locations')->ignore($agencyLocation->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
 
-        $clientLocation->update($request->only('location', 'status'));
+        $agencyLocation->update($request->only('location', 'status'));
 
         return response()->json([
             'status' => true,
-            'message' => 'Client location updated successfully',
-            'data' => $clientLocation
+            'message' => 'Agency location updated successfully',
+            'data' => $agencyLocation
         ], 200);
     }
 
@@ -183,22 +183,22 @@ class ClientLocationController extends Controller
         $ids = $updates->pluck('id')->all();
         $locations = $updates->pluck('location')->all();
 
-        $clientLocations = ClientLocation::where('agency_id', $agencyId)
+        $agencyLocations = AgencyLocation::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
 
-        if ($clientLocations->count() !== count($ids)) {
-            $missingIds = collect($ids)->diff($clientLocations->keys())->values()->all();
+        if ($agencyLocations->count() !== count($ids)) {
+            $missingIds = collect($ids)->diff($agencyLocations->keys())->values()->all();
 
             return response()->json([
                 'status' => false,
-                'message' => 'Some client locations were not found or unauthorized.',
+                'message' => 'Some Agency locations were not found or unauthorized.',
                 'missing_ids' => $missingIds
             ], 404);
         }
 
-        $locationConflicts = ClientLocation::where('agency_id', $agencyId)
+        $locationConflicts = AgencyLocation::where('agency_id', $agencyId)
             ->whereIn('location', $locations)
             ->whereNotIn('id', $ids)
             ->pluck('location')
@@ -212,19 +212,19 @@ class ClientLocationController extends Controller
             ], 422);
         }
 
-        $updated = DB::transaction(function () use ($updates, $clientLocations) {
+        $updated = DB::transaction(function () use ($updates, $agencyLocations) {
             $result = [];
 
             foreach ($updates as $item) {
-                $clientLocation = $clientLocations[$item['id']];
+                $agencyLocation = $agencyLocations[$item['id']];
 
                 $payload = ['location' => $item['location']];
                 if (array_key_exists('status', $item)) {
                     $payload['status'] = $item['status'];
                 }
 
-                $clientLocation->update($payload);
-                $result[] = $clientLocation->fresh();
+                $agencyLocation->update($payload);
+                $result[] = $agencyLocation->fresh();
             }
 
             return $result;
@@ -232,23 +232,23 @@ class ClientLocationController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client locations updated successfully',
+            'message' => 'Agency locations updated successfully',
             'data' => $updated
         ], 200);
     }
 
     public function destroy($id)
     {
-        $clientLocation = ClientLocation::where('id', $id)
+        $agencyLocation = AgencyLocation::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$clientLocation) {
+        if (!$agencyLocation) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
-        $clientLocation->delete();
+        $agencyLocation->delete();
 
-        return response()->json(['message' => 'Client location deleted successfully']);
+        return response()->json(['message' => 'Agency location deleted successfully']);
     }
 }

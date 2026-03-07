@@ -3,37 +3,38 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientType;
+use App\Models\AgencyTag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class ClientTypeController extends Controller
+class AgencyTagController extends Controller
 {
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
-
         $search = $request->query('search');
 
-        $clientTypes = ClientType::where('agency_id', auth('api')->user()->agency_id)
+        $agencyTag = AgencyTag::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
-            })->latest()->paginate($perPage);
+            })
+            ->latest()
+            ->paginate($perPage);
 
-        $clientTypes->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyTag->appends(['search' => $search, 'per_page' => $perPage]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Client types retrieved successfully',
-            'data' => $clientTypes->items(),
+            'message' => 'Agency tags retrieved successfully',
+            'data' => $agencyTag->items(),
             'meta' => [
-                'current_page' => $clientTypes->currentPage(),
-                'last_page' => $clientTypes->lastPage(),
-                'per_page' => $clientTypes->perPage(),
-                'total' => $clientTypes->total(),
-                'next_page_url' => $clientTypes->nextPageUrl(),
-                'prev_page_url' => $clientTypes->previousPageUrl(),
+                'current_page' => $agencyTag->currentPage(),
+                'last_page' => $agencyTag->lastPage(),
+                'per_page' => $agencyTag->perPage(),
+                'total' => $agencyTag->total(),
+                'next_page_url' => $agencyTag->nextPageUrl(),
+                'prev_page_url' => $agencyTag->previousPageUrl(),
             ]
         ], 200);
     }
@@ -42,20 +43,20 @@ class ClientTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientType = ClientType::where('id', $id)
+        $agencyTag = AgencyTag::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientType) {
+        if (!$agencyTag) {
             return response()->json([
                 'status' => false,
-                'message' => 'Client type not found or unauthorized'
+                'message' => 'Agency tag not found or unauthorized'
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $clientType
+            'data' => $agencyTag
         ], 200);
     }
 
@@ -81,11 +82,11 @@ class ClientTypeController extends Controller
         if ($names->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one name using "name" or "names".'
+                'message' => 'Please provide at least one tag using "name" or "names".'
             ], 422);
         }
 
-        $existingNames = ClientType::where('agency_id', $agencyId)
+        $existingNames = AgencyTag::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -93,7 +94,7 @@ class ClientTypeController extends Controller
         if (!empty($existingNames)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Some names already exist.',
+                'message' => 'Some tag already exist.',
                 'duplicates' => $existingNames
             ], 422);
         }
@@ -108,9 +109,9 @@ class ClientTypeController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        ClientType::insert($rows);
+        AgencyTag::insert($rows);
 
-        $created = ClientType::where('agency_id', $agencyId)
+        $created = AgencyTag::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -122,7 +123,7 @@ class ClientTypeController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client types created successfully',
+            'message' => 'Agency tag created successfully',
             'data' => $created,
         ], 201);
     }
@@ -131,11 +132,11 @@ class ClientTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $clientType = ClientType::where('id', $id)
+        $agencyTag = AgencyTag::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$clientType) {
+        if (!$agencyTag) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -144,17 +145,17 @@ class ClientTypeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('client_types')->ignore($clientType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('agency_check_lists')->ignore($agencyTag->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
 
-        $clientType->update($request->only('name', 'status'));
+        $agencyTag->update($request->only('name', 'status'));
 
         return response()->json([
             'status' => true,
-            'message' => 'Client type updated successfully',
-            'data' => $clientType
+            'message' => 'Agency tag updated successfully',
+            'data' => $agencyTag
         ], 200);
     }
 
@@ -183,22 +184,22 @@ class ClientTypeController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $clientTypes = ClientType::where('agency_id', $agencyId)
+        $agencyTags = AgencyTag::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
 
-        if ($clientTypes->count() !== count($ids)) {
-            $missingIds = collect($ids)->diff($clientTypes->keys())->values()->all();
+        if ($agencyTags->count() !== count($ids)) {
+            $missingIds = collect($ids)->diff($agencyTags->keys())->values()->all();
 
             return response()->json([
                 'status' => false,
-                'message' => 'Some client types were not found or unauthorized.',
+                'message' => 'Some agency tag were not found or unauthorized.',
                 'missing_ids' => $missingIds
             ], 404);
         }
 
-        $nameConflicts = ClientType::where('agency_id', $agencyId)
+        $nameConflicts = AgencyTag::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -207,24 +208,24 @@ class ClientTypeController extends Controller
         if (!empty($nameConflicts)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Some names already exist.',
+                'message' => 'Some checklist already exist.',
                 'duplicates' => $nameConflicts
             ], 422);
         }
 
-        $updated = DB::transaction(function () use ($updates, $clientTypes) {
+        $updated = DB::transaction(function () use ($updates, $agencyTags) {
             $result = [];
 
             foreach ($updates as $item) {
-                $clientType = $clientTypes[$item['id']];
+                $agencyTag = $agencyTags[$item['id']];
 
                 $payload = ['name' => $item['name']];
                 if (array_key_exists('status', $item)) {
                     $payload['status'] = $item['status'];
                 }
 
-                $clientType->update($payload);
-                $result[] = $clientType->fresh();
+                $agencyTag->update($payload);
+                $result[] = $agencyTag->fresh();
             }
 
             return $result;
@@ -232,23 +233,23 @@ class ClientTypeController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Client types updated successfully',
+            'message' => 'Agency tag updated successfully',
             'data' => $updated
         ], 200);
     }
 
     public function destroy($id)
     {
-        $clientType = ClientType::where('id', $id)
+        $agencyTag = AgencyTag::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$clientType) {
+        if (!$agencyTag) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
-        $clientType->delete();
+        $agencyTag->delete();
 
-        return response()->json(['message' => 'Client type deleted successfully']);
+        return response()->json(['message' => 'Agency tag deleted successfully']);
     }
 }
