@@ -213,7 +213,7 @@ class RolePermissionSeeder extends Seeder
         //     );
         // }
 
-        $roles = ['Super Admin','Admin Staff', 'Agency Admin','Agency Staff', 'Client', 'Candidate'];
+        $roles = ['super_admin','admin_staff', 'agency_admin','agency_staff', 'client', 'candidate'];
 
         foreach ($roles as $role) {
             Role::firstOrCreate([

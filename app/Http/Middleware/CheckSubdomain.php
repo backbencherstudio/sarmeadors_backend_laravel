@@ -13,7 +13,7 @@ class CheckSubdomain
     {
         $user = auth('api')->user();
 
-        if ($user && ($user->hasRole('Super Admin') || $user->hasRole('Admin Staff'))) {
+        if ($user && ($user->hasRole('super_admin') || $user->hasRole('admin_staff'))) {
             return $next($request);
         }
 
@@ -21,7 +21,7 @@ class CheckSubdomain
             $email = $request->input('email');
             if ($email) {
                 $loginUser = User::where('email', $email)->first();
-                if ($loginUser && ($loginUser->hasRole('Super Admin') || $loginUser->hasRole('Admin Staff'))) {
+                if ($loginUser && ($loginUser->hasRole('super_admin') || $loginUser->hasRole('admin_staff'))) {
                     return $next($request);
                 }
             }
