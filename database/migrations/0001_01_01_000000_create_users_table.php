@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('mobile',20)->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('agency_id',10);
+            $table->foreignId('agency_id')->index();
             $table->rememberToken();
             $table->timestamps();
         });
