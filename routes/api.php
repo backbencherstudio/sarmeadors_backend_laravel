@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ClientStatusController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 
 
@@ -58,6 +59,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
+
+    //Client Status
+    Route::get('/client-statuses', [ClientStatusController::class, 'index']);
+    Route::post('/client-status-store', [ClientStatusController::class, 'store']);
+    Route::get('/client-status-edit/{id}', [ClientStatusController::class, 'edit']);
+    Route::put('/client-status-update/{id}', [ClientStatusController::class, 'update']);
+    Route::patch('/client-status-serial-update/{id}', [ClientStatusController::class, 'serial']);
+    Route::delete('/client-status-delete/{id}', [ClientStatusController::class, 'destroy']);
 
 });
 
