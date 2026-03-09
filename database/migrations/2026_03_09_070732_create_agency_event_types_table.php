@@ -13,7 +13,11 @@ return new class extends Migration
     {
         Schema::create('agency_event_types', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
+            $table->string('name');
+            $table->tinyInteger('status')->default(1);
             $table->timestamps();
+            $table->unique(['agency_id', 'name']);
         });
     }
 
