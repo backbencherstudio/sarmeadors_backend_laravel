@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Agency\AgencyChecklistController;
+use App\Http\Controllers\Agency\AgencyEventController;
 use App\Http\Controllers\Agency\AgencyEventTypeController;
 use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyTagController;
@@ -56,6 +57,13 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::put('agency-event-type-update/{id}', [AgencyEventTypeController::class, 'update']);
     Route::put('agency-event-type-bulk-update', [AgencyEventTypeController::class, 'bulkUpdate']);
     Route::delete('agency-event-type-destroy/{id}', [AgencyEventTypeController::class, 'destroy']);
+
+    //agency event management route
+    Route::get('events', [AgencyEventController::class, 'index']);
+    Route::post('events', [AgencyEventController::class, 'store']);
+    Route::get('events/{id}', [AgencyEventController::class, 'show']);
+    Route::put('events/{id}', [AgencyEventController::class, 'update']);
+    Route::delete('events/{id}', [AgencyEventController::class, 'destroy']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
@@ -91,6 +99,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('agency-tag-update/{id}', [AgencyTagController::class, 'update']);
     Route::put('agency-tag-bulk-update', [AgencyTagController::class, 'bulkUpdate']);
     Route::delete('agency-tag-destroy/{id}', [AgencyTagController::class, 'destroy']);
+
+    //agency event type management route
+    Route::get('agency-event-types', [AgencyEventTypeController::class, 'index']);
+    Route::get('agency-event-type/{id}', [AgencyEventTypeController::class, 'show']);
+    Route::post('agency-event-type-store', [AgencyEventTypeController::class, 'store']);
+    Route::put('agency-event-type-update/{id}', [AgencyEventTypeController::class, 'update']);
+    Route::put('agency-event-type-bulk-update', [AgencyEventTypeController::class, 'bulkUpdate']);
+    Route::delete('agency-event-type-destroy/{id}', [AgencyEventTypeController::class, 'destroy']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
