@@ -60,6 +60,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
 
+    Route::post('info-update', [AgencyController::class, 'infoUpdate']);
+
     //Client Status
     Route::get('/client-statuses', [ClientStatusController::class, 'index']);
     Route::post('/client-status-store', [ClientStatusController::class, 'store']);

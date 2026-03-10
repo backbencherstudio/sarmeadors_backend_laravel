@@ -17,6 +17,7 @@ class Agency extends Model
         'subdomain_prefix',
         'email',
         'phone',
+        'address',
         'logo',
         'primary_color',
         'secondary_color',

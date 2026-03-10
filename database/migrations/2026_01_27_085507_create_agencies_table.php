@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('subdomain_prefix', 50)->unique();
             $table->string('email',100)->nullable();
             $table->string('phone',20)->nullable();
+            $table->text('address',1000)->nullable();
             $table->string('logo',255)->nullable();
             $table->string('primary_color',50)->nullable();
             $table->string('secondary_color',50)->nullable();

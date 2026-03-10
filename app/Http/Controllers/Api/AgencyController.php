@@ -34,6 +34,7 @@ class AgencyController extends Controller
             'last_name'  => 'nullable|string|max:100',
             'email'      => 'required|email|unique:users,email',
             'phone'      => 'nullable|string|max:20',
+            'address'    => 'nullable|string|max:1000',
             'password'   => 'required|min:6|confirmed',
             'subdomain'  => 'required|string|unique:agencies,subdomain',
         ]);
@@ -60,6 +61,7 @@ class AgencyController extends Controller
                 'last_name'         => $data['last_name'] ?? null,
                 'email'             => $data['email'],
                 'phone'             => $data['phone'] ?? null,
+                'address'           => $data['address'] ?? null,
                 'subdomain'         => $data['subdomain'],
                 'subdomain_prefix'  => $prefix,
                 'status'            => 1,
@@ -132,6 +134,7 @@ class AgencyController extends Controller
                 'last_name'  => 'nullable|string|max:100',
                 'email'      => ['required','email', Rule::unique('users', 'email')->ignore($user->id), ],
                 'phone'      => 'nullable|string|max:20',
+                'address'    => 'nullable|string|max:1000',
                 'password'   => 'nullable|min:6|confirmed',
                 'subdomain'  => ['required','string', Rule::unique('agencies', 'subdomain')->ignore($agency->id), ],
             ]);
@@ -154,6 +157,7 @@ class AgencyController extends Controller
                 'last_name'        => $data['last_name'] ?? null,
                 'email'            => $data['email'],
                 'phone'            => $data['phone'] ?? null,
+                'address'          => $data['address'] ?? null,
                 'subdomain'        => $data['subdomain'],
                 'subdomain_prefix' => $prefix,
             ]);
@@ -238,6 +242,50 @@ class AgencyController extends Controller
                 'error'   => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function infoUpdate(Request $request)
+    {
+        $authUser = auth('api')->user();
+        $agency = $authUser->agency;
+
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'required|string|max:100',
+            'last_name'  => 'nullable|string|max:100',
+            'email'      => ['required','email', Rule::unique('users', 'email')->ignore($authUser->id), ],
+            'phone'      => 'nullable|string|max:20',
+            'address'    => 'nullable|string|max:1000',
+            'password'   => 'nullable|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation failed',
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        $agency->update([
+            'first_name' => $data['first_name'],
+            'last_name'  => $data['last_name'] ?? null,
+            'email'      => $data['email'],
+            'phone'      => $data['phone'] ?? null,
+            'address'    => $data['address'] ?? null,
+        ]);
+
+        if (!empty($data['password'])) {
+            $authUser->update([
+                'password' => Hash::make($data['password'])
+            ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency information updated successfully'
+        ]);
     }
 
 }
