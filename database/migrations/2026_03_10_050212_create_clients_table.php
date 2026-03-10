@@ -18,14 +18,15 @@ return new class extends Migration
 
             $table->string('first_name');
             $table->string('last_name')->nullable();
-            $table->string('email')->nullable();
-            $table->string('mobile');
+            $table->string('email')->unique();
+            $table->string('mobile')->nullable();
+            $table->text('address')->nullable();
 
-            $table->string('user_type')->nullable();
-            $table->unsignedBigInteger('type_id')->nullable();
-            $table->unsignedBigInteger('location_id')->nullable();
-            $table->unsignedBigInteger('checklist_id')->nullable();
-            $table->unsignedBigInteger('tag_id')->nullable();
+            $table->json('type_id')->nullable();
+            $table->json('location_id')->nullable();
+            $table->json('checklist_id')->nullable();
+            $table->json('tag_id')->nullable();
+            $table->json('status_id')->nullable();
 
             $table->timestamps();
         });

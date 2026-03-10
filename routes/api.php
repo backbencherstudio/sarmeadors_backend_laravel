@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Agency\ClientController;
+use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Api\AgencyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -7,6 +9,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientStatusController;
 use App\Http\Controllers\Api\ForgotPasswordController;
+use App\Http\Controllers\Agency\FormFieldController;
 
 
 Route::get('/login', function () {
@@ -69,6 +72,17 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('/client-status-update/{id}', [ClientStatusController::class, 'update']);
     Route::patch('/client-status-serial-update/{id}', [ClientStatusController::class, 'serial']);
     Route::delete('/client-status-delete/{id}', [ClientStatusController::class, 'destroy']);
+
+    //Form
+    Route::post('/forms', [FormController::class, 'store']);
+    Route::post('/form-fields', [FormFieldController::class, 'store']);
+
+    Route::post('/form-fields/reorder',[FormFieldController::class,'reorder']);
+    Route::get('/forms/{slug}',[FormController::class,'show']);
+
+    //Client Registration
+    Route::post('/clients',[ClientController::class,'store']);
+    Route::get('/clients/{id}',[ClientController::class,'show']);
 
 });
 
