@@ -6,12 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Form extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'agency_id',
+        'name',
+        'slug',
+        'entity',
+        'status'
+    ];
 
     public function fields()
     {
-        return $this->hasMany(FormField::class)
-            ->orderBy('serial');
+        return $this->hasMany(FormField::class)->orderBy('serial');
     }
 
     public function submissions()

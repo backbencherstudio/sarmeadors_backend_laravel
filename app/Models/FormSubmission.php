@@ -6,11 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class FormSubmission extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'form_id',
+        'entity_id'
+    ];
 
     public function values()
     {
-        return $this->hasMany(FormFieldValue::class,'submission_id');
+        return $this->hasMany(FormFieldValue::class, 'submission_id');
     }
 
     public function form()
