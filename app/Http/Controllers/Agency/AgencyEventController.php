@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyEvent;
+use App\Models\Event;
 use Illuminate\Http\Request;
 
 class AgencyEventController extends Controller
@@ -15,7 +15,7 @@ class AgencyEventController extends Controller
         $search = $request->query('search');
 
         // $events = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
-        $events = AgencyEvent::with(['eventType', 'assignedUser'])
+        $events = Event::with(['eventType', 'assignedUser'])
             ->where('agency_id', $agencyId)
             ->when($search, function ($query, $search) {
                 return $query->where('event_title', 'like', '%' . $search . '%');
@@ -42,7 +42,7 @@ class AgencyEventController extends Controller
 
         $request->validate([
             'event_title'    => 'required|string|max:255',
-            'event_type_id'  => 'required|exists:agency_event_types,id',
+            'event_type_id'  => 'required|exists:event_types,id',
             'event_date'     => 'required|date',
             'event_time'     => 'required',
             'event_time_zone' => 'required|string',
@@ -71,15 +71,12 @@ class AgencyEventController extends Controller
             if ($request->filled('client_id')) {
                 // $client = Client::find($request->client_id);
                 // $location = $client?->address; // assuming 'address' column exists
-            } elseif ($request->filled('candidate_id')) {
-                // $candidate = Candidate::find($request->candidate_id);
-                // $location = $candidate?->address;
             }
         }
 
         $formattedTime = date("H:i:s", strtotime($request->event_time));
 
-        $event = AgencyEvent::create([
+        $event = Event::create([
             'agency_id'       => $agencyId,
             'event_type_id'   => $request->event_type_id,
             'event_title'     => $request->event_title,
@@ -108,7 +105,7 @@ class AgencyEventController extends Controller
         $agencyId = auth('api')->user()->agency_id;
 
         // $event = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
-        $event = AgencyEvent::with(['eventType', 'assignedUser'])
+        $event = Event::with(['eventType', 'assignedUser'])
             ->where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
@@ -124,7 +121,7 @@ class AgencyEventController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $event = AgencyEvent::where('id', $id)->where('agency_id', $agencyId)->first();
+        $event = Event::where('id', $id)->where('agency_id', $agencyId)->first();
 
         if (!$event) {
             return response()->json(['status' => false, 'message' => 'Event not found'], 404);
@@ -132,7 +129,7 @@ class AgencyEventController extends Controller
 
         $request->validate([
             'event_title'    => 'required|string|max:255',
-            'event_type_id'  => 'required|exists:agency_event_types,id',
+            'event_type_id'  => 'required|exists:event_types,id',
             'event_date'     => 'required|date',
             'event_time'     => 'required',
             'event_time_zone' => 'required|string',
@@ -162,8 +159,6 @@ class AgencyEventController extends Controller
 
             if ($clientId) {
                 // $data['location'] = Client::find($clientId)?->address;
-            } elseif ($candidateId) {
-                // $data['location'] = Candidate::find($candidateId)?->address;
             }
         */
         }
@@ -182,7 +177,7 @@ class AgencyEventController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $event = AgencyEvent::where('id', $id)->where('agency_id', $agencyId)->first();
+        $event = Event::where('id', $id)->where('agency_id', $agencyId)->first();
 
         if (!$event) {
             return response()->json(['status' => false, 'message' => 'Event not found'], 404);

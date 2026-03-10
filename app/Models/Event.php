@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AgencyEvent extends Model
+class Event extends Model
 {
     protected $fillable = [
         'agency_id',
@@ -24,7 +24,7 @@ class AgencyEvent extends Model
 
     public function eventType()
     {
-        return $this->belongsTo(AgencyEventType::class, 'event_type_id');
+        return $this->belongsTo(EventType::class, 'event_type_id');
     }
 
     // public function client() {

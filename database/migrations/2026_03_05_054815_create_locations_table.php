@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('agency_tags', function (Blueprint $table) {
+        Schema::create('locations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
+            $table->string('location');
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
-            $table->unique(['agency_id', 'name']);
+            $table->unique(['agency_id', 'location']);
         });
     }
 
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('agency_tags');
+        Schema::dropIfExists('locations');
     }
 };

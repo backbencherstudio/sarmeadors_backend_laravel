@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('agency_events', function (Blueprint $table) {
+        Schema::create('events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('event_type_id')->constrained('agency_event_types')->cascadeOnDelete();
+            $table->foreignId('event_type_id')->constrained('event_types')->cascadeOnDelete();
 
             $table->string('event_title');
             $table->date('event_date');
@@ -43,6 +43,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('agency_events');
+        Schema::dropIfExists('events');
     }
 };

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyTag;
+use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,7 +15,7 @@ class AgencyTagController extends Controller
         $perPage = $request->query('per_page', 10);
         $search = $request->query('search');
 
-        $agencyTag = AgencyTag::where('agency_id', auth('api')->user()->agency_id)
+        $agencyTag = Tag::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
             })
@@ -43,7 +43,7 @@ class AgencyTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyTag = AgencyTag::where('id', $id)
+        $agencyTag = Tag::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -86,7 +86,7 @@ class AgencyTagController extends Controller
             ], 422);
         }
 
-        $existingNames = AgencyTag::where('agency_id', $agencyId)
+        $existingNames = Tag::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -109,9 +109,9 @@ class AgencyTagController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        AgencyTag::insert($rows);
+        Tag::insert($rows);
 
-        $created = AgencyTag::where('agency_id', $agencyId)
+        $created = Tag::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -132,7 +132,7 @@ class AgencyTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyTag = AgencyTag::where('id', $id)
+        $agencyTag = Tag::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -145,7 +145,7 @@ class AgencyTagController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_check_lists')->ignore($agencyTag->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('check_lists')->ignore($agencyTag->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -184,7 +184,7 @@ class AgencyTagController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyTags = AgencyTag::where('agency_id', $agencyId)
+        $agencyTags = Tag::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -199,7 +199,7 @@ class AgencyTagController extends Controller
             ], 404);
         }
 
-        $nameConflicts = AgencyTag::where('agency_id', $agencyId)
+        $nameConflicts = Tag::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -240,7 +240,7 @@ class AgencyTagController extends Controller
 
     public function destroy($id)
     {
-        $agencyTag = AgencyTag::where('id', $id)
+        $agencyTag = Tag::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 

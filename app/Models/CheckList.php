@@ -5,13 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class AgencyLocation extends Model
+class CheckList extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'agency_id',
-        'location',
+        'name',
+        'type',
         'status',
     ];
 

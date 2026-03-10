@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('agency_check_lists', function (Blueprint $table) {
+        Schema::create('types', function (Blueprint $table) {
             $table->id();
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
             $table->string('name');
+            $table->string('type');
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
             $table->unique(['agency_id', 'name']);
@@ -26,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('agency_check_lists');
+        Schema::dropIfExists('types');
     }
 };

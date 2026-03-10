@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyEventType;
+use App\Models\EventType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,7 +16,7 @@ class AgencyEventTypeController extends Controller
 
         $search = $request->query('search');
 
-        $agencyEventTypes = AgencyEventType::where('agency_id', auth('api')->user()->agency_id)
+        $agencyEventTypes = EventType::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
             })->latest()->paginate($perPage);
@@ -42,7 +42,7 @@ class AgencyEventTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyEventType = AgencyEventType::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -85,7 +85,7 @@ class AgencyEventTypeController extends Controller
             ], 422);
         }
 
-        $existingNames = AgencyEventType::where('agency_id', $agencyId)
+        $existingNames = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -108,9 +108,9 @@ class AgencyEventTypeController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        AgencyEventType::insert($rows);
+        EventType::insert($rows);
 
-        $created = AgencyEventType::where('agency_id', $agencyId)
+        $created = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -131,7 +131,7 @@ class AgencyEventTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyEventType = AgencyEventType::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -144,7 +144,7 @@ class AgencyEventTypeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_event_types')->ignore($agencyEventType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('event_types')->ignore($agencyEventType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -183,7 +183,7 @@ class AgencyEventTypeController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyEventTypes = AgencyEventType::where('agency_id', $agencyId)
+        $agencyEventTypes = EventType::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -198,7 +198,7 @@ class AgencyEventTypeController extends Controller
             ], 404);
         }
 
-        $nameConflicts = AgencyEventType::where('agency_id', $agencyId)
+        $nameConflicts = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -239,7 +239,7 @@ class AgencyEventTypeController extends Controller
 
     public function destroy($id)
     {
-        $agencyEventType = AgencyEventType::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 

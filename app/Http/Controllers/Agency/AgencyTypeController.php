@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyType;
+use App\Models\Type;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,7 +16,7 @@ class AgencyTypeController extends Controller
 
         $search = $request->query('search');
 
-        $agencyTypes = AgencyType::where('agency_id', auth('api')->user()->agency_id)
+        $agencyTypes = Type::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
             })->latest()->paginate($perPage);
@@ -42,7 +42,7 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -85,7 +85,7 @@ class AgencyTypeController extends Controller
             ], 422);
         }
 
-        $existingNames = AgencyType::where('agency_id', $agencyId)
+        $existingNames = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -108,9 +108,9 @@ class AgencyTypeController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        AgencyType::insert($rows);
+        Type::insert($rows);
 
-        $created = AgencyType::where('agency_id', $agencyId)
+        $created = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -131,7 +131,7 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -144,7 +144,7 @@ class AgencyTypeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_types')->ignore($agencyType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('types')->ignore($agencyType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -183,7 +183,7 @@ class AgencyTypeController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyTypes = AgencyType::where('agency_id', $agencyId)
+        $agencyTypes = Type::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -198,7 +198,7 @@ class AgencyTypeController extends Controller
             ], 404);
         }
 
-        $nameConflicts = AgencyType::where('agency_id', $agencyId)
+        $nameConflicts = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -239,7 +239,7 @@ class AgencyTypeController extends Controller
 
     public function destroy($id)
     {
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
