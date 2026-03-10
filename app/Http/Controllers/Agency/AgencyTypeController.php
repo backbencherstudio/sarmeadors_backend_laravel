@@ -15,13 +15,29 @@ class AgencyTypeController extends Controller
         $perPage = $request->query('per_page', 10);
 
         $search = $request->query('search');
+        $type = $request->query('type');
+
+        if (!is_null($type)) {
+            $type = is_string($type) ? strtolower(trim($type)) : $type;
+            if (!in_array($type, ['candidate', 'client'], true)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid type. Allowed: candidate, client.',
+                ], 422);
+            }
+        }
 
         $agencyTypes = Type::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
-            })->latest()->paginate($perPage);
+            })
+            ->when($type, function ($query, $type) {
+                return $query->where('type', $type);
+            })
+            ->latest()
+            ->paginate($perPage);
 
-        $agencyTypes->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyTypes->appends(['search' => $search, 'per_page' => $perPage, 'type' => $type]);
 
         return response()->json([
             'status' => true,
@@ -63,10 +79,16 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
+        // If frontend doesn't send it, default to candidate.
+        $requestType = $request->input('type', 'candidate');
+        $requestType = is_string($requestType) ? strtolower(trim($requestType)) : $requestType;
+        $request->merge(['type' => $requestType]);
+
         $request->validate([
             'name' => 'nullable|string|max:255|required_without:names',
             'names' => 'nullable|array|min:1|required_without:name',
             'names.*' => 'required|string|max:255|distinct',
+            'type' => ['required', 'string', Rule::in(['candidate', 'client'])],
             'status' => 'nullable|in:0,1',
         ]);
 
@@ -98,11 +120,13 @@ class AgencyTypeController extends Controller
             ], 422);
         }
 
+        $type = $request->input('type');
         $status = $request->status ?? 1;
         $now = now();
         $rows = $names->map(fn($name) => [
             'agency_id' => $agencyId,
             'name' => $name,
+            'type' => $type,
             'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
