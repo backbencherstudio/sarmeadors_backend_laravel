@@ -60,10 +60,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
 
     //agency event management route
     Route::get('events', [AgencyEventController::class, 'index']);
-    Route::post('events', [AgencyEventController::class, 'store']);
-    Route::get('events/{id}', [AgencyEventController::class, 'show']);
-    Route::put('events/{id}', [AgencyEventController::class, 'update']);
-    Route::delete('events/{id}', [AgencyEventController::class, 'destroy']);
+    Route::post('event-store', [AgencyEventController::class, 'store']);
+    Route::get('event-show/{id}', [AgencyEventController::class, 'show']);
+    Route::put('event-update/{id}', [AgencyEventController::class, 'update']);
+    Route::delete('event-destroy/{id}', [AgencyEventController::class, 'destroy']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {

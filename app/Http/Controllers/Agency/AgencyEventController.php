@@ -14,7 +14,8 @@ class AgencyEventController extends Controller
         $perPage = $request->query('per_page', 10);
         $search = $request->query('search');
 
-        $events = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
+        // $events = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
+        $events = AgencyEvent::with(['eventType', 'assignedUser'])
             ->where('agency_id', $agencyId)
             ->when($search, function ($query, $search) {
                 return $query->where('event_title', 'like', '%' . $search . '%');
@@ -35,9 +36,6 @@ class AgencyEventController extends Controller
         ], 200);
     }
 
-    /**
-     * Store a newly created event.
-     */
     public function store(Request $request)
     {
         $agencyId = auth('api')->user()->agency_id;
@@ -48,10 +46,14 @@ class AgencyEventController extends Controller
             'event_date'     => 'required|date',
             'event_time'     => 'required',
             'event_time_zone' => 'required|string',
-            'client_id'      => 'nullable|exists:clients,id',
-            'candidate_id'   => 'nullable|exists:candidates,id',
+            // 'client_id'      => 'nullable|exists:clients,id',
+            // 'candidate_id'   => 'nullable|exists:candidates,id',
+
+            'client_id'      => 'nullable|integer',
+            'candidate_id'   => 'nullable|integer',
+
             'location'       => 'nullable|string|max:255',
-            'interview_link' => 'nullable|url',
+            'interview_link' => 'nullable|string',
             'note'           => 'nullable|string',
             'is_email_notify' => 'boolean',
             'assign_user_id' => 'nullable|exists:users,id',
@@ -67,20 +69,22 @@ class AgencyEventController extends Controller
         // If location is empty, fetch from profile
         if (empty($location)) {
             if ($request->filled('client_id')) {
-                $client = Client::find($request->client_id);
-                $location = $client?->address; // assuming 'address' column exists
+                // $client = Client::find($request->client_id);
+                // $location = $client?->address; // assuming 'address' column exists
             } elseif ($request->filled('candidate_id')) {
-                $candidate = Candidate::find($request->candidate_id);
-                $location = $candidate?->address;
+                // $candidate = Candidate::find($request->candidate_id);
+                // $location = $candidate?->address;
             }
         }
+
+        $formattedTime = date("H:i:s", strtotime($request->event_time));
 
         $event = AgencyEvent::create([
             'agency_id'       => $agencyId,
             'event_type_id'   => $request->event_type_id,
             'event_title'     => $request->event_title,
             'event_date'      => $request->event_date,
-            'event_time'      => $request->event_time,
+            'event_time'      => $formattedTime,
             'event_time_zone' => $request->event_time_zone,
             'client_id'       => $request->client_id,
             'candidate_id'    => $request->candidate_id,
@@ -94,18 +98,17 @@ class AgencyEventController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Event created successfully',
-            'data' => $event->load(['eventType', 'client', 'candidate', 'assignedUser'])
+            // 'data' => $event->load(['eventType', 'client', 'candidate', 'assignedUser'])
+            'data' => $event->load(['eventType', 'assignedUser'])
         ], 201);
     }
 
-    /**
-     * Display the specified event.
-     */
     public function show($id)
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $event = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
+        // $event = AgencyEvent::with(['eventType', 'client', 'candidate', 'assignedUser'])
+        $event = AgencyEvent::with(['eventType', 'assignedUser'])
             ->where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
@@ -117,9 +120,6 @@ class AgencyEventController extends Controller
         return response()->json(['status' => true, 'data' => $event], 200);
     }
 
-    /**
-     * Update the specified event.
-     */
     public function update(Request $request, $id)
     {
         $agencyId = auth('api')->user()->agency_id;
@@ -131,28 +131,41 @@ class AgencyEventController extends Controller
         }
 
         $request->validate([
-            'event_title'    => 'sometimes|required|string|max:255',
-            'event_type_id'  => 'sometimes|required|exists:agency_event_types,id',
-            'event_date'     => 'sometimes|required|date',
-            'event_time'     => 'sometimes|required',
-            'client_id'      => 'nullable|exists:clients,id',
-            'candidate_id'   => 'nullable|exists:candidates,id',
+            'event_title'    => 'required|string|max:255',
+            'event_type_id'  => 'required|exists:agency_event_types,id',
+            'event_date'     => 'required|date',
+            'event_time'     => 'required',
+            'event_time_zone' => 'required|string',
+            // 'client_id'      => 'nullable|exists:clients,id',
+            // 'candidate_id'   => 'nullable|exists:candidates,id',
+
+            'client_id'      => 'nullable|integer',
+            'candidate_id'   => 'nullable|integer',
+
             'location'       => 'nullable|string|max:255',
+            'interview_link' => 'nullable|string',
+            'note'           => 'nullable|string',
             'is_email_notify' => 'boolean',
+            'assign_user_id' => 'nullable|exists:users,id',
         ]);
 
         $data = $request->all();
 
-        // Location update logic: if location is passed as empty, try to refresh from profile
+        if ($request->filled('event_time')) {
+            $data['event_time'] = date("H:i:s", strtotime($request->event_time));
+        }
+
         if ($request->has('location') && empty($request->location)) {
+        /*
             $clientId = $request->client_id ?? $event->client_id;
             $candidateId = $request->candidate_id ?? $event->candidate_id;
 
             if ($clientId) {
-                $data['location'] = Client::find($clientId)?->address;
+                // $data['location'] = Client::find($clientId)?->address;
             } elseif ($candidateId) {
-                $data['location'] = Candidate::find($candidateId)?->address;
+                // $data['location'] = Candidate::find($candidateId)?->address;
             }
+        */
         }
 
         $event->update($data);
@@ -160,13 +173,11 @@ class AgencyEventController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Event updated successfully',
-            'data' => $event->fresh(['eventType', 'client', 'candidate', 'assignedUser'])
+            // 'data' => $event->fresh(['eventType', 'client', 'candidate', 'assignedUser'])
+            'data' => $event->fresh(['eventType', 'assignedUser'])
         ], 200);
     }
 
-    /**
-     * Remove the specified event.
-     */
     public function destroy($id)
     {
         $agencyId = auth('api')->user()->agency_id;

@@ -21,8 +21,11 @@ return new class extends Migration
             $table->time('event_time');
             $table->string('event_time_zone')->default('UTC');
 
-            $table->foreignId('client_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('candidate_id')->nullable()->constrained()->nullOnDelete();
+            // $table->foreignId('client_id')->nullable()->constrained()->nullOnDelete();
+            // $table->foreignId('candidate_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->unsignedBigInteger('client_id')->nullable();
+            $table->unsignedBigInteger('candidate_id')->nullable();
 
             $table->string('location')->nullable();
             $table->string('interview_link')->nullable();
