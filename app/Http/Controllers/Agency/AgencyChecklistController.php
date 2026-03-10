@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyCheckList;
+use App\Models\CheckList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -14,15 +14,29 @@ class AgencyChecklistController extends Controller
     {
         $perPage = $request->query('per_page', 10);
         $search = $request->query('search');
+        $type = $request->query('type');
 
-        $agencyCheckList = AgencyCheckList::where('agency_id', auth('api')->user()->agency_id)
+        if (!is_null($type)) {
+            $type = is_string($type) ? strtolower(trim($type)) : $type;
+            if (!in_array($type, ['candidate', 'client'], true)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid type. Allowed: candidate, client.',
+                ], 422);
+            }
+        }
+
+        $agencyCheckList = CheckList::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
+            })
+            ->when($type, function ($query, $type) {
+                return $query->where('type', $type);
             })
             ->latest()
             ->paginate($perPage);
 
-        $agencyCheckList->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyCheckList->appends(['search' => $search, 'per_page' => $perPage, 'type' => $type]);
 
         return response()->json([
             'status' => true,
@@ -43,7 +57,7 @@ class AgencyChecklistController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyCheckList = AgencyCheckList::where('id', $id)
+        $agencyCheckList = CheckList::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -64,10 +78,16 @@ class AgencyChecklistController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
+        // If frontend doesn't send it, default to candidate.
+        $requestType = $request->input('type', 'candidate');
+        $requestType = is_string($requestType) ? strtolower(trim($requestType)) : $requestType;
+        $request->merge(['type' => $requestType]);
+
         $request->validate([
             'name' => 'nullable|string|max:255|required_without:names',
             'names' => 'nullable|array|min:1|required_without:name',
             'names.*' => 'required|string|max:255|distinct',
+            'type' => ['required', 'string', Rule::in(['candidate', 'client'])],
             'status' => 'nullable|in:0,1',
         ]);
 
@@ -86,7 +106,7 @@ class AgencyChecklistController extends Controller
             ], 422);
         }
 
-        $existingNames = AgencyCheckList::where('agency_id', $agencyId)
+        $existingNames = CheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -99,19 +119,21 @@ class AgencyChecklistController extends Controller
             ], 422);
         }
 
+        $type = $request->input('type');
         $status = $request->status ?? 1;
         $now = now();
         $rows = $names->map(fn($name) => [
             'agency_id' => $agencyId,
             'name' => $name,
+            'type' => $type,
             'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
         ])->all();
 
-        AgencyCheckList::insert($rows);
+        CheckList::insert($rows);
 
-        $created = AgencyCheckList::where('agency_id', $agencyId)
+        $created = CheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -132,7 +154,7 @@ class AgencyChecklistController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyCheckList = AgencyCheckList::where('id', $id)
+        $agencyCheckList = CheckList::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -145,7 +167,7 @@ class AgencyChecklistController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_check_lists')->ignore($agencyCheckList->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('check_lists')->ignore($agencyCheckList->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -184,7 +206,7 @@ class AgencyChecklistController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyCheckLists = AgencyCheckList::where('agency_id', $agencyId)
+        $agencyCheckLists = CheckList::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -199,7 +221,7 @@ class AgencyChecklistController extends Controller
             ], 404);
         }
 
-        $nameConflicts = AgencyCheckList::where('agency_id', $agencyId)
+        $nameConflicts = CheckList::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -240,7 +262,7 @@ class AgencyChecklistController extends Controller
 
     public function destroy($id)
     {
-        $agencyCheckList = AgencyCheckList::where('id', $id)
+        $agencyCheckList = CheckList::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 

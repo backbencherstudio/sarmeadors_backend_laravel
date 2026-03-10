@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyType;
+use App\Models\Type;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,13 +15,29 @@ class AgencyTypeController extends Controller
         $perPage = $request->query('per_page', 10);
 
         $search = $request->query('search');
+        $type = $request->query('type');
 
-        $agencyTypes = AgencyType::where('agency_id', auth('api')->user()->agency_id)
+        if (!is_null($type)) {
+            $type = is_string($type) ? strtolower(trim($type)) : $type;
+            if (!in_array($type, ['candidate', 'client'], true)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid type. Allowed: candidate, client.',
+                ], 422);
+            }
+        }
+
+        $agencyTypes = Type::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
-            })->latest()->paginate($perPage);
+            })
+            ->when($type, function ($query, $type) {
+                return $query->where('type', $type);
+            })
+            ->latest()
+            ->paginate($perPage);
 
-        $agencyTypes->appends(['search' => $search, 'per_page' => $perPage]);
+        $agencyTypes->appends(['search' => $search, 'per_page' => $perPage, 'type' => $type]);
 
         return response()->json([
             'status' => true,
@@ -42,7 +58,7 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -63,10 +79,16 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
+        // If frontend doesn't send it, default to candidate.
+        $requestType = $request->input('type', 'candidate');
+        $requestType = is_string($requestType) ? strtolower(trim($requestType)) : $requestType;
+        $request->merge(['type' => $requestType]);
+
         $request->validate([
             'name' => 'nullable|string|max:255|required_without:names',
             'names' => 'nullable|array|min:1|required_without:name',
             'names.*' => 'required|string|max:255|distinct',
+            'type' => ['required', 'string', Rule::in(['candidate', 'client'])],
             'status' => 'nullable|in:0,1',
         ]);
 
@@ -85,7 +107,7 @@ class AgencyTypeController extends Controller
             ], 422);
         }
 
-        $existingNames = AgencyType::where('agency_id', $agencyId)
+        $existingNames = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -98,19 +120,21 @@ class AgencyTypeController extends Controller
             ], 422);
         }
 
+        $type = $request->input('type');
         $status = $request->status ?? 1;
         $now = now();
         $rows = $names->map(fn($name) => [
             'agency_id' => $agencyId,
             'name' => $name,
+            'type' => $type,
             'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
         ])->all();
 
-        AgencyType::insert($rows);
+        Type::insert($rows);
 
-        $created = AgencyType::where('agency_id', $agencyId)
+        $created = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -131,7 +155,7 @@ class AgencyTypeController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -144,7 +168,7 @@ class AgencyTypeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_types')->ignore($agencyType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('types')->ignore($agencyType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -183,7 +207,7 @@ class AgencyTypeController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyTypes = AgencyType::where('agency_id', $agencyId)
+        $agencyTypes = Type::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -198,7 +222,7 @@ class AgencyTypeController extends Controller
             ], 404);
         }
 
-        $nameConflicts = AgencyType::where('agency_id', $agencyId)
+        $nameConflicts = Type::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -239,7 +263,7 @@ class AgencyTypeController extends Controller
 
     public function destroy($id)
     {
-        $agencyType = AgencyType::where('id', $id)
+        $agencyType = Type::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 

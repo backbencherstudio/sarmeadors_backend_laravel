@@ -3,16 +3,17 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\Tag;
+use App\Models\EventType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class AgencyTagController extends Controller
+class AgencyEventTypeController extends Controller
 {
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
+
         $search = $request->query('search');
         $type = $request->query('type');
 
@@ -26,7 +27,7 @@ class AgencyTagController extends Controller
             }
         }
 
-        $agencyTag = Tag::where('agency_id', auth('api')->user()->agency_id)
+        $agencyEventTypes = EventType::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', '%' . $search . '%');
             })
@@ -36,19 +37,19 @@ class AgencyTagController extends Controller
             ->latest()
             ->paginate($perPage);
 
-        $agencyTag->appends(['search' => $search, 'per_page' => $perPage, 'type' => $type]);
+        $agencyEventTypes->appends(['search' => $search, 'per_page' => $perPage, 'type' => $type]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Agency tags retrieved successfully',
-            'data' => $agencyTag->items(),
+            'message' => 'Agency event types retrieved successfully',
+            'data' => $agencyEventTypes->items(),
             'meta' => [
-                'current_page' => $agencyTag->currentPage(),
-                'last_page' => $agencyTag->lastPage(),
-                'per_page' => $agencyTag->perPage(),
-                'total' => $agencyTag->total(),
-                'next_page_url' => $agencyTag->nextPageUrl(),
-                'prev_page_url' => $agencyTag->previousPageUrl(),
+                'current_page' => $agencyEventTypes->currentPage(),
+                'last_page' => $agencyEventTypes->lastPage(),
+                'per_page' => $agencyEventTypes->perPage(),
+                'total' => $agencyEventTypes->total(),
+                'next_page_url' => $agencyEventTypes->nextPageUrl(),
+                'prev_page_url' => $agencyEventTypes->previousPageUrl(),
             ]
         ], 200);
     }
@@ -57,20 +58,20 @@ class AgencyTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyTag = Tag::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyTag) {
+        if (!$agencyEventType) {
             return response()->json([
                 'status' => false,
-                'message' => 'Agency tag not found or unauthorized'
+                'message' => 'Agency event type not found or unauthorized'
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $agencyTag
+            'data' => $agencyEventType
         ], 200);
     }
 
@@ -102,11 +103,11 @@ class AgencyTagController extends Controller
         if ($names->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one tag using "name" or "names".'
+                'message' => 'Please provide at least one name using "name" or "names".'
             ], 422);
         }
 
-        $existingNames = Tag::where('agency_id', $agencyId)
+        $existingNames = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->pluck('name')
             ->toArray();
@@ -114,7 +115,7 @@ class AgencyTagController extends Controller
         if (!empty($existingNames)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Some tag already exist.',
+                'message' => 'Some names already exist.',
                 'duplicates' => $existingNames
             ], 422);
         }
@@ -131,9 +132,9 @@ class AgencyTagController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        Tag::insert($rows);
+        EventType::insert($rows);
 
-        $created = Tag::where('agency_id', $agencyId)
+        $created = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names->all())
             ->orderBy('id')
             ->get()
@@ -145,7 +146,7 @@ class AgencyTagController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Agency tag created successfully',
+            'message' => 'Agency event types created successfully',
             'data' => $created,
         ], 201);
     }
@@ -154,11 +155,11 @@ class AgencyTagController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyTag = Tag::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyTag) {
+        if (!$agencyEventType) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -167,17 +168,17 @@ class AgencyTagController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('check_lists')->ignore($agencyTag->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('event_types')->ignore($agencyEventType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
 
-        $agencyTag->update($request->only('name', 'status'));
+        $agencyEventType->update($request->only('name', 'status'));
 
         return response()->json([
             'status' => true,
-            'message' => 'Agency tag updated successfully',
-            'data' => $agencyTag
+            'message' => 'Agency event type updated successfully',
+            'data' => $agencyEventType
         ], 200);
     }
 
@@ -206,22 +207,22 @@ class AgencyTagController extends Controller
         $ids = $updates->pluck('id')->all();
         $names = $updates->pluck('name')->all();
 
-        $agencyTags = Tag::where('agency_id', $agencyId)
+        $agencyEventTypes = EventType::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
 
-        if ($agencyTags->count() !== count($ids)) {
-            $missingIds = collect($ids)->diff($agencyTags->keys())->values()->all();
+        if ($agencyEventTypes->count() !== count($ids)) {
+            $missingIds = collect($ids)->diff($agencyEventTypes->keys())->values()->all();
 
             return response()->json([
                 'status' => false,
-                'message' => 'Some agency tag were not found or unauthorized.',
+                'message' => 'Some agency event types were not found or unauthorized.',
                 'missing_ids' => $missingIds
             ], 404);
         }
 
-        $nameConflicts = Tag::where('agency_id', $agencyId)
+        $nameConflicts = EventType::where('agency_id', $agencyId)
             ->whereIn('name', $names)
             ->whereNotIn('id', $ids)
             ->pluck('name')
@@ -230,24 +231,24 @@ class AgencyTagController extends Controller
         if (!empty($nameConflicts)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Some checklist already exist.',
+                'message' => 'Some names already exist.',
                 'duplicates' => $nameConflicts
             ], 422);
         }
 
-        $updated = DB::transaction(function () use ($updates, $agencyTags) {
+        $updated = DB::transaction(function () use ($updates, $agencyEventTypes) {
             $result = [];
 
             foreach ($updates as $item) {
-                $agencyTag = $agencyTags[$item['id']];
+                $agencyEventType = $agencyEventTypes[$item['id']];
 
                 $payload = ['name' => $item['name']];
                 if (array_key_exists('status', $item)) {
                     $payload['status'] = $item['status'];
                 }
 
-                $agencyTag->update($payload);
-                $result[] = $agencyTag->fresh();
+                $agencyEventType->update($payload);
+                $result[] = $agencyEventType->fresh();
             }
 
             return $result;
@@ -255,23 +256,23 @@ class AgencyTagController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Agency tag updated successfully',
+            'message' => 'Agency event types updated successfully',
             'data' => $updated
         ], 200);
     }
 
     public function destroy($id)
     {
-        $agencyTag = Tag::where('id', $id)
+        $agencyEventType = EventType::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$agencyTag) {
+        if (!$agencyEventType) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
-        $agencyTag->delete();
+        $agencyEventType->delete();
 
-        return response()->json(['message' => 'Agency tag deleted successfully']);
+        return response()->json(['message' => 'Agency event type deleted successfully']);
     }
 }

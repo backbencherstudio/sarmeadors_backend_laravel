@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgencyLocation;
+use App\Models\Location;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,7 +16,7 @@ class AgencyLocationController extends Controller
 
         $search = $request->query('search');
 
-        $agencyLocations = AgencyLocation::where('agency_id', auth('api')->user()->agency_id)
+        $agencyLocations = Location::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
                 return $query->where('location', 'like', '%' . $search . '%');
             })->latest()->paginate($perPage);
@@ -42,7 +42,7 @@ class AgencyLocationController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyLocation = AgencyLocation::where('id', $id)
+        $agencyLocation = Location::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -85,7 +85,7 @@ class AgencyLocationController extends Controller
             ], 422);
         }
 
-        $existingLocations = AgencyLocation::where('agency_id', $agencyId)
+        $existingLocations = Location::where('agency_id', $agencyId)
             ->whereIn('location', $locations->all())
             ->pluck('location')
             ->toArray();
@@ -108,9 +108,9 @@ class AgencyLocationController extends Controller
             'updated_at' => $now,
         ])->all();
 
-        AgencyLocation::insert($rows);
+        Location::insert($rows);
 
-        $created = AgencyLocation::where('agency_id', $agencyId)
+        $created = Location::where('agency_id', $agencyId)
             ->whereIn('location', $locations->all())
             ->orderBy('id')
             ->get()
@@ -131,7 +131,7 @@ class AgencyLocationController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agencyLocation = AgencyLocation::where('id', $id)
+        $agencyLocation = Location::where('id', $id)
             ->where('agency_id', $agencyId)
             ->first();
 
@@ -144,7 +144,7 @@ class AgencyLocationController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('agency_locations')->ignore($agencyLocation->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('locations')->ignore($agencyLocation->id)->where(fn($query) => $query->where('agency_id', $agencyId))
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -183,7 +183,7 @@ class AgencyLocationController extends Controller
         $ids = $updates->pluck('id')->all();
         $locations = $updates->pluck('location')->all();
 
-        $agencyLocations = AgencyLocation::where('agency_id', $agencyId)
+        $agencyLocations = Location::where('agency_id', $agencyId)
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
@@ -198,7 +198,7 @@ class AgencyLocationController extends Controller
             ], 404);
         }
 
-        $locationConflicts = AgencyLocation::where('agency_id', $agencyId)
+        $locationConflicts = Location::where('agency_id', $agencyId)
             ->whereIn('location', $locations)
             ->whereNotIn('id', $ids)
             ->pluck('location')
@@ -239,7 +239,7 @@ class AgencyLocationController extends Controller
 
     public function destroy($id)
     {
-        $agencyLocation = AgencyLocation::where('id', $id)
+        $agencyLocation = Location::where('id', $id)
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
