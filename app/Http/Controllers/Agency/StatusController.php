@@ -1,20 +1,20 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientStatus;
+use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
-class ClientStatusController extends Controller
+class StatusController extends Controller
 {
     public function index()
     {
         $authUser = auth('api')->user();
 
-        $query = ClientStatus::with('agency:id,first_name')->orderBy('serial');
+        $query = Status::with('agency:id,first_name')->orderBy('serial');
         $query->where('agency_id', $authUser->agency_id);
 
         return response()->json([
@@ -33,12 +33,12 @@ class ClientStatusController extends Controller
             'color' => 'nullable|string|max:50',
         ]);
 
-        $lastSerial = ClientStatus::where('agency_id', $authUser->agency_id)
+        $lastSerial = Status::where('agency_id', $authUser->agency_id)
                         ->max('serial');
 
         $nextSerial = $lastSerial ? $lastSerial + 1 : 1;
 
-        $status = ClientStatus::create([
+        $status = Status::create([
             'agency_id' => $authUser->agency_id,
             'name'      => $request->name,
             'color'     => $request->color,
@@ -56,7 +56,7 @@ class ClientStatusController extends Controller
     {
         $authUser = auth('api')->user();
 
-        $status = ClientStatus::findOrFail($id);
+        $status = Status::findOrFail($id);
 
         if ($status->agency_id !== $authUser->agency_id) {
             abort(403);
@@ -73,7 +73,7 @@ class ClientStatusController extends Controller
     {
         $authUser = auth('api')->user();
 
-        $status = ClientStatus::findOrFail($id);
+        $status = Status::findOrFail($id);
 
         if ($status->agency_id !== $authUser->agency_id) {
             abort(403);
@@ -97,7 +97,7 @@ class ClientStatusController extends Controller
     {
         $authUser = auth('api')->user();
 
-        $status = ClientStatus::findOrFail($id);
+        $status = Status::findOrFail($id);
 
         if ($status->agency_id !== $authUser->agency_id) {
             abort(403);
@@ -122,7 +122,7 @@ class ClientStatusController extends Controller
             ]);
         }
 
-        $otherStatus = ClientStatus::where('agency_id', $authUser->agency_id)
+        $otherStatus = Status::where('agency_id', $authUser->agency_id)
                             ->where('serial', $newSerial)
                             ->first();
 
@@ -143,7 +143,7 @@ class ClientStatusController extends Controller
     {
         $authUser = auth('api')->user();
 
-        $status = ClientStatus::findOrFail($id);
+        $status = Status::findOrFail($id);
 
         if ($status->agency_id !== $authUser->agency_id) {
             abort(403);

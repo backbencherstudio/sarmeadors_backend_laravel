@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\ClientStatusController;
+use App\Http\Controllers\Agency\StatusController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Agency\FormFieldController;
 
@@ -66,12 +66,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('info-update', [AgencyController::class, 'infoUpdate']);
 
     //Client Status
-    Route::get('/client-statuses', [ClientStatusController::class, 'index']);
-    Route::post('/client-status-store', [ClientStatusController::class, 'store']);
-    Route::get('/client-status-edit/{id}', [ClientStatusController::class, 'edit']);
-    Route::put('/client-status-update/{id}', [ClientStatusController::class, 'update']);
-    Route::patch('/client-status-serial-update/{id}', [ClientStatusController::class, 'serial']);
-    Route::delete('/client-status-delete/{id}', [ClientStatusController::class, 'destroy']);
+    Route::get('/client-statuses', [StatusController::class, 'index']);
+    Route::post('/client-status-store', [StatusController::class, 'store']);
+    Route::get('/client-status-edit/{id}', [StatusController::class, 'edit']);
+    Route::put('/client-status-update/{id}', [StatusController::class, 'update']);
+    Route::patch('/client-status-serial-update/{id}', [StatusController::class, 'serial']);
+    Route::delete('/client-status-delete/{id}', [StatusController::class, 'destroy']);
 
     //Form
     Route::post('/forms', [FormController::class, 'store']);

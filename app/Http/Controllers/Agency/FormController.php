@@ -26,6 +26,7 @@ class FormController extends Controller
 
         return response()->json([
             'status' => true,
+            'message' => 'Form created successfully',
             'data' => $form
         ]);
     }

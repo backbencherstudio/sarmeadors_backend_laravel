@@ -16,58 +16,61 @@ use Illuminate\Support\Facades\Validator;
 class ClientController extends Controller
 {
     // {
-    // "form_id":1,
+    // "form_id": 1,
 
-    // "first_name":"John",
-    // "last_name":"Doe",
-    // "email":"john@gmail.com",
-    // "mobile":"017000000",
+    // "first_name": "John",
+    // "last_name": "Doe",
+    // "email": "john@example.com",
+    // "mobile": "01700000000",
 
-    // "type_id":[1,3],
-    // "location_id":[2,5],
-    // "checklist_id":[4,7],
-    // "tag_id":[2,8],
-    // "status_id":[1,4],
+    // "type_id": [1, 2],
+    // "location_id": [3],
+    // "checklist_id": [5, 6],
+    // "tag_id": [2],
+    // "status_id": [1],
 
-    //     "fields":{
-    //         "1":"Male",
-    //         "2":"1995-10-10",
-    //         "3":"123456789"
-    //     }
+    // "fields": {
+    //     "1": "Male",
+    //     "2": "1996-10-10",
     // }
+    // }
+
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'form_id' => 'required|exists:forms,id',
-            'first_name' => 'required|string|max:255',
-            'email' => 'nullable|email',
-            'mobile' => 'required',
-            'fields' => 'nullable|array'
-        ]);
+        $agencyId = auth('api')->user()->agency_id;
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'errors' => $validator->errors()
-            ], 422);
+        $form = Form::where('id',$request->form_id)
+            ->where('agency_id',$agencyId)
+            ->firstOrFail();
+
+        $formFields = FormField::where('form_id',$form->id)
+            ->where('status',1)
+            ->get();
+
+        $rules = [
+            'first_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:clients,email',
+            'mobile' => 'nullable|string|max:20',
+        ];
+
+        foreach ($formFields as $field) {
+
+            if ($field->validation_rules) {
+
+                $rules["fields.$field->id"] = $field->validation_rules;
+            }
+
+            if ($field->is_required) {
+
+                $rules["fields.$field->id"] = 'required';
+            }
         }
+
+        $request->validate($rules);
 
         DB::beginTransaction();
 
         try {
-
-            $agencyId = auth('api')->user()->agency_id;
-
-            $form = Form::where('id', $request->form_id)
-                ->where('agency_id', $agencyId)
-                ->first();
-
-            if (!$form) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Form not found'
-                ], 404);
-            }
 
             $client = Client::create([
                 'agency_id' => $agencyId,
@@ -87,24 +90,28 @@ class ClientController extends Controller
                 'entity_id' => $client->id
             ]);
 
-            if ($request->has('fields')) {
+            $allowedFields = $formFields->pluck('id')->toArray();
 
-                foreach ($request->fields as $fieldId => $value) {
+            $insertData = [];
 
-                    $field = FormField::where('id', $fieldId)
-                        ->where('form_id', $form->id)
-                        ->first();
+            foreach ($request->fields ?? [] as $fieldId => $value) {
 
-                    if (!$field) {
-                        continue;
-                    }
-
-                    FormFieldValue::create([
-                        'submission_id' => $submission->id,
-                        'form_field_id' => $fieldId,
-                        'value' => $value
-                    ]);
+                if (!in_array($fieldId,$allowedFields)) {
+                    continue;
                 }
+
+                $insertData[] = [
+                    'submission_id' => $submission->id,
+                    'form_field_id' => $fieldId,
+                    'value' => $value,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+            }
+
+            if (!empty($insertData)) {
+
+                FormFieldValue::insert($insertData);
             }
 
             DB::commit();
@@ -115,14 +122,15 @@ class ClientController extends Controller
                 'data' => $client
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
 
             DB::rollBack();
 
             return response()->json([
                 'status' => false,
-                'message' => $e->getMessage()
-            ], 500);
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ],500);
         }
     }
 
