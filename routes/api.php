@@ -66,12 +66,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('info-update', [AgencyController::class, 'infoUpdate']);
 
     //Client Status
-    Route::get('/client-statuses', [StatusController::class, 'index']);
-    Route::post('/client-status-store', [StatusController::class, 'store']);
-    Route::get('/client-status-edit/{id}', [StatusController::class, 'edit']);
-    Route::put('/client-status-update/{id}', [StatusController::class, 'update']);
-    Route::patch('/client-status-serial-update/{id}', [StatusController::class, 'serial']);
-    Route::delete('/client-status-delete/{id}', [StatusController::class, 'destroy']);
+    Route::get('/statuses', [StatusController::class, 'index']);
+    Route::post('/status-store', [StatusController::class, 'store']);
+    Route::get('/status-edit/{id}', [StatusController::class, 'edit']);
+    Route::put('/status-update/{id}', [StatusController::class, 'update']);
+    Route::patch('/status-serial-update/{id}', [StatusController::class, 'serial']);
+    Route::delete('/status-delete/{id}', [StatusController::class, 'destroy']);
+    //reasons
+    Route::post('/status-reasons', [StatusController::class, 'storeReasons']);
 
     //Form
     Route::post('/forms', [FormController::class, 'store']);

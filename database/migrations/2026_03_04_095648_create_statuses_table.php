@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('name', 100);
             $table->string('color',50)->nullable();
             $table->integer('serial');
+            $table->string('type', 50)->default('N/A'); // 'client', 'project', etc.
             $table->tinyInteger('any_reason')->default(0); //'0 = No, 1 = Yes;
             $table->text('reason')->nullable();
             $table->timestamps();

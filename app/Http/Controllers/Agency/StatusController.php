@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Agency;
 use App\Http\Controllers\Controller;
 use App\Models\Status;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -29,8 +30,10 @@ class StatusController extends Controller
         $authUser = auth('api')->user();
 
         $request->validate([
-            'name'  => 'required|string|max:100|unique:client_statuses,name,NULL,id,agency_id,' . $authUser->agency_id,
-            'color' => 'nullable|string|max:50',
+            'type'  => 'required|in:client,candidate|max:50',
+            'name'  => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,' . $authUser->agency_id,
+            'color' => 'required|string|max:50',
+
         ]);
 
         $lastSerial = Status::where('agency_id', $authUser->agency_id)
@@ -43,6 +46,7 @@ class StatusController extends Controller
             'name'      => $request->name,
             'color'     => $request->color,
             'serial'    => $nextSerial,
+            'type'      => $request->type,
         ]);
 
         return response()->json([
@@ -80,8 +84,8 @@ class StatusController extends Controller
         }
 
         $request->validate([
-            'name'   => 'required|string|max:255',
-            'color'  => 'nullable|string|max:50',
+            'name'   => 'required|string|max:255|unique:statuses,name,' . $status->id . ',id,agency_id,' . $authUser->agency_id,
+            'color'  => 'required|string|max:50',
         ]);
 
         $status->update($request->only('name', 'color'));
@@ -107,7 +111,7 @@ class StatusController extends Controller
             'serial' => [
                 'required',
                 'integer',
-                Rule::exists('client_statuses', 'serial')->where(function ($query) use ($authUser) {
+                Rule::exists('statuses', 'serial')->where(function ($query) use ($authUser) {
                     $query->where('agency_id', $authUser->agency_id);
                 }),
             ],
@@ -156,4 +160,48 @@ class StatusController extends Controller
             'message' => 'Client status deleted successfully.',
         ]);
     }
+
+    public function storeReasons(Request $request)
+    {
+        $request->validate([
+            'statuses' => 'required|array',
+            'statuses.*.id' => 'required|exists:statuses,id',
+            'statuses.*.reason' => 'required|max:1000',
+        ]);
+
+        $agencyId = auth('api')->user()->agency_id;
+
+        DB::beginTransaction();
+
+        try {
+
+            foreach ($request->statuses as $statusData) {
+
+                Status::where('id', $statusData['id'])
+                    ->where('agency_id', $agencyId)
+                    ->update([
+                        'any_reason' => 1,
+                        'reason' => $statusData['reason']
+                    ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Reasons stored successfully'
+            ]);
+
+        } catch (\Throwable $e) {
+
+            DB::rollBack();
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

@@ -14,6 +14,9 @@ class Status extends Model
         'name',
         'color',
         'serial',
+        'any_reason',
+        'reason',
+        'type',
     ];
 
     public function agency()
