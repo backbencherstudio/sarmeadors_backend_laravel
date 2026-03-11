@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientStatus;
+use App\Models\Status;
 use App\Models\StatusTemplate;
 use Illuminate\Http\Request;
 
@@ -13,7 +13,7 @@ class StatusTemplateController extends Controller
     {
         $agencyId = auth()->user()->agency_id;
 
-        $flow = ClientStatus::where('agency_id', $agencyId)
+        $flow = Status::where('agency_id', $agencyId)
             ->with('statusTemplates.template')
             ->orderBy('serial', 'asc')
             ->get();
@@ -115,7 +115,7 @@ class StatusTemplateController extends Controller
             'template_type' => 'required|string',
         ]);
 
-        $status = ClientStatus::where('id', $request->status_id)
+        $status = Status::where('id', $request->status_id)
             ->where('agency_id', auth()->user()->agency_id)
             ->first();
 
@@ -149,7 +149,7 @@ class StatusTemplateController extends Controller
             return response()->json(['message' => 'Status Template not found or Unauthorized'], 404);
         }
 
-        $validStatus = ClientStatus::where('id', $request->status_id)
+        $validStatus = Status::where('id', $request->status_id)
             ->where('agency_id', auth()->user()->agency_id)
             ->exists();
 
@@ -177,7 +177,7 @@ class StatusTemplateController extends Controller
         })->find($id);
 
         if (!$statusTemplate) {
-            return response()->json(['message' => 'Data not found or Unauthorized'], 404);
+            return response()->json(['message' => 'Status template not found or Unauthorized access'], 404);
         }
 
         $statusTemplate->delete();

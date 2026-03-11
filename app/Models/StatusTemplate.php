@@ -10,7 +10,7 @@ class StatusTemplate extends Model
 
     public function status()
     {
-        return $this->belongsTo(ClientStatus::class, 'status_id');
+        return $this->belongsTo(Status::class, 'status_id');
     }
 
     public function template()

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('status_templates', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('status_id')->constrained('client_statuses')->onDelete('cascade');
+            $table->foreignId('status_id')->constrained('statuses')->onDelete('cascade');
             $table->foreignId('template_id')->constrained('templates')->onDelete('cascade');
             $table->string('template_type');
             $table->timestamps();
