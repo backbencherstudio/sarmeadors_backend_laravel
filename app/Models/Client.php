@@ -12,11 +12,19 @@ class Client extends Model
         'last_name',
         'email',
         'mobile',
-        'user_type',
         'type_id',
         'location_id',
         'checklist_id',
-        'tag_id'
+        'tag_id',
+        'status_id'
+    ];
+
+    protected $casts = [
+        'type_id' => 'array',
+        'location_id' => 'array',
+        'checklist_id' => 'array',
+        'tag_id' => 'array',
+        'status_id' => 'array'
     ];
 
     public function submissions()
