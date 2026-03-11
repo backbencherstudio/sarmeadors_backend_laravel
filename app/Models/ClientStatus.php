@@ -20,4 +20,9 @@ class ClientStatus extends Model
     {
         return $this->belongsTo(Agency::class);
     }
+
+    public function statusTemplates()
+    {
+        return $this->hasMany(StatusTemplate::class, 'status_id');
+    }
 }

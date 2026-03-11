@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('status_templates', function (Blueprint $table) {
+        Schema::create('templates', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
+            $table->string('title');
+            $table->enum('type', ['email', 'document']);
+            $table->longText('content');
             $table->timestamps();
         });
     }
@@ -22,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('status_templates');
+        Schema::dropIfExists('templates');
     }
 };
