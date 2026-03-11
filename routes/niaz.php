@@ -6,6 +6,7 @@ use App\Http\Controllers\Agency\AgencyEventTypeController;
 use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
+use App\Http\Controllers\Agency\StatusTemplateController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +65,19 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::get('event-show/{id}', [AgencyEventController::class, 'show']);
     Route::put('event-update/{id}', [AgencyEventController::class, 'update']);
     Route::delete('event-destroy/{id}', [AgencyEventController::class, 'destroy']);
+
+    //agency status template management route
+    Route::get('status-templates', [StatusTemplateController::class, 'index']);
+    Route::post('status-templates', [StatusTemplateController::class, 'store']);
+    Route::get('status-templates/{id}', [StatusTemplateController::class, 'show']);
+    Route::put('status-templates/{id}', [StatusTemplateController::class, 'update']);
+    Route::delete('status-templates/{id}', [StatusTemplateController::class, 'destroy']);
+    Route::get('get-process-flow', [StatusTemplateController::class, 'getProcessFlow']);
+
+
+
+
+
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
