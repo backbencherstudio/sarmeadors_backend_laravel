@@ -66,12 +66,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::put('event-update/{id}', [AgencyEventController::class, 'update']);
     Route::delete('event-destroy/{id}', [AgencyEventController::class, 'destroy']);
 
-    //agency status template management route
+    //agency status template (get-process-flow) management route
     Route::get('get-process-flow', [StatusTemplateController::class, 'getProcessFlow']);
     Route::post('status-template-store', [StatusTemplateController::class, 'store']);
     Route::get('status-template-show/{id}', [StatusTemplateController::class, 'show']);
     Route::put('status-template-update/{id}', [StatusTemplateController::class, 'update']);
     Route::delete('status-template-destroy/{id}', [StatusTemplateController::class, 'destroy']);
+
+    Route::post('statuses/store-after', [StatusTemplateController::class, 'storeAfter']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {

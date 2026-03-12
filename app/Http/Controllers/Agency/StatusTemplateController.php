@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Status;
 use App\Models\StatusTemplate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StatusTemplateController extends Controller
 {
@@ -28,18 +29,19 @@ class StatusTemplateController extends Controller
 
         $formattedFlow = $flow->map(function ($status) {
             return [
-                'id'        => $status->id,
-                'name'      => $status->name,
-                'color'     => $status->color,
-                'serial'    => $status->serial,
-                'templates' => $status->statusTemplates->groupBy('template_type')->map(function ($items) {
+                'status_id'        => $status->id,
+                'status_name'      => $status->name,
+                'status_color'     => $status->color,
+                'serial'           => $status->serial,
+                'status_type'      => $status->type,
+                'templates'        => $status->statusTemplates->groupBy('template_type')->map(function ($items) {
                     return $items->map(function ($item) {
                         return [
-                            'status_template_id' => $item->id,
-                            'id'                 => $item->template->id,
-                            'title'              => $item->template->title,
-                            'content'            => $item->template->content,
-                            'type'               => $item->template->type,
+                            'status_template_id'  => $item->id,
+                            'template_id'         => $item->template->id,
+                            'template_title'      => $item->template->title,
+                            'template_content'    => $item->template->content,
+                            'template_type'       => $item->template->type,
                         ];
                     });
                 })
@@ -52,30 +54,6 @@ class StatusTemplateController extends Controller
             'data'    => $formattedFlow
         ], 200);
     }
-
-    // public function getProcessFlow()
-    // {
-    //     $agencyId = auth()->user()->agency_id;
-
-    //     $flow = ClientStatus::where('agency_id', $agencyId)
-    //         ->with('statusTemplates.template')
-    //         ->orderBy('serial', 'asc')
-    //         ->get();
-
-    //     if ($flow->isEmpty()) {
-    //         return response()->json([
-    //             'status'  => 'info',
-    //             'message' => 'No process flow found for this agency. Please setup your client statuses first.',
-    //             'data'    => []
-    //         ], 200);
-    //     }
-
-    //     return response()->json([
-    //         'status'  => 'success',
-    //         'message' => 'Process flow retrieved successfully.',
-    //         'data'    => $flow
-    //     ], 200);
-    // }
 
     public function show($id)
     {
@@ -182,5 +160,45 @@ class StatusTemplateController extends Controller
 
         $statusTemplate->delete();
         return response()->json(['status' => 'success', 'message' => 'Deleted']);
+    }
+
+    //Create new status
+    public function storeAfter(Request $request)
+    {
+        $authUser = auth('api')->user();
+
+        $request->validate([
+            'after_status_id' => 'required|exists:statuses,id',
+            'type'            => 'required|in:client,candidate|max:50',
+            'name'            => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,' . $authUser->agency_id,
+            'color'           => 'required|string|max:50',
+        ]);
+
+        $referenceStatus = Status::where('id', $request->after_status_id)
+            ->where('agency_id', $authUser->agency_id)
+            ->firstOrFail();
+
+        $newSerial = $referenceStatus->serial + 1;
+
+        return DB::transaction(function () use ($authUser, $request, $newSerial) {
+
+            Status::where('agency_id', $authUser->agency_id)
+                ->where('serial', '>=', $newSerial)
+                ->increment('serial');
+
+            $status = Status::create([
+                'agency_id' => $authUser->agency_id,
+                'name'      => $request->name,
+                'color'     => $request->color,
+                'serial'    => $newSerial,
+                'type'      => $request->type,
+            ]);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'New status inserted successfully at position ' . $newSerial,
+                'data'    => $status,
+            ]);
+        });
     }
 }
