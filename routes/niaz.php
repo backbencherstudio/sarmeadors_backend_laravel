@@ -20,12 +20,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->gr
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
 
     //agency type management route
-    Route::get('types', [AgencyTypeController::class, 'index']);
-    Route::get('type/{id}', [AgencyTypeController::class, 'show']);
-    Route::post('type-store', [AgencyTypeController::class, 'store']);
-    Route::put('type-update/{id}', [AgencyTypeController::class, 'update']);
-    Route::put('type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
-    Route::delete('type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
+    Route::get('agency-types', [AgencyTypeController::class, 'index']);
+    Route::get('agency-type/{id}', [AgencyTypeController::class, 'show']);
+    Route::post('agency-type-store', [AgencyTypeController::class, 'store']);
+    Route::put('agency-type-update/{id}', [AgencyTypeController::class, 'update']);
+    Route::put('agency-type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
+    Route::delete('agency-type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
 
     //agency location management route
     Route::get('locations', [AgencyLocationController::class, 'index']);

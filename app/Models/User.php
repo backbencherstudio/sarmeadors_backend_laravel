@@ -42,4 +42,15 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class);
+    }
+
+    public function notes()
+    {
+        return $this->hasMany(AgencyNote::class);
+    }
 }

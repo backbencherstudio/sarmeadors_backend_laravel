@@ -37,4 +37,15 @@ class Agency extends Model
     {
         return $this->hasMany(User::class);
     }
+
+
+    public function notes()
+    {
+        return $this->hasMany(AgencyNote::class);
+    }
+
+    public function messageTemplates()
+    {
+        return $this->hasMany(MessageTemplate::class);
+    }
 }
