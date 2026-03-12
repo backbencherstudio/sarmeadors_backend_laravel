@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Agency\StatusController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Agency\FormFieldController;
-
+use App\Http\Controllers\Client\ClientController as ClientClientController;
 
 Route::get('/login', function () {
     return response()->json([
@@ -25,6 +25,10 @@ Route::middleware('subdomain')->group(function () {
     Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
     Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
     Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
+
+    Route::prefix('client')->group(function () {
+        Route::post('/register', [ClientClientController::class, 'store']);
+    });
 });
 
 
