@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\ClientController;
 use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Api\AgencyController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Agency\StatusController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Agency\FormFieldController;
 use App\Http\Controllers\Client\ClientController as ClientClientController;
+use App\Http\Controllers\Webhook\StripeWebhookController;
 
 Route::get('/login', function () {
     return response()->json([
@@ -19,6 +21,8 @@ Route::get('/login', function () {
     ], 401);
 })->name('api.login');
 
+Route::post('/stripe/webhook/{agencyPrefix}', [StripeWebhookController::class, 'handle']);
+
 Route::middleware('subdomain')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 
@@ -26,8 +30,15 @@ Route::middleware('subdomain')->group(function () {
     Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
     Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
 
+    // Stripe Settings
+    Route::get('/settings/stripe',    [AgencySettingsController::class, 'getStripeStatus']);
+    Route::post('/settings/stripe',   [AgencySettingsController::class, 'saveStripeKeys']);
+    Route::delete('/settings/stripe', [AgencySettingsController::class, 'removeStripeKeys']);
+
     Route::prefix('client')->group(function () {
         Route::post('/register', [ClientClientController::class, 'store']);
+        Route::post('/register',       [ClientRegistrationController::class, 'register']);
+        Route::post('/verify-payment', [ClientRegistrationController::class, 'verifyPayment']);
     });
 });
 
