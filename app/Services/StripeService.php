@@ -38,6 +38,8 @@ class StripeService
                 'valid'      => true,
                 'account_id' => $account->id,
                 'email'      => $account->email ?? null,
+
+                
             ];
         } catch (\Stripe\Exception\AuthenticationException $e) {
             return [
