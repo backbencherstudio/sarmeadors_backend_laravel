@@ -62,9 +62,21 @@ class DocumentTemplateController extends Controller
 
     public function show($id)
     {
-        $template = DocumentTemplate::with(['fields', 'signers'])->findOrFail($id);
+        $template = DocumentTemplate::with(['fields', 'signers'])->find($id);
+
+        if (!$template) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Template not found'
+            ], 404);
+        }
+
         $template->file_url = $template->file_path ? asset($template->file_path) : null;
-        return response()->json(['status' => true, 'data' => $template]);
+
+        return response()->json([
+            'status' => true,
+            'data' => $template
+        ]);
     }
 
     public function store(Request $request)
