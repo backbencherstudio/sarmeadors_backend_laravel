@@ -86,7 +86,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
 
     //Client Registration
     Route::prefix('clients')->group(function () {
-        Route::post('/register',[ClientController::class,'store']);
+        Route::post('/',[ClientController::class,'store']);
+        Route::post('/register',[ClientController::class,'register']);
         Route::get('/{id}',[ClientController::class,'show']);
         Route::post('/verify-payment', [ClientController::class, 'verifyPayment']);
     });

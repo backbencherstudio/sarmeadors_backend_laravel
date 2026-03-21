@@ -108,6 +108,7 @@ class AgencySettingsController extends Controller
     {
         try {
             $agency = $request->current_agency;
+            // dd($agency);
 
             $agency->update([
                 'stripe_publishable_key' => null,

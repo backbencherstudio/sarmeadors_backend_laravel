@@ -43,25 +43,20 @@ class ClientController extends Controller
 
     public function store(Request $request)
     {
-        dd($request);
-        $agency = auth('api')->user()->agency;
+        $agencyId = auth('api')->user()->agency_id;
 
-        $form = Form::where('id', $request->form_id)
-            ->where('agency_id', $agency->id)
+        $form = Form::where('id',$request->form_id)
+            ->where('agency_id',$agencyId)
             ->firstOrFail();
 
-        $formFields = FormField::where('form_id', $form->id)
-            ->where('status', 1)
+        $formFields = FormField::where('form_id',$form->id)
+            ->where('status',1)
             ->get();
 
         $rules = [
-            'first_name'  => 'required|string|max:255',
-            'last_name'   => 'nullable|string|max:255',
-            'email'       => 'required|email|unique:clients,email',
-            'mobile'      => 'nullable|string|max:20',
-            'location_id' => 'nullable|array',
-            'location_id.*' => 'integer|exists:locations,id',
-            'about_us'    => 'nullable|string',
+            'first_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:clients,email',
+            'mobile' => 'nullable|string|max:20',
         ];
 
         foreach ($formFields as $field) {
@@ -77,39 +72,23 @@ class ClientController extends Controller
             }
         }
 
-        if (!$agency->hasStripeKeys()) {
-            return $this->sendError('This agency has not configured payment processing yet.', [], 422);
-        }
-
-        $exists = Client::where('agency_id', $agency->id)->where('email', $request->email)->exists();
-
-        if ($exists) {
-            return $this->sendError('Email already registered with this agency.', [], 422);
-        }
-
         $request->validate($rules);
 
         DB::beginTransaction();
 
         try {
 
-            $amount = (float) $request->amount;
-            $currency = $request->currency ?? 'usd';
-
             $client = Client::create([
-                'agency_id' => $agency->id,
+                'agency_id' => $agencyId,
                 'first_name' => $request->first_name,
-                'last_name' => $request->last_name ?? null,
+                'last_name' => $request->last_name,
                 'email' => $request->email,
-                'mobile' => $request->mobile ?? null,
+                'mobile' => $request->mobile,
                 'type_id' => $request->type_id,
-                'location_id' => $request->location_id ?? null,
+                'location_id' => $request->location_id,
                 'checklist_id' => $request->checklist_id,
                 'tag_id' => $request->tag_id,
-                'status_id' => $request->status_id,
-                'about_us' => $request->about_us ?? null,
-                'payment_status' => 'pending',
-                'is_active'      => false,
+                'status_id' => $request->status_id
             ]);
 
             $submission = FormSubmission::create([
@@ -123,7 +102,7 @@ class ClientController extends Controller
 
             foreach ($request->fields ?? [] as $fieldId => $value) {
 
-                if (!in_array($fieldId, $allowedFields)) {
+                if (!in_array($fieldId,$allowedFields)) {
                     continue;
                 }
 
@@ -141,10 +120,104 @@ class ClientController extends Controller
                 FormFieldValue::insert($insertData);
             }
 
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Client created successfully',
+                'data' => $client
+            ]);
+
+        } catch (\Throwable $e) {
+
+            DB::rollBack();
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ],500);
+        }
+    }
+
+    public function show($id)
+    {
+        $client = Client::with([
+            'submissions.values.field'
+        ])->findOrFail($id);
+
+        return response()->json($client);
+    }
+
+    public function register(Request $request)
+    {
+        dd($request);
+        $agency = auth('api')->user()->agency;
+
+        // New validations
+        $rules = [
+            'first_name'  => 'required|string|max:255',
+            'last_name'   => 'nullable|string|max:255',
+            'email'       => 'required|email|unique:clients,email',
+            'mobile'      => 'nullable|string|max:20',
+            'location_id' => 'nullable|array',
+            'location_id.*' => 'integer|exists:locations,id',
+            'about_us'    => 'nullable|string',
+        ];
+
+        // Stripe config check (NEW)
+        if (!$agency->hasStripeKeys()) {
+            return $this->sendError('This agency has not configured payment processing yet.', [], 422);
+        }
+
+        // Agency ভিত্তিক email check (UPDATED)
+        $exists = Client::where('agency_id', $agency->id)
+            ->where('email', $request->email)
+            ->exists();
+
+        if ($exists) {
+            return $this->sendError('Email already registered with this agency.', [], 422);
+        }
+
+        $request->validate($rules);
+
+        DB::beginTransaction();
+
+        try {
+
+            // Payment related (NEW)
+            $amount = (float) $request->amount;
+            $currency = $request->currency ?? 'usd';
+
+            // Updated client creation
+            $client = Client::create([
+                'agency_id'     => $agency->id,
+                'first_name'    => $request->first_name,
+                'last_name'     => $request->last_name ?? null,
+                'email'         => $request->email,
+                'mobile'        => $request->mobile ?? null,
+                'type_id'       => $request->type_id,
+                'location_id'   => $request->location_id ?? null,
+                'checklist_id'  => $request->checklist_id,
+                'tag_id'        => $request->tag_id,
+                'status_id'     => $request->status_id,
+                'about_us'      => $request->about_us ?? null,
+                'payment_status' => 'pending',   // NEW
+                'is_active'     => false,       // NEW
+            ]);
+
+            // Stripe customer (NEW)
             $this->stripeService->createCustomer($client, $agency);
 
-            $session = $this->stripeService->createCheckoutSession($client, $agency, $amount, $currency);
+            // Stripe checkout session (NEW)
+            $session = $this->stripeService->createCheckoutSession(
+                $client,
+                $agency,
+                $amount,
+                $currency
+            );
 
+            // Payment table (NEW)
             Payment::create([
                 'agency_id'                  => $agency->id,
                 'client_id'                  => $client->id,
@@ -156,24 +229,17 @@ class ClientController extends Controller
 
             DB::commit();
 
-            $data = ['client' => $client, 'checkout_url' => $session->url, 'session_id'  => $session->id];
-
-            return $this->sendResponse($data, 'Client created successfully', 200);
+            return $this->sendResponse([
+                'client'       => $client,
+                'checkout_url' => $session->url,
+                'session_id'   => $session->id
+            ], 'Registration successful', 200);
         } catch (\Throwable $e) {
 
             DB::rollBack();
 
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
-    }
-
-    public function show($id)
-    {
-        $client = Client::with([
-            'submissions.values.field'
-        ])->findOrFail($id);
-
-        return response()->json($client);
     }
 
     /**
