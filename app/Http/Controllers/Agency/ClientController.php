@@ -151,7 +151,6 @@ class ClientController extends Controller
 
     public function register(Request $request)
     {
-        dd($request);
         $agency = auth('api')->user()->agency;
 
         // New validations
@@ -165,6 +164,7 @@ class ClientController extends Controller
             'about_us'    => 'nullable|string',
         ];
 
+        // dd($request->all());
         // Stripe config check (NEW)
         if (!$agency->hasStripeKeys()) {
             return $this->sendError('This agency has not configured payment processing yet.', [], 422);
@@ -253,6 +253,8 @@ class ClientController extends Controller
             'session_id' => 'required|string',
         ]);
 
+        // dd($request->all());
+
         // ★ Need agency to use their Stripe keys
         $agency = auth('api')->user()->agency;
 
@@ -262,6 +264,8 @@ class ClientController extends Controller
                 $agency,
                 $request->session_id
             );
+
+            // dd($session->payment_intent->id);
 
             $payment = Payment::where('stripe_checkout_session_id', $session->id)
                 ->where('agency_id', $agency->id)
