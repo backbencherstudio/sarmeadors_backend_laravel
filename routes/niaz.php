@@ -89,12 +89,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
 
     //agency type management route
-    Route::get('types', [AgencyTypeController::class, 'index']);
-    Route::get('type/{id}', [AgencyTypeController::class, 'show']);
-    Route::post('type-store', [AgencyTypeController::class, 'store']);
-    Route::put('type-update/{id}', [AgencyTypeController::class, 'update']);
-    Route::put('type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
-    Route::delete('type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
+    Route::get('agency-types', [AgencyTypeController::class, 'index']);
+    Route::get('agency-type/{id}', [AgencyTypeController::class, 'show']);
+    Route::post('agency-type-store', [AgencyTypeController::class, 'store']);
+    Route::put('agency-type-update/{id}', [AgencyTypeController::class, 'update']);
+    Route::put('agency-type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
+    Route::delete('agency-type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
 
     //agency location management route
     Route::get('locations', [AgencyLocationController::class, 'index']);
@@ -127,6 +127,30 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('event-type-update/{id}', [AgencyEventTypeController::class, 'update']);
     Route::put('event-type-bulk-update', [AgencyEventTypeController::class, 'bulkUpdate']);
     Route::delete('event-type-destroy/{id}', [AgencyEventTypeController::class, 'destroy']);
+
+    //agency event management route
+    Route::get('events', [AgencyEventController::class, 'index']);
+    Route::post('event-store', [AgencyEventController::class, 'store']);
+    Route::get('event-show/{id}', [AgencyEventController::class, 'show']);
+    Route::put('event-update/{id}', [AgencyEventController::class, 'update']);
+    Route::delete('event-destroy/{id}', [AgencyEventController::class, 'destroy']);
+
+    //agency status template (get-process-flow) management route
+    Route::get('get-process-flow', [StatusTemplateController::class, 'getProcessFlow']);
+    Route::post('status-template-store', [StatusTemplateController::class, 'store']);
+    Route::get('status-template-show/{id}', [StatusTemplateController::class, 'show']);
+    Route::put('status-template-update/{id}', [StatusTemplateController::class, 'update']);
+    Route::delete('status-template-destroy/{id}', [StatusTemplateController::class, 'destroy']);
+    //status template create new status after
+    Route::post('statuses/store-after', [StatusTemplateController::class, 'storeAfter']);
+
+
+    //document template management route
+    Route::get('document-templates', [DocumentTemplateController::class, 'index']);
+    Route::post('document-templates/store', [DocumentTemplateController::class, 'store']);
+    Route::get('document-templates/show/{id}', [DocumentTemplateController::class, 'show']);
+    Route::post('document-templates/update/{id}', [DocumentTemplateController::class, 'update']);
+    Route::delete('document-templates/delete/{id}', [DocumentTemplateController::class, 'destroy']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
