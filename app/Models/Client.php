@@ -11,12 +11,16 @@ class Client extends Model
         'first_name',
         'last_name',
         'email',
-        'mobile',
+        'phone',
+        'about_us',
         'type_id',
         'location_id',
         'checklist_id',
         'tag_id',
-        'status_id'
+        'status_id',
+        'stripe_customer_id',
+        'payment_status',
+        'is_active',
     ];
 
     protected $casts = [
@@ -24,8 +28,24 @@ class Client extends Model
         'location_id' => 'array',
         'checklist_id' => 'array',
         'tag_id' => 'array',
-        'status_id' => 'array'
+        'status_id' => 'array',
+        'is_active' => 'boolean',
     ];
+
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return "{$this->first_name} {$this->last_name}";
+    }
 
     public function submissions()
     {
