@@ -15,18 +15,19 @@ class Candidate extends Model
         'last_name',
         'email',
         'mobile',
-        'date_of_birth',
-        'nationality',
-        'address',
-        'city',
-        'postal_code',
-        'state',
-        'country',
+        'type_id',
+        'location_id',
     ];
 
-    protected $casts = [
-        'date_of_birth' => 'date',
-    ];
+    public function type()
+    {
+        return $this->belongsTo(Type::class);
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(Location::class);
+    }
 
     public function agency()
     {

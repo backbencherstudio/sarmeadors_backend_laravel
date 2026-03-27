@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('candidates', function (Blueprint $table) {
             $table->id();
-            
+
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
 
             // Personal Information
@@ -21,15 +21,8 @@ return new class extends Migration
             $table->string('last_name')->nullable();
             $table->string('email')->unique();
             $table->string('mobile')->nullable();
-            $table->date('date_of_birth')->nullable();
-            $table->string('nationality')->nullable();
-
-            // Address Information
-            $table->text('address')->nullable();
-            $table->string('city')->nullable();
-            $table->string('postal_code')->nullable();
-            $table->string('state')->nullable();
-            $table->string('country')->nullable();
+            $table->foreignId('type_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('location_id')->constrained()->cascadeOnDelete();
 
             $table->timestamps();
         });
