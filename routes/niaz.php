@@ -76,7 +76,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     //status template create new status after
     Route::post('statuses/store-after', [StatusTemplateController::class, 'storeAfter']);
 
-
     //document template management route
     Route::get('document-templates', [DocumentTemplateController::class, 'index']);
     Route::post('document-templates/store', [DocumentTemplateController::class, 'store']);
@@ -143,7 +142,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::delete('status-template-destroy/{id}', [StatusTemplateController::class, 'destroy']);
     //status template create new status after
     Route::post('statuses/store-after', [StatusTemplateController::class, 'storeAfter']);
-
 
     //document template management route
     Route::get('document-templates', [DocumentTemplateController::class, 'index']);
