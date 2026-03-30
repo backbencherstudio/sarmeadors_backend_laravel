@@ -151,6 +151,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::delete('document-templates/delete/{id}', [DocumentTemplateController::class, 'destroy']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {
 
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {});
+});
+
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {
+    
+});
