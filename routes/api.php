@@ -88,6 +88,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::prefix('clients')->group(function () {
         Route::post('/',[ClientController::class,'store']);
         Route::post('/register',[ClientController::class,'register']);
+        Route::post('login',[ClientController::class,'login']);
+        Route::post('/logout',[ClientController::class,'logout']);
+        Route::post('/set-password',[ClientController::class,'setPassword']);
         Route::get('/{id}',[ClientController::class,'show']);
         Route::post('/verify-payment', [ClientController::class, 'verifyPayment']);
     });

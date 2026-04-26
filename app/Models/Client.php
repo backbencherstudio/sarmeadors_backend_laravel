@@ -11,6 +11,8 @@ class Client extends Model
         'first_name',
         'last_name',
         'email',
+        'password',
+        'must_change_password',
         'phone',
         'about_us',
         'type_id',
@@ -23,6 +25,10 @@ class Client extends Model
         'is_active',
     ];
 
+    protected $hidden = [
+        'password',
+    ];
+
     protected $casts = [
         'type_id' => 'array',
         'location_id' => 'array',
@@ -30,6 +36,8 @@ class Client extends Model
         'tag_id' => 'array',
         'status_id' => 'array',
         'is_active' => 'boolean',
+        'must_change_password' => 'boolean',
+        'password' => 'hashed',
     ];
 
     public function agency()

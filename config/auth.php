@@ -46,6 +46,11 @@ return [
             'driver' => 'jwt',
             'provider' => 'users',
         ],
+
+        'client' => [
+            'driver' => 'jwt',
+            'provider' => 'clients',
+        ],
     ],
 
     /*
@@ -75,6 +80,11 @@ return [
         //     'driver' => 'database',
         //     'table' => 'users',
         // ],
+
+        'clients' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Client::class,
+        ],
     ],
 
     /*
