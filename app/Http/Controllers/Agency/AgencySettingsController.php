@@ -24,6 +24,7 @@ class AgencySettingsController extends Controller
         try {
             $agency = $request->current_agency;
             // dd($agency);
+            
             $data = [
                 'has_stripe_keys'    => $agency->hasStripeKeys(),
                 'has_webhook_secret' => $agency->hasWebhookSecret(),
@@ -113,6 +114,7 @@ class AgencySettingsController extends Controller
             $agency->update([
                 'stripe_publishable_key' => null,
                 'stripe_secret_key'      => null,
+                'stripe_webhook_secret'  => null,
             ]);
 
             return $this->sendResponse( [],'Stripe keys removed.', 200);
