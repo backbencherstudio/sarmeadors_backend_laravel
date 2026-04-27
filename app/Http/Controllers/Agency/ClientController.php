@@ -12,8 +12,8 @@ use App\Models\FormField;
 use App\Models\Payment;
 use App\Services\StripeService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+
 
 class ClientController extends Controller
 {
@@ -45,12 +45,12 @@ class ClientController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $form = Form::where('id', $request->form_id)
-            ->where('agency_id', $agencyId)
+        $form = Form::where('id',$request->form_id)
+            ->where('agency_id',$agencyId)
             ->firstOrFail();
 
-        $formFields = FormField::where('form_id', $form->id)
-            ->where('status', 1)
+        $formFields = FormField::where('form_id',$form->id)
+            ->where('status',1)
             ->get();
 
         $rules = [
@@ -102,7 +102,7 @@ class ClientController extends Controller
 
             foreach ($request->fields ?? [] as $fieldId => $value) {
 
-                if (!in_array($fieldId, $allowedFields)) {
+                if (!in_array($fieldId,$allowedFields)) {
                     continue;
                 }
 
@@ -122,11 +122,12 @@ class ClientController extends Controller
 
             DB::commit();
 
-            return $this->sendResponse([
+            return response()->json([
                 'status' => true,
                 'message' => 'Client created successfully',
                 'data' => $client
             ]);
+
         } catch (\Throwable $e) {
 
             DB::rollBack();
@@ -135,7 +136,7 @@ class ClientController extends Controller
                 'status' => false,
                 'message' => 'Something went wrong',
                 'error' => $e->getMessage()
-            ], 500);
+            ],500);
         }
     }
 
@@ -194,19 +195,15 @@ class ClientController extends Controller
                 'first_name'    => $request->first_name,
                 'last_name'     => $request->last_name ?? null,
                 'email'         => $request->email,
-                'password'      => $request->email,
-                'must_change_password' => true, // Force password change on first login (NEW)
                 'mobile'        => $request->mobile ?? null,
                 'type_id'       => $request->type_id,
                 'location_id'   => $request->location_id ?? null,
                 'checklist_id'  => $request->checklist_id,
                 'tag_id'        => $request->tag_id,
-
-
                 'status_id'     => $request->status_id,
                 'about_us'      => $request->about_us ?? null,
-                'payment_status' => 'pending',
-                'is_active'     => false,
+                'payment_status' => 'pending',   // NEW
+                'is_active'     => false,       // NEW
             ]);
 
             // Stripe customer (NEW)
@@ -294,172 +291,6 @@ class ClientController extends Controller
             return $this->sendError('Payment not completed.', ('status' . $session->payment_status), 402);
         } catch (\Exception $e) {
             return $this->sendError('Could not verify payment.', $e->getMessage(), 500);
-        }
-    }
-
-    public function login(Request $request)
-    {
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required|string',
-            ]);
-
-            $agency = auth('api')->user()->agency;
-
-            $client = Client::where('agency_id', $agency->id)
-                ->where('email', $request->email)
-                ->first();
-
-            if (!$client) {
-                return $this->sendError('Invalid credentials', [], 401);
-            }
-
-            if (!$client->is_active) {
-                return $this->sendError('Account inactive', [], 403);
-            }
-
-            $credentials = [
-                'email' => $request->email,
-                'password' => $request->password,
-            ];
-
-            if (!$token = auth('client')->attempt($credentials)) {
-                return $this->sendError('Invalid credentials', [], 401);
-            }
-
-            $client = auth('client')->user();
-
-            return $this->sendResponse([
-                'status' => true,
-                'message' => 'Login successful',
-                'token' => $token,
-                'must_change_password' => $client->must_change_password,
-                'data' => $client,
-            ]);
-        } catch (\Throwable $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    public function setPassword(Request $request)
-    {
-        try {
-            $request->validate([
-                'password' => 'required|string|min:6|confirmed',
-            ]);
-
-            $client = $request->user('client');
-
-            if (!$client) {
-                return $this->sendError('Unauthorized', [], 403);
-            }
-
-            if (!$request->user('client')->tokenCan('change-password')) {
-                return $this->sendError('Invalid token for password change', [], 403);
-            }
-
-            if ($request->password === $client->email) {
-                return $this->sendError('Password cannot be the same as email', [], 422);
-            }
-
-            $client->update([
-                'password' => bcrypt($request->password),
-                'must_change_password' => false,
-            ]);
-
-            $client->tokens()->delete();
-
-            $token = $client->createToken('client-token', ['*'], now()->addDays(30))->plainTextToken;
-
-            return $this->sendResponse([
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ], 'Password updated successfully', 200);
-        } catch (\Throwable $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    public function profile(Request $request)
-    {
-        try {
-            $client = $request->user('client');
-
-            if (!$client) {
-                return $this->sendError('Unauthorized', [], 403);
-            }
-
-            $data = [
-                'id' => $client->id,
-                'first_name' => $client->first_name,
-                'last_name' => $client->last_name,
-                'email' => $client->email,
-                'mobile' => $client->mobile,
-                'about_us' => $client->about_us,
-                'type_id' => $client->type_id,
-                'location_id' => $client->location_id,
-                'checklist_id' => $client->checklist_id,
-                'tag_id' => $client->tag_id,
-                'status_id' => $client->status_id,
-                'payment_status' => $client->payment_status,
-                'is_active' => $client->is_active,
-            ];
-
-            return $this->sendResponse($data, 'Client profile retrieved successfully', 200);
-        } catch (\Throwable $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    public function changePassword(Request $request)
-    {
-        try {
-            $request->validate([
-                'current_password' => 'required|string',
-                'new_password' => 'required|string|min:6|confirmed',
-            ]);
-
-            $client = $request->user('client');
-
-            if (!$client) {
-                return $this->sendError('Unauthorized', [], 403);
-            }
-
-            if (!Hash::check($request->current_password, $client->password)) {
-                return $this->sendError('Current password is incorrect', [], 422);
-            }
-
-            if ($request->new_password === $client->email) {
-                return $this->sendError('New password cannot be the same as email', [], 422);
-            }
-
-            $client->update([
-                'password' => bcrypt($request->new_password),
-                'must_change_password' => false,
-            ]);
-
-            // Revoke all tokens after password change
-            $client->tokens()->delete();
-
-            return $this->sendResponse([], 'Password changed successfully', 200);
-        } catch (\Throwable $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    public function logout(Request $request)
-    {
-        try {
-            $client = $request->user('client');
-
-            if ($client) {
-                $client->tokens()->delete();
-            }
-
-            return $this->sendResponse([], 'Logged out successfully', 200);
-        } catch (\Throwable $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
     }
 }
