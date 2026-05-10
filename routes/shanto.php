@@ -64,6 +64,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->pr
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
 
+    Route::get('/agency-info', [AgencyController::class, 'info']);
     Route::post('info-update/{id}', [AgencyController::class, 'infoUpdate']);
 });
 

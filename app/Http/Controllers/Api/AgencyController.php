@@ -422,7 +422,6 @@ class AgencyController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Agency information updated successfully',
-                'data' => $agency->fresh(),
             ]);
 
         } catch (\Throwable $e) {
@@ -433,6 +432,51 @@ class AgencyController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function info()
+    {
+        $authUser = auth('api')->user();
+
+        $agency = Agency::find($authUser->agency_id);
+
+        if (!$agency) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency information retrieved successfully',
+            'data' => [
+                'id' => $agency->id,
+                'logo' => $agency->logo,
+                'logo_height' => $agency->logo_height,
+                'favicon' => $agency->favicon,
+
+                'website' => $agency->website,
+                'font' => $agency->font,
+                'tax_id' => $agency->tax_id,
+                'language' => $agency->language,
+
+                'stripe_publishable_key' => $agency->stripe_publishable_key
+                    ? substr($agency->stripe_publishable_key, 0, 10) . '...'
+                    : null,
+
+                'stripe_secret_key' => $agency->stripe_secret_key
+                    ? substr($agency->stripe_secret_key, 0, 10) . '...'
+                    : null,
+
+                'stripe_webhook_secret' => $agency->stripe_webhook_secret
+                    ? substr($agency->stripe_webhook_secret, 0, 10) . '...'
+                    : null,
+
+                'subdomain' => $agency->subdomain,
+            ]
+        ]);
     }
 
 }
