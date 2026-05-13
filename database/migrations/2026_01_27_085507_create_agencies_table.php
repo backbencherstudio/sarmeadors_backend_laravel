@@ -20,7 +20,12 @@ return new class extends Migration
             $table->string('mobile',20)->nullable();
             $table->text('address',500)->nullable();
             $table->string('logo',255)->nullable();
+            $table->integer('logo_height')->nullable();
             $table->string('favicon',255)->nullable();
+            $table->string('website',255)->nullable();
+            $table->string('font',255)->nullable();
+            $table->string('tax_id',255)->nullable();
+            $table->string('language',20)->nullable();
             $table->enum('status', ['active','inactive','suspended'])->default('active');
             $table->text('stripe_publishable_key')->nullable();
             $table->text('stripe_secret_key')->nullable();

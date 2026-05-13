@@ -326,8 +326,9 @@ class AgencyController extends Controller
     public function infoUpdate(Request $request, $id)
     {
         $authUser = auth('api')->user();
-
+        
         if ($authUser->agency_id != $id) {
+
             return response()->json([
                 'status' => false,
                 'message' => 'Unauthorized access',
@@ -345,9 +346,13 @@ class AgencyController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'address' => 'nullable|string|max:1000',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'logo_height' => 'nullable|integer|min:20|max:500',
             'favicon' => 'nullable|image|mimes:jpg,jpeg,png,ico,webp|max:1024',
+            'website' => 'nullable|url|max:255',
+            'font' => 'nullable|string|max:100',
+            'tax_id' => 'nullable|string|max:100',
+            'language' => 'nullable|string|max:50',
             'stripe_publishable_key' => 'nullable|string|max:255',
             'stripe_secret_key' => 'nullable|string|max:255',
             'stripe_webhook_secret' => 'nullable|string|max:255',
@@ -369,9 +374,11 @@ class AgencyController extends Controller
             if ($request->hasFile('logo')) {
 
                 if ($agency->getRawOriginal('logo')) {
+
                     Storage::disk('public')
                         ->delete($agency->getRawOriginal('logo'));
                 }
+
                 $data['logo'] = $request->file('logo')
                     ->store('agencies/logo', 'public');
             }
@@ -379,19 +386,31 @@ class AgencyController extends Controller
             if ($request->hasFile('favicon')) {
 
                 if ($agency->getRawOriginal('favicon')) {
+
                     Storage::disk('public')
                         ->delete($agency->getRawOriginal('favicon'));
                 }
+
                 $data['favicon'] = $request->file('favicon')
                     ->store('agencies/favicon', 'public');
             }
 
             $agency->update([
-                'address' => $data['address'] ?? $agency->address,
+
                 'logo' => $data['logo']
                     ?? $agency->getRawOriginal('logo'),
+                'logo_height' => $data['logo_height']
+                    ?? $agency->logo_height,
                 'favicon' => $data['favicon']
                     ?? $agency->getRawOriginal('favicon'),
+                'website' => $data['website']
+                    ?? $agency->website,
+                'font' => $data['font']
+                    ?? $agency->font,
+                'tax_id' => $data['tax_id']
+                    ?? $agency->tax_id,
+                'language' => $data['language']
+                    ?? $agency->language,
                 'stripe_publishable_key' => $data['stripe_publishable_key']
                     ?? $agency->stripe_publishable_key,
                 'stripe_secret_key' => $data['stripe_secret_key']
