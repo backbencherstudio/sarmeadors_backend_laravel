@@ -9,6 +9,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Illuminate\Http\Middleware\HandleCors;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
 
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(HandleCors::class);
+        
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
@@ -31,13 +34,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*')) {
-                return redirect('/api/login');
+                return response()->json([
+                    'message' => 'Unauthenticated'
+                ], 401);
             }
         });
 
         $exceptions->render(function (AccessDeniedHttpException $e, $request) {
             if ($request->is('api/*')) {
-                return redirect('/api/login');
+                return response()->json([
+                    'message' => 'Forbidden'
+                ], 403);
             }
         });
 

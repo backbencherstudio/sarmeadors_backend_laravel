@@ -77,9 +77,13 @@ class AuthController extends Controller
     public function refresh()
     {
         $token = auth('api')->refresh();
-        $user = auth('api')->user();
 
-        return $this->respondWithToken($token, $user);
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => auth('api')->factory()->getTTL() * 60,
+        ]);
     }
 
 
@@ -93,4 +97,5 @@ class AuthController extends Controller
             'expires_in' => auth('api')->factory()->getTTL() * 60,
         ]);
     }
+
 }
