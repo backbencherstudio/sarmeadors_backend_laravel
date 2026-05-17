@@ -16,7 +16,7 @@ class Agency extends Model
         'subdomain',
         'subdomain_prefix',
         'email',
-        'phone',
+        'mobile',
         'address',
         'logo',
         'primary_color',
@@ -33,10 +33,6 @@ class Agency extends Model
         'stripe_publishable_key',
         'stripe_webhook_secret', 
     ];
-
-    // ══════════════════════════════════
-    // Encrypt all Stripe credentials
-    // ══════════════════════════════════
 
     protected function stripeSecretKey(): Attribute
     {
@@ -85,34 +81,6 @@ class Agency extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
-    }
-
-    // ══════════════════════════════════
-    // Helpers
-    // ══════════════════════════════════
-
-    public function getFullNameAttribute(): string
-    {
-        return "{$this->first_name} {$this->last_name}";
-    }
-
-    public function hasStripeKeys(): bool
-    {
-        return !empty($this->stripe_secret_key)
-            && !empty($this->stripe_publishable_key);
-    }
-
-    public function hasWebhookSecret(): bool
-    {
-        return !empty($this->stripe_webhook_secret);
-    }
-
-    /**
-     * Fully configured = keys + webhook secret
-     */
-    public function isStripeReady(): bool
-    {
-        return $this->hasStripeKeys() && $this->hasWebhookSecret();
     }
     
 }

@@ -11,14 +11,14 @@ class Client extends Model
         'first_name',
         'last_name',
         'email',
-        'phone',
-        'about_us',
+        'mobile',
+        'address',
+        'hear_about_us',
         'type_id',
         'location_id',
         'checklist_id',
         'tag_id',
         'status_id',
-        'stripe_customer_id',
         'payment_status',
         'is_active',
     ];
@@ -29,7 +29,6 @@ class Client extends Model
         'checklist_id' => 'array',
         'tag_id' => 'array',
         'status_id' => 'array',
-        'is_active' => 'boolean',
     ];
 
     public function agency()
