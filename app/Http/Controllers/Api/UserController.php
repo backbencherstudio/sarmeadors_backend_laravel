@@ -45,7 +45,6 @@ class UserController extends Controller
         ]);
     }
 
-
     public function store(Request $request)
     {
         $authUser = auth('api')->user();
@@ -104,6 +103,7 @@ class UserController extends Controller
         }
 
         DB::beginTransaction();
+        
         try {
 
             $user = User::create([
@@ -173,87 +173,100 @@ class UserController extends Controller
     {
         $authUser = auth('api')->user();
 
-        $user = User::findOrFail($id);
-
-        if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Unauthorized access.'
-            ], 403);
-        }
-
         $allowedRoles = match (true) {
-            $authUser->hasRole('super_admin')  => ['super_admin', 'admin_staff'],
-            $authUser->hasRole('agency_admin') => ['agency_admin', 'agency_staff'],
-            default => [],
+
+            $authUser->hasRole('super_admin') => [
+                'super_admin',
+                'admin_staff',
+            ],
+
+            $authUser->hasRole('agency_admin') => [
+                'agency_admin',
+                'agency_staff',
+            ],
+
+            $authUser->hasRole('admin_staff'),
+            $authUser->hasRole('agency_staff') => [],
+
+            default => null,
         };
 
-        if (empty($allowedRoles)) {
+        if (!$allowedRoles) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'You are not authorized to update users.'
             ], 403);
         }
+
+        $user = User::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name'  => ['nullable', 'string', 'max:100'],
             'mobile'     => ['nullable', 'string', 'max:20'],
-            'email'      => ['required','email','max:255', Rule::unique('users', 'email')->ignore($user->id), ],
+            'email'      => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'role_id'    => ['required', 'integer', 'exists:roles,id'],
             'password'   => ['nullable', 'confirmed', Password::defaults()],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation errors',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors()
             ], 422);
         }
 
         $validated = $validator->validated();
 
+        $role = Role::findOrFail($validated['role_id']);
+
+        if (!in_array($role->name, $allowedRoles)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'You are not allowed to assign this role.'
+            ], 403);
+        }
+
         DB::beginTransaction();
 
         try {
+
             $user->update([
                 'first_name' => $validated['first_name'],
                 'last_name'  => $validated['last_name'] ?? null,
-                'mobile'     => $validated['mobile'] ?? null,
                 'email'      => $validated['email'],
+                'mobile'     => $validated['mobile'] ?? null,
+                'password'   => !empty($validated['password'])
+                    ? Hash::make($validated['password'])
+                    : $user->password,
             ]);
 
-            if (!empty($validated['password'])) {
-                $user->update([
-                    'password' => Hash::make($validated['password'])
-                ]);
-            }
-
-            $user->syncRoles([$validated['role_id']]);
+            $user->syncRoles([$role->name]);
 
             DB::commit();
 
             return response()->json([
-                'status'  => true,
+                'status' => true,
                 'message' => 'User updated successfully.',
-                'data'    => [
-                    'id'         => $user->id,
+                'data' => [
+                    'id' => $user->id,
                     'first_name' => $user->first_name,
-                    'last_name'  => $user->last_name,
-                    'mobile'     => $user->mobile,
-                    'email'      => $user->email,
-                    'roles'      => $user->getRoleNames()->first(),
+                    'last_name' => $user->last_name,
+                    'mobile' => $user->mobile,
+                    'email' => $user->email,
+                    'role' => $role->name,
                 ]
-            ]);
+            ], 200);
 
         } catch (\Throwable $e) {
+
             DB::rollBack();
 
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'User update failed.',
-                'error'   => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
