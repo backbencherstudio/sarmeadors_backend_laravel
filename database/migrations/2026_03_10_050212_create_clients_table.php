@@ -21,12 +21,16 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('mobile')->nullable();
             $table->text('address')->nullable();
+            $table->text('hear_about_us')->nullable();
 
             $table->json('type_id')->nullable();
             $table->json('location_id')->nullable();
             $table->json('checklist_id')->nullable();
             $table->json('tag_id')->nullable();
             $table->json('status_id')->nullable();
+            
+            $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending');
+            $table->tinyInteger('is_active')->default(1);
 
             $table->timestamps();
         });

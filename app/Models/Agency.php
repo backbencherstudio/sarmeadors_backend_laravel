@@ -12,8 +12,7 @@ class Agency extends Model
     use HasFactory;
 
     protected $fillable = [
-        'first_name',
-        'last_name',
+        'name',
         'subdomain',
         'subdomain_prefix',
         'email',
@@ -27,15 +26,6 @@ class Agency extends Model
         'stripe_publishable_key',
         'stripe_secret_key',
         'stripe_webhook_secret', 
-        'stripe_onboarding_complete',
-        'trial_ends_at',
-        'subscription_ends_at',
-    ];
-
-    protected $casts = [
-        'stripe_onboarding_complete' => 'boolean',
-        'trial_ends_at' => 'datetime',
-        'subscription_ends_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -44,7 +34,7 @@ class Agency extends Model
         'stripe_webhook_secret', 
     ];
 
-     // ══════════════════════════════════
+    // ══════════════════════════════════
     // Encrypt all Stripe credentials
     // ══════════════════════════════════
 
@@ -124,4 +114,5 @@ class Agency extends Model
     {
         return $this->hasStripeKeys() && $this->hasWebhookSecret();
     }
+    
 }
