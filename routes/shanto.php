@@ -50,16 +50,18 @@ Route::middleware('auth:api')->group(function () {});
 
 Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {});
-
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
-
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {
+    
     //Agency
     Route::get('/agencies', [AgencyController::class, 'data']);
     Route::post('/agency-store', [AgencyController::class, 'store']);
     Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
     Route::put('/agency-update/{id}', [AgencyController::class, 'update']);
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
+
+});
+
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
 
 });
 
