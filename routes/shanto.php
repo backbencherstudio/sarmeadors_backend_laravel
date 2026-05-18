@@ -35,11 +35,12 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/update-password', [UserController::class, 'updatePass']);
+    Route::post('/update-profile', [UserController::class, 'updateProfile']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:super_admin|agency_admin'])->group(function () {
     Route::get('/users', [UserController::class, 'data']);
-    route::get('role-list', [UserController::class, 'roleList']);
+    Route::get('/role-list', [UserController::class, 'roleList']);
     Route::post('/user-store', [UserController::class, 'store']);
     Route::get('/user-edit-data/{id}', [UserController::class, 'edit']);
     Route::put('/user-update/{id}', [UserController::class, 'update']);

@@ -374,4 +374,54 @@ class UserController extends Controller
         ], 200);
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = auth('api')->user();
+
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'required|string|max:100',
+            'last_name'  => 'nullable|string|max:100',
+            'mobile'     => 'nullable|string|max:20',
+            'email'      => ['required','email','max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'password'   => 'nullable|string|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation errors',
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        $updateData = [
+            'first_name' => $validated['first_name'],
+            'last_name'  => $validated['last_name'] ?? null,
+            'mobile'     => $validated['mobile'] ?? null,
+            'email'      => $validated['email'],
+        ];
+
+        if (!empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
+        }
+
+        $user->update($updateData);
+        $user->refresh();
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Profile updated successfully.',
+            'data'    => [
+                'id'         => $user->id,
+                'first_name' => $user->first_name,
+                'last_name'  => $user->last_name,
+                'mobile'     => $user->mobile,
+                'email'      => $user->email,
+                'role'       => $user->getRoleNames()->first(),
+            ]
+        ], 200);
+    }
+
 }
