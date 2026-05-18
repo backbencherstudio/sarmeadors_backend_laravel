@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Str;
@@ -79,6 +80,7 @@ class UserController extends Controller
             'last_name'  => ['nullable', 'string', 'max:100'],
             'mobile'     => ['nullable', 'string', 'max:20'],
             'email'      => ['required', 'email', 'max:255', 'unique:users,email'],
+            'image'      => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'role_id'    => ['required', 'integer', 'exists:roles,id'],
             'password'   => ['required', 'confirmed', Password::defaults()],
         ]);
@@ -103,19 +105,27 @@ class UserController extends Controller
         }
 
         DB::beginTransaction();
-        
+
         try {
+            $imagePath = null;
+
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')
+                    ->store('users', 'public');
+            }
 
             $user = User::create([
                 'first_name' => $validated['first_name'],
                 'last_name'  => $validated['last_name'] ?? null,
                 'email'      => $validated['email'],
                 'mobile'     => $validated['mobile'] ?? null,
-                'agency_id' => $authUser->agency_id,
-                'password' => Hash::make($validated['password']),
+                'image'      => $imagePath,
+                'agency_id'  => $authUser->agency_id,
+                'password'   => Hash::make($validated['password']),
             ]);
 
             $user->assignRole($role->name);
+
             DB::commit();
 
             return response()->json([
@@ -127,6 +137,9 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'mobile' => $user->mobile,
                     'email' => $user->email,
+                    'image' => $user->image 
+                        ? asset('storage/' . $user->image) 
+                        : null,
                     'role' => $role->name,
                 ]
             ], 201);
@@ -164,6 +177,7 @@ class UserController extends Controller
                 'last_name'  => $user->last_name,
                 'mobile'     => $user->mobile,
                 'email'      => $user->email,
+                'image'      => $user->image ? asset('storage/' . $user->image) : null,
                 'role'       => $user->getRoleNames()->first(),
             ]
         ]);
@@ -185,7 +199,7 @@ class UserController extends Controller
                 'agency_staff',
             ],
 
-            $authUser->hasRole('admin_staff'),
+            $authUser->hasRole('admin_staff') ||
             $authUser->hasRole('agency_staff') => [],
 
             default => null,
@@ -205,6 +219,7 @@ class UserController extends Controller
             'last_name'  => ['nullable', 'string', 'max:100'],
             'mobile'     => ['nullable', 'string', 'max:20'],
             'email'      => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'image'      => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'role_id'    => ['required', 'integer', 'exists:roles,id'],
             'password'   => ['nullable', 'confirmed', Password::defaults()],
         ]);
@@ -232,11 +247,24 @@ class UserController extends Controller
 
         try {
 
+            $imagePath = $user->image;
+
+            if ($request->hasFile('image')) {
+
+                if ($user->image && Storage::disk('public')->exists($user->image)) {
+                    Storage::disk('public')->delete($user->image);
+                }
+
+                $imagePath = $request->file('image')
+                    ->store('users', 'public');
+            }
+
             $user->update([
                 'first_name' => $validated['first_name'],
                 'last_name'  => $validated['last_name'] ?? null,
                 'email'      => $validated['email'],
                 'mobile'     => $validated['mobile'] ?? null,
+                'image'      => $imagePath,
                 'password'   => !empty($validated['password'])
                     ? Hash::make($validated['password'])
                     : $user->password,
@@ -255,6 +283,9 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'mobile' => $user->mobile,
                     'email' => $user->email,
+                    'image' => $user->image
+                        ? asset('storage/' . $user->image)
+                        : null,
                     'role' => $role->name,
                 ]
             ], 200);
@@ -271,36 +302,53 @@ class UserController extends Controller
         }
     }
 
-    public function data()
+    public function data(Request $request)
     {
         $authUser = auth('api')->user();
 
+        $perPage = $request->get('per_page', 10);
+
         $query = User::whereHas('roles')
             ->with(['roles:id,name'])
-            ->select('id', 'first_name', 'last_name', 'email', 'mobile', 'agency_id');
+            ->select('id','first_name','last_name','email','mobile','image','agency_id'
+            );
 
         if (!$authUser->hasRole('super_admin')) {
             $query->where('agency_id', $authUser->agency_id);
         }
 
-        $users = $query->get()->map(function ($user) {
+        $users = $query
+            ->latest('id')
+            ->paginate($perPage);
+
+        $users->getCollection()->transform(function ($user) {
             return [
                 'id'         => $user->id,
                 'first_name' => $user->first_name,
                 'last_name'  => $user->last_name,
                 'email'      => $user->email,
                 'mobile'     => $user->mobile,
+                'image'      => $user->image,
                 'agency_id'  => $user->agency_id,
                 'role'       => $user->getRoleNames()->first(),
             ];
-        });
+    });
 
-        return response()->json([
-            'status'  => true,
-            'message' => 'Users fetched successfully.',
-            'data'    => $users,
-        ]);
-    }
+    return response()->json([
+        'status'  => true,
+        'message' => 'Users fetched successfully.',
+        'data'    => $users->items(),
+
+        'pagination' => [
+            'current_page' => $users->currentPage(),
+            'last_page'    => $users->lastPage(),
+            'per_page'     => $users->perPage(),
+            'total'        => $users->total(),
+            'from'         => $users->firstItem(),
+            'to'           => $users->lastItem(),
+        ]
+    ]);
+}
 
     public function destroy($id)
     {

@@ -18,6 +18,7 @@ class User extends Authenticatable implements JWTSubject
         'first_name',
         'last_name',
         'email',
+        'image',
         'mobile',
         'password',
         'agency_id',
@@ -32,6 +33,11 @@ class User extends Authenticatable implements JWTSubject
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function getImageAttribute()
+    {
+        return $this->attributes['image'] ? asset('storage/' . $this->attributes['image']) : null;
+    }
 
     public function getJWTIdentifier()
     {
