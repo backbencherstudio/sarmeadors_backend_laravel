@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
@@ -322,47 +323,97 @@ class AgencyController extends Controller
         }
     }
 
-    public function infoUpdate(Request $request)
+    public function infoUpdate(Request $request, $id)
     {
         $authUser = auth('api')->user();
-        $agency = $authUser->agency;
+
+        if ($authUser->agency_id != $id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+
+        $agency = Agency::find($id);
+
+        if (!$agency) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:100',
-            'last_name'  => 'nullable|string|max:100',
-            'email'      => ['required','email', Rule::unique('users', 'email')->ignore($authUser->id), ],
-            'mobile'     => 'nullable|string|max:20',
-            'address'    => 'nullable|string|max:1000',
-            'password'   => 'nullable|min:6|confirmed',
+            'address' => 'nullable|string|max:1000',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'favicon' => 'nullable|image|mimes:jpg,jpeg,png,ico,webp|max:1024',
+            'stripe_publishable_key' => 'nullable|string|max:255',
+            'stripe_secret_key' => 'nullable|string|max:255',
+            'stripe_webhook_secret' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
+
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        $data = $validator->validated();
+        try {
 
-        $agency->update([
-            'name' => $data['name'],
-            'email'      => $data['email'],
-            'mobile'     => $data['mobile'] ?? null,
-            'address'    => $data['address'] ?? null,
-        ]);
+            $data = $validator->validated();
 
-        if (!empty($data['password'])) {
-            $authUser->update([
-                'password' => Hash::make($data['password'])
+            if ($request->hasFile('logo')) {
+
+                if ($agency->getRawOriginal('logo')) {
+                    Storage::disk('public')
+                        ->delete($agency->getRawOriginal('logo'));
+                }
+                $data['logo'] = $request->file('logo')
+                    ->store('agencies/logo', 'public');
+            }
+
+            if ($request->hasFile('favicon')) {
+
+                if ($agency->getRawOriginal('favicon')) {
+                    Storage::disk('public')
+                        ->delete($agency->getRawOriginal('favicon'));
+                }
+                $data['favicon'] = $request->file('favicon')
+                    ->store('agencies/favicon', 'public');
+            }
+
+            $agency->update([
+                'address' => $data['address'] ?? $agency->address,
+                'logo' => $data['logo']
+                    ?? $agency->getRawOriginal('logo'),
+                'favicon' => $data['favicon']
+                    ?? $agency->getRawOriginal('favicon'),
+                'stripe_publishable_key' => $data['stripe_publishable_key']
+                    ?? $agency->stripe_publishable_key,
+                'stripe_secret_key' => $data['stripe_secret_key']
+                    ?? $agency->stripe_secret_key,
+                'stripe_webhook_secret' => $data['stripe_webhook_secret']
+                    ?? $agency->stripe_webhook_secret,
             ]);
-        }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Agency information updated successfully'
-        ]);
+            return response()->json([
+                'status' => true,
+                'message' => 'Agency information updated successfully',
+                'data' => $agency->fresh(),
+            ]);
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency update failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
 }
