@@ -339,11 +339,9 @@ class UserController extends Controller
 
             'pagination' => [
                 'current_page' => $users->currentPage(),
-                'last_page'    => $users->lastPage(),
-                'per_page'     => $users->perPage(),
-                'total'        => $users->total(),
-                'from'         => $users->firstItem(),
-                'to'           => $users->lastItem(),
+                'per_page'    => $users->perPage(),
+                'total'       => $users->total(),
+                'last_page'   => $users->lastPage(),
             ]
         ]);
     }
