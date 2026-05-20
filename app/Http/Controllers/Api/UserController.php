@@ -330,30 +330,34 @@ class UserController extends Controller
                 'agency_id'  => $user->agency_id,
                 'role'       => $user->getRoleNames()->first(),
             ];
-    });
+        });
 
-    return response()->json([
-        'status'  => true,
-        'message' => 'Users fetched successfully.',
-        'data'    => $users->items(),
+        return response()->json([
+            'status'  => true,
+            'message' => 'Users fetched successfully.',
+            'data'    => $users->items(),
 
-        'pagination' => [
-            'current_page' => $users->currentPage(),
-            'last_page'    => $users->lastPage(),
-            'per_page'     => $users->perPage(),
-            'total'        => $users->total(),
-            'from'         => $users->firstItem(),
-            'to'           => $users->lastItem(),
-        ]
-    ]);
-}
+            'pagination' => [
+                'current_page' => $users->currentPage(),
+                'last_page'    => $users->lastPage(),
+                'per_page'     => $users->perPage(),
+                'total'        => $users->total(),
+                'from'         => $users->firstItem(),
+                'to'           => $users->lastItem(),
+            ]
+        ]);
+    }
 
     public function destroy($id)
     {
         $authUser = auth('api')->user();
 
         $user = User::findOrFail($id);
-        if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
+
+        if (
+            $authUser->hasRole('agency_admin') &&
+            $authUser->agency_id !== $user->agency_id
+        ) {
             return response()->json([
                 'status' => false,
                 'message' => 'Unauthorized access.'
@@ -364,8 +368,14 @@ class UserController extends Controller
 
         try {
 
+            $image = $user->getRawOriginal('image');
+
+            if ($image && Storage::disk('public')->exists($image)) {
+                Storage::disk('public')->delete($image);
+            }
+
             $user->syncRoles([]);
-            $user->syncPermissions([]);
+            // $user->syncPermissions([]);
 
             $user->delete();
 
@@ -377,6 +387,7 @@ class UserController extends Controller
             ], 200);
 
         } catch (\Throwable $e) {
+
             DB::rollBack();
 
             return response()->json([
@@ -428,7 +439,8 @@ class UserController extends Controller
             'first_name' => 'required|string|max:100',
             'last_name'  => 'nullable|string|max:100',
             'mobile'     => 'nullable|string|max:20',
-            'email'      => ['required','email','max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'email'      => ['required','email','max:255',Rule::unique('users', 'email')->ignore($user->id)],
+            'image'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'password'   => 'nullable|string|min:6|confirmed',
         ]);
 
@@ -453,6 +465,17 @@ class UserController extends Controller
             $updateData['password'] = Hash::make($validated['password']);
         }
 
+        if ($request->hasFile('image')) {
+            $oldImage = $user->getRawOriginal('image');
+
+            if ($oldImage && Storage::disk('public')->exists($oldImage)) {
+                Storage::disk('public')->delete($oldImage);
+            }
+
+            $updateData['image'] = $request->file('image')
+                ->store('users', 'public');
+        }
+
         $user->update($updateData);
         $user->refresh();
 
@@ -465,7 +488,8 @@ class UserController extends Controller
                 'last_name'  => $user->last_name,
                 'mobile'     => $user->mobile,
                 'email'      => $user->email,
-                'role'       => $user->getRoleNames()->first(),
+                'image'      => $user->image,
+                // 'role'       => $user->getRoleNames()->first(),
             ]
         ], 200);
     }
