@@ -137,9 +137,7 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'mobile' => $user->mobile,
                     'email' => $user->email,
-                    'image' => $user->image 
-                        ? asset('storage/' . $user->image) 
-                        : null,
+                    'image' => $user->image,
                     'role' => $role->name,
                 ]
             ], 201);
