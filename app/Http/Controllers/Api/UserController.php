@@ -249,8 +249,10 @@ class UserController extends Controller
 
             if ($request->hasFile('image')) {
 
-                if ($user->image && Storage::disk('public')->exists($user->image)) {
-                    Storage::disk('public')->delete($user->image);
+                $oldImage = $user->getRawOriginal('image');
+
+                if ($oldImage && Storage::disk('public')->exists($oldImage)) {
+                    Storage::disk('public')->delete($oldImage);
                 }
 
                 $imagePath = $request->file('image')
@@ -281,9 +283,7 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'mobile' => $user->mobile,
                     'email' => $user->email,
-                    'image' => $user->image
-                        ? asset('storage/' . $user->image)
-                        : null,
+                    'image' => $user->image,
                     'role' => $role->name,
                 ]
             ], 200);

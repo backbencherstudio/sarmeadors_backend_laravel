@@ -43,7 +43,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|agency_admin'])->g
     Route::get('/role-list', [UserController::class, 'roleList']);
     Route::post('/user-store', [UserController::class, 'store']);
     Route::get('/user-edit-data/{id}', [UserController::class, 'edit']);
-    Route::put('/user-update/{id}', [UserController::class, 'update']);
+    Route::post('/user-update/{id}', [UserController::class, 'update']);
     Route::delete('/user-delete/{id}', [UserController::class, 'destroy']);
 });
 
