@@ -57,7 +57,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->gr
     Route::get('/agencies', [AgencyController::class, 'data']);
     Route::post('/agency-store', [AgencyController::class, 'store']);
     Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
-    Route::put('/agency-update/{id}', [AgencyController::class, 'update']);
+    Route::post('/agency-update/{id}', [AgencyController::class, 'update']);
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 
 });

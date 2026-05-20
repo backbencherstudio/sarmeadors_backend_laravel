@@ -21,6 +21,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->foreignId('agency_id')->index();
+            $table->tinyInteger('is_owner')->default(0);
             $table->rememberToken();
             $table->timestamps();
         });

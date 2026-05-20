@@ -81,6 +81,7 @@ class AgencyController extends Controller
                 'email' => $data['email'],
                 'mobile' => $data['mobile'] ?? null,
                 'agency_id' => $agency->id,
+                'is_owner' => 1,
                 'password' => Hash::make($data['password']),
             ]);
 
@@ -122,71 +123,104 @@ class AgencyController extends Controller
 
     public function edit($id)
     {
-        $agency = Agency::findOrFail($id);
+        $agency = Agency::find($id);
+
+        if (!$agency) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
 
         return response()->json([
             'status' => true,
             'data' => [
-                'agency' => $agency,
+                'id' => $agency->id,
+                'name' => $agency->name,
+                'email' => $agency->email,
+                'mobile' => $agency->mobile,
+                'address' => $agency->address,
+                'subdomain' => $agency->subdomain,
+                'subdomain_prefix' => $agency->subdomain_prefix,
+                'status' => $agency->status,
+                'max_users' => $agency->max_users,
+                'max_clients' => $agency->max_clients,
+                'max_candidates' => $agency->max_candidates,
             ]
         ]);
     }
 
     public function update(Request $request, $id)
     {
+        $agency = Agency::find($id);
+
+        if (!$agency) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100',
+            'email' => ['required','email', 'max:100', Rule::unique('agencies', 'email')->ignore($agency->id),],
+            'mobile' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'max_users' => 'required|integer|min:1',
+            'max_clients' => 'required|integer|min:1',
+            'max_candidates' => 'required|integer|min:1',
+            'status' => 'nullable|in:active,inactive,suspended',
+            'subdomain_prefix' => [ 'required','string','max:50', Rule::unique('agencies', 'subdomain_prefix')->ignore($agency->id), 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+        ]);
+
+        if ($validator->fails()) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         DB::beginTransaction();
 
         try {
 
-            $agency = Agency::findOrFail($id);
-
-            $user = User::where('agency_id', $agency->id)
-                        ->role('agency_admin')
-                        ->firstOrFail();
-
-            $validator = Validator::make($request->all(), [
-                'first_name' => 'required|string|max:100',
-                'last_name'  => 'nullable|string|max:100',
-                'email'      => ['required','email', Rule::unique('users', 'email')->ignore($user->id), ],
-                'mobile'     => 'nullable|string|max:20',
-                'address'    => 'nullable|string|max:1000',
-                'password'   => 'nullable|min:6|confirmed',
-                'subdomain'  => ['required','string', Rule::unique('agencies', 'subdomain')->ignore($agency->id), ],
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Validation failed',
-                    'errors'  => $validator->errors()
-                ], 422);
-            }
-
             $data = $validator->validated();
 
-            $parts = explode('.', $data['subdomain']);
-            $prefix = $parts[0];
-
+            $prefix = strtolower($data['subdomain_prefix']);
+            $fullSubdomain = $prefix . '.staffhaus.io';
             $agency->update([
-                'name'             => $data['name'],
-                'email'            => $data['email'],
-                'mobile'           => $data['mobile'] ?? null,
-                'address'          => $data['address'] ?? null,
-                'subdomain'        => $data['subdomain'],
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'mobile' => $data['mobile'] ?? null,
+                'address' => $data['address'] ?? null,
+                'subdomain' => $fullSubdomain,
                 'subdomain_prefix' => $prefix,
+                'status' => $data['status'] ?? 'active',
+                'max_users' => $data['max_users'],
+                'max_clients' => $data['max_clients'],
+                'max_candidates' => $data['max_candidates'],
             ]);
 
-            $user->update([
-                'first_name' => $data['name'],
-                'last_name'  => null,
-                'email'      => $data['email'],
-                'mobile'     => $data['mobile'] ?? null,
-            ]);
+            $admin = User::where('agency_id', $agency->id)
+                ->where('is_owner', 1)
+                ->first();
 
-            if (!empty($data['password'])) {
-                $user->update([
-                    'password' => Hash::make($data['password'])
+            if ($admin) {
+
+                $admin->update([
+                    'first_name' => $data['name'],
+                    'email' => $data['email'],
+                    'mobile' => $data['mobile'] ?? null,
                 ]);
+
+                if ($request->filled('password')) {
+                    $admin->update([
+                        'password' => Hash::make($request->password)
+                    ]);
+                }
             }
 
             DB::commit();
@@ -195,12 +229,20 @@ class AgencyController extends Controller
                 'status' => true,
                 'message' => 'Agency updated successfully',
                 'data' => [
-                    'agency_id' => $agency->id,
-                    'agency_name' => $agency->name,
-                    'subdomain' => $agency->subdomain,
-                    'agency_admin_name' => $user->first_name . ' ' . $user->last_name,
-                    'agency_email' => $user->email,
+                    'agency' => [
+                        'id' => $agency->id,
+                        'name' => $agency->name,
+                        'subdomain' => $agency->subdomain,
+                        'status' => $agency->status,
+                    ],
+
+                    'admin' => $admin ? [
+                        'id' => $admin->id,
+                        'name' => $admin->first_name,
+                        'email' => $admin->email,
+                    ] : null
                 ]
+
             ]);
 
         } catch (\Throwable $e) {
@@ -210,7 +252,7 @@ class AgencyController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Agency update failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
