@@ -175,7 +175,7 @@ class UserController extends Controller
                 'last_name'  => $user->last_name,
                 'mobile'     => $user->mobile,
                 'email'      => $user->email,
-                'image'      => $user->image ? asset('storage/' . $user->image) : null,
+                'image'      => $user->image ?? null,
                 'role'       => $user->getRoleNames()->first(),
             ]
         ]);
@@ -303,13 +303,10 @@ class UserController extends Controller
     public function data(Request $request)
     {
         $authUser = auth('api')->user();
-
         $perPage = $request->get('per_page', 10);
-
         $query = User::whereHas('roles')
             ->with(['roles:id,name'])
-            ->select('id','first_name','last_name','email','mobile','image','agency_id'
-            );
+            ->select('id','first_name','last_name','email','mobile','image','agency_id');
 
         if (!$authUser->hasRole('super_admin')) {
             $query->where('agency_id', $authUser->agency_id);
@@ -331,7 +328,6 @@ class UserController extends Controller
                 'role'       => $user->getRoleNames()->first(),
             ];
         });
-
         return response()->json([
             'status'  => true,
             'message' => 'Users fetched successfully.',
