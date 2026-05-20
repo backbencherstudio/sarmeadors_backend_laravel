@@ -259,43 +259,36 @@ class AgencyController extends Controller
 
     public function destroy($id)
     {
+        $agency = Agency::find($id);
+
+        if (!$agency) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
+
         DB::beginTransaction();
 
         try {
-            $agency = Agency::findOrFail($id);
-            $authUser = auth('api')->user();
 
-            if ($authUser->agency_id == $agency->id) {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'You cannot delete your own agency.'
-                ], 403);
-            }
-
-            $agencyUsers = $agency->users()->get();
-
-            foreach ($agencyUsers as $user) {
-                $user->roles()->detach();
-                $user->delete();
-            }
-
+            User::where('agency_id', $agency->id)->delete();
             $agency->delete();
 
             DB::commit();
 
             return response()->json([
-                'status'  => true,
-                'message' => 'Agency deleted successfully.'
+                'status' => true,
+                'message' => 'Agency deleted successfully',
             ]);
 
         } catch (\Throwable $e) {
-
             DB::rollBack();
-
             return response()->json([
-                'status'  => false,
-                'message' => 'Agency deletion failed.',
-                'error'   => $e->getMessage()
+                'status' => false,
+                'message' => 'Agency deletion failed',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
