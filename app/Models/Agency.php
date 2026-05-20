@@ -19,13 +19,14 @@ class Agency extends Model
         'mobile',
         'address',
         'logo',
-        'primary_color',
-        'secondary_color',
         'favicon',
         'status',
         'stripe_publishable_key',
         'stripe_secret_key',
-        'stripe_webhook_secret', 
+        'stripe_webhook_secret',
+        'max_users',
+        'max_clients',
+        'max_candidates',
     ];
 
     protected $hidden = [

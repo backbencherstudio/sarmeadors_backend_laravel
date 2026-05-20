@@ -16,17 +16,18 @@ return new class extends Migration
             $table->string('name', 100);
             $table->string('subdomain', 100)->unique();
             $table->string('subdomain_prefix', 50)->unique();
-            $table->string('email',100)->nullable();
+            $table->string('email',100)->unique();
             $table->string('mobile',20)->nullable();
-            $table->text('address',1000)->nullable();
+            $table->text('address',500)->nullable();
             $table->string('logo',255)->nullable();
             $table->string('favicon',255)->nullable();
-            $table->string('primary_color',50)->nullable();
-            $table->string('secondary_color',50)->nullable();
             $table->enum('status', ['active','inactive','suspended'])->default('active');
             $table->text('stripe_publishable_key')->nullable();
             $table->text('stripe_secret_key')->nullable();
             $table->text('stripe_webhook_secret')->nullable();
+            $table->integer('max_users')->default(20);
+            $table->integer('max_clients')->default(100);
+            $table->integer('max_candidates')->default(1000);
             $table->timestamps();
         });
     }

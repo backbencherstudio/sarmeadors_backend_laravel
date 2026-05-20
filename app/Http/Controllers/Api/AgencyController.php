@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class AgencyController extends Controller
 {
 
     public function data()
     {
-        $agencies = Agency::get();
+        $agencies = Agency::all();
 
         return response()->json([
             'status' => true,
@@ -30,20 +31,24 @@ class AgencyController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:100',
-            'last_name'  => 'nullable|string|max:100',
-            'email'      => 'required|email|unique:users,email',
-            'phone'      => 'nullable|string|max:20',
-            'address'    => 'nullable|string|max:1000',
-            'password'   => 'required|min:6|confirmed',
-            'subdomain'  => 'required|string|unique:agencies,subdomain',
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:100|unique:users,email|unique:agencies,email',
+            'mobile' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'password' => 'required|string|min:6|confirmed',
+            'max_users' => 'required|integer|min:1',
+            'max_clients' => 'required|integer|min:1',
+            'max_candidates' => 'required|integer|min:1',
+            'status' => 'nullable|in:active,inactive,suspended',
+            'subdomain_prefix' => ['required', 'string','max:50','unique:agencies,subdomain_prefix','regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
         ]);
 
         if ($validator->fails()) {
+
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors()
             ], 422);
         }
 
@@ -52,32 +57,34 @@ class AgencyController extends Controller
         try {
 
             $data = $validator->validated();
-
-            $parts = explode('.', $data['subdomain']);
-            $prefix = $parts[0];
+            $prefix = strtolower($data['subdomain_prefix']);
+            $fullSubdomain = $prefix . '.staffhaus.io';
 
             $agency = Agency::create([
-                'first_name'        => $data['first_name'],
-                'last_name'         => $data['last_name'] ?? null,
-                'email'             => $data['email'],
-                'phone'             => $data['phone'] ?? null,
-                'address'           => $data['address'] ?? null,
-                'subdomain'         => $data['subdomain'],
-                'subdomain_prefix'  => $prefix,
-                'status'            => 1,
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'mobile' => $data['mobile'] ?? null,
+                'address' => $data['address'] ?? null,
+
+                'subdomain' => $fullSubdomain,
+                'subdomain_prefix' => $prefix,
+
+                'status' => $data['status'] ?? 'active',
+
+                'max_users' => $data['max_users'],
+                'max_clients' => $data['max_clients'],
+                'max_candidates' => $data['max_candidates'],
             ]);
 
             $user = User::create([
-                'first_name' => $data['first_name'],
-                'last_name'  => $data['last_name'] ?? null,
-                'email'      => $data['email'],
-                'mobile'     => $data['phone'] ?? null,
-                'agency_id'  => $agency->id,
-                'password'   => Hash::make($data['password']),
+                'first_name' => $data['name'],
+                'email' => $data['email'],
+                'mobile' => $data['mobile'] ?? null,
+                'agency_id' => $agency->id,
+                'password' => Hash::make($data['password']),
             ]);
 
-            $role = Role::where('name', 'agency_admin')->firstOrFail();
-            $user->assignRole($role);
+            $user->assignRole('agency_admin');
 
             DB::commit();
 
@@ -85,12 +92,20 @@ class AgencyController extends Controller
                 'status' => true,
                 'message' => 'Agency created successfully',
                 'data' => [
-                    'agency_id' => $agency->id,
-                    'agency_name' => $agency->first_name,
-                    'subdomain' => $agency->subdomain,
-                    'agency_admin_name' => $user->first_name . ' ' . $user->last_name,
-                    'agency_email' => $user->email,
+                    'agency' => [
+                        'id' => $agency->id,
+                        'name' => $agency->name,
+                        'subdomain' => $agency->subdomain,
+                        'status' => $agency->status,
+                    ],
+
+                    'admin' => [
+                        'id' => $user->id,
+                        'name' => $user->first_name,
+                        'email' => $user->email,
+                    ]
                 ]
+
             ], 201);
 
         } catch (\Throwable $e) {
@@ -100,7 +115,7 @@ class AgencyController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Agency creation failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -133,7 +148,7 @@ class AgencyController extends Controller
                 'first_name' => 'required|string|max:100',
                 'last_name'  => 'nullable|string|max:100',
                 'email'      => ['required','email', Rule::unique('users', 'email')->ignore($user->id), ],
-                'phone'      => 'nullable|string|max:20',
+                'mobile'     => 'nullable|string|max:20',
                 'address'    => 'nullable|string|max:1000',
                 'password'   => 'nullable|min:6|confirmed',
                 'subdomain'  => ['required','string', Rule::unique('agencies', 'subdomain')->ignore($agency->id), ],
@@ -153,20 +168,19 @@ class AgencyController extends Controller
             $prefix = $parts[0];
 
             $agency->update([
-                'first_name'       => $data['first_name'],
-                'last_name'        => $data['last_name'] ?? null,
+                'name'             => $data['name'],
                 'email'            => $data['email'],
-                'phone'            => $data['phone'] ?? null,
+                'mobile'           => $data['mobile'] ?? null,
                 'address'          => $data['address'] ?? null,
                 'subdomain'        => $data['subdomain'],
                 'subdomain_prefix' => $prefix,
             ]);
 
             $user->update([
-                'first_name' => $data['first_name'],
-                'last_name'  => $data['last_name'] ?? null,
+                'first_name' => $data['name'],
+                'last_name'  => null,
                 'email'      => $data['email'],
-                'mobile'     => $data['phone'] ?? null,
+                'mobile'     => $data['mobile'] ?? null,
             ]);
 
             if (!empty($data['password'])) {
@@ -182,7 +196,7 @@ class AgencyController extends Controller
                 'message' => 'Agency updated successfully',
                 'data' => [
                     'agency_id' => $agency->id,
-                    'agency_name' => $agency->first_name . ' ' . $agency->last_name,
+                    'agency_name' => $agency->name,
                     'subdomain' => $agency->subdomain,
                     'agency_admin_name' => $user->first_name . ' ' . $user->last_name,
                     'agency_email' => $user->email,
@@ -253,7 +267,7 @@ class AgencyController extends Controller
             'first_name' => 'required|string|max:100',
             'last_name'  => 'nullable|string|max:100',
             'email'      => ['required','email', Rule::unique('users', 'email')->ignore($authUser->id), ],
-            'phone'      => 'nullable|string|max:20',
+            'mobile'     => 'nullable|string|max:20',
             'address'    => 'nullable|string|max:1000',
             'password'   => 'nullable|min:6|confirmed',
         ]);
@@ -269,10 +283,9 @@ class AgencyController extends Controller
         $data = $validator->validated();
 
         $agency->update([
-            'first_name' => $data['first_name'],
-            'last_name'  => $data['last_name'] ?? null,
+            'name' => $data['name'],
             'email'      => $data['email'],
-            'phone'      => $data['phone'] ?? null,
+            'mobile'     => $data['mobile'] ?? null,
             'address'    => $data['address'] ?? null,
         ]);
 
