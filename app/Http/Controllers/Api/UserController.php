@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -75,6 +76,20 @@ class UserController extends Controller
             ], 403);
         }
 
+        $agency = null;
+
+        if ($authUser->agency_id != 0) {
+
+            $agency = Agency::find($authUser->agency_id);
+
+            if ($agency && $agency->total_users >= $agency->max_users) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User limit exceeded for this agency.'
+                ], 403);
+            }
+        }
+
         $validator = Validator::make($request->all(), [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name'  => ['nullable', 'string', 'max:100'],
@@ -107,6 +122,7 @@ class UserController extends Controller
         DB::beginTransaction();
 
         try {
+
             $imagePath = null;
 
             if ($request->hasFile('image')) {
@@ -125,6 +141,10 @@ class UserController extends Controller
             ]);
 
             $user->assignRole($role->name);
+
+            if ($agency) {
+                $agency->increment('total_users');
+            }
 
             DB::commit();
 
@@ -348,6 +368,13 @@ class UserController extends Controller
 
         $user = User::findOrFail($id);
 
+        if ($user->is_owner == 1) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Owner user cannot be deleted.'
+            ], 403);
+        }
+
         if (
             $authUser->hasRole('agency_admin') &&
             $authUser->agency_id !== $user->agency_id
@@ -369,7 +396,15 @@ class UserController extends Controller
             }
 
             $user->syncRoles([]);
-            // $user->syncPermissions([]);
+
+            if ($user->agency_id != 0) {
+
+                $agency = Agency::find($user->agency_id);
+
+                if ($agency && $agency->total_users > 0) {
+                    $agency->decrement('total_users');
+                }
+            }
 
             $user->delete();
 

@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@gmail.com',
             'mobile' => '01700000001',
             'agency_id' => 0,
+            'is_owner' => 1,
             'password' => bcrypt('111111'),
         ]);
 
