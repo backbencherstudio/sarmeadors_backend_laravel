@@ -273,22 +273,38 @@ class AgencyController extends Controller
 
         try {
 
-            User::where('agency_id', $agency->id)->delete();
+            $users = User::where('agency_id', $agency->id)->get();
+
+            foreach ($users as $user) {
+
+                $user->syncRoles([]);
+                $user->delete();
+            }
+
             $agency->delete();
 
             DB::commit();
 
             return response()->json([
+
                 'status' => true,
+
                 'message' => 'Agency deleted successfully',
+
             ]);
 
         } catch (\Throwable $e) {
+
             DB::rollBack();
+
             return response()->json([
+
                 'status' => false,
+
                 'message' => 'Agency deletion failed',
+
                 'error' => $e->getMessage(),
+
             ], 500);
         }
     }
