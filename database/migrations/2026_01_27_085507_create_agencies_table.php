@@ -28,6 +28,9 @@ return new class extends Migration
             $table->integer('max_users')->default(20);
             $table->integer('max_clients')->default(100);
             $table->integer('max_candidates')->default(1000);
+            $table->integer('total_users')->default(0);
+            $table->integer('total_clients')->default(0);
+            $table->integer('total_candidates')->default(0);
             $table->timestamps();
         });
     }

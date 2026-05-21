@@ -27,6 +27,9 @@ class Agency extends Model
         'max_users',
         'max_clients',
         'max_candidates',
+        'total_users',
+        'total_clients',
+        'total_candidates',
     ];
 
     protected $hidden = [

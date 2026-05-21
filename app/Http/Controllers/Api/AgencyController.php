@@ -74,6 +74,9 @@ class AgencyController extends Controller
                 'max_users' => $data['max_users'],
                 'max_clients' => $data['max_clients'],
                 'max_candidates' => $data['max_candidates'],
+                'total_users' => 1,
+                'total_clients' => 0,
+                'total_candidates' => 0,
             ]);
 
             $user = User::create([
@@ -146,6 +149,9 @@ class AgencyController extends Controller
                 'max_users' => $agency->max_users,
                 'max_clients' => $agency->max_clients,
                 'max_candidates' => $agency->max_candidates,
+                'total_users' => $agency->total_users,
+                'total_clients' => $agency->total_clients,
+                'total_candidates' => $agency->total_candidates,
             ]
         ]);
     }
@@ -267,6 +273,13 @@ class AgencyController extends Controller
                 'status' => false,
                 'message' => 'Agency not found',
             ], 404);
+        }
+
+        if ($agency->total_clients > 0 || $agency->total_candidates > 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Cannot delete agency with existing clients or candidates',
+            ], 400);
         }
 
         DB::beginTransaction();
