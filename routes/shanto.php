@@ -49,9 +49,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|agency_admin'])->g
 
 Route::middleware('auth:api')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {
     
     //Agency
     Route::get('/agencies', [AgencyController::class, 'data']);
@@ -62,13 +62,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->gr
 
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
 
+    Route::post('info-update/{id}', [AgencyController::class, 'infoUpdate']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {
-
-    Route::post('info-update', [AgencyController::class, 'infoUpdate']);
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
 
     //Client Status
     Route::get('/statuses', [StatusController::class, 'index']);
@@ -93,6 +92,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
 });
 
 
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {});

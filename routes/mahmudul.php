@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:api')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
     Route::get('agency_notes/{user}', [AgencyNoteController::class, 'index']);
     Route::post('agency_notes/{user}', [AgencyNoteController::class, 'store']);
     Route::get('agency_notes/show/{agency_note}', [AgencyNoteController::class, 'show']);
@@ -32,8 +32,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->group(functio
     Route::delete('message_template', [MessageTemplateController::class, 'destroy']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->group(function () {});
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {});

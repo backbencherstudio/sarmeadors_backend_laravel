@@ -20,10 +20,10 @@ class Agency extends Model
         'address',
         'logo',
         'favicon',
-        'status',
         'stripe_publishable_key',
         'stripe_secret_key',
         'stripe_webhook_secret',
+        'status',
         'max_users',
         'max_clients',
         'max_candidates',
@@ -85,6 +85,16 @@ class Agency extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function getLogoAttribute($value)
+    {
+        return $value ? asset('storage/' . $value) : null;
+    }
+
+    public function getFaviconAttribute($value)
+    {
+        return $value ? asset('storage/' . $value) : null;
     }
     
 }
