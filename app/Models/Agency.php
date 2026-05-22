@@ -40,30 +40,30 @@ class Agency extends Model
     protected $hidden = [
         'stripe_secret_key',
         'stripe_publishable_key',
-        'stripe_webhook_secret', 
+        'stripe_webhook_secret',
     ];
 
     protected function stripeSecretKey(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
+            get: fn(?string $value) => $value ? decrypt($value) : null,
+            set: fn(?string $value) => $value ? encrypt($value) : null,
         );
     }
 
     protected function stripePublishableKey(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
+            get: fn(?string $value) => $value ? decrypt($value) : null,
+            set: fn(?string $value) => $value ? encrypt($value) : null,
         );
     }
 
     protected function stripeWebhookSecret(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
+            get: fn(?string $value) => $value ? decrypt($value) : null,
+            set: fn(?string $value) => $value ? encrypt($value) : null,
         );
     }
 
@@ -101,5 +101,9 @@ class Agency extends Model
     {
         return $value ? asset('storage/' . $value) : null;
     }
-    
+
+    public function subLocations()
+    {
+        return $this->hasMany(SubLocation::class);
+    }
 }
