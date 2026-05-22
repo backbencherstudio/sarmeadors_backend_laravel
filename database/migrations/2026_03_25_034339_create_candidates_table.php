@@ -16,13 +16,15 @@ return new class extends Migration
 
             $table->foreignId('agency_id')->constrained()->cascadeOnDelete();
 
-            // Personal Information
             $table->string('first_name');
             $table->string('last_name')->nullable();
             $table->string('email')->unique();
             $table->string('mobile')->nullable();
-            $table->foreignId('type_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('location_id')->constrained()->cascadeOnDelete();
+            $table->text('hear_about_us')->nullable();
+            $table->string('image')->nullable();
+
+            $table->json('type_id')->nullable();
+            $table->json('location_id')->nullable();
 
             $table->timestamps();
         });

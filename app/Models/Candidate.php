@@ -15,9 +15,22 @@ class Candidate extends Model
         'last_name',
         'email',
         'mobile',
+        'hear_about_us',
+        'image',
+        
         'type_id',
         'location_id',
     ];
+
+    protected $casts = [
+        'type_id' => 'array',
+        'location_id' => 'array',
+    ];
+
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
+    }
 
     public function type()
     {
