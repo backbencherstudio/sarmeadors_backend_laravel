@@ -14,13 +14,13 @@ class Client extends Model
         'mobile',
         'image',
         'hear_about_us',
+        'payment_status',
+
         'type_id',
         'location_id',
         'checklist_id',
         'tag_id',
         'status_id',
-        'payment_status',
-        'is_active',
     ];
 
     protected $casts = [
@@ -31,6 +31,11 @@ class Client extends Model
         'status_id' => 'array',
     ];
 
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
+    }
+
     public function agency()
     {
         return $this->belongsTo(Agency::class);
@@ -39,11 +44,6 @@ class Client extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
-    }
-
-    public function getFullNameAttribute(): string
-    {
-        return "{$this->first_name} {$this->last_name}";
     }
 
     public function submissions()

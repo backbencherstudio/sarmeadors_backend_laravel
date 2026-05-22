@@ -22,15 +22,13 @@ return new class extends Migration
             $table->string('mobile')->nullable();
             $table->text('hear_about_us')->nullable();
             $table->string('image')->nullable();
+            $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending');
 
             $table->json('type_id')->nullable();
             $table->json('location_id')->nullable();
             $table->json('checklist_id')->nullable();
             $table->json('tag_id')->nullable();
             $table->json('status_id')->nullable();
-            
-            $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending');
-            $table->tinyInteger('is_active')->default(1);
 
             $table->timestamps();
         });
