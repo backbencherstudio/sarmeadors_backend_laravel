@@ -12,7 +12,7 @@ class Client extends Model
         'last_name',
         'email',
         'mobile',
-        'address',
+        'image',
         'hear_about_us',
         'type_id',
         'location_id',

@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('last_name')->nullable();
             $table->string('email')->unique();
             $table->string('mobile')->nullable();
-            $table->text('address')->nullable();
             $table->text('hear_about_us')->nullable();
+            $table->string('image')->nullable();
 
             $table->json('type_id')->nullable();
             $table->json('location_id')->nullable();
