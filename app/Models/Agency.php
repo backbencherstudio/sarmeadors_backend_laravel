@@ -106,4 +106,9 @@ class Agency extends Model
     {
         return $this->hasMany(SubLocation::class);
     }
+
+    public function services()
+    {
+        return $this->hasMany(Service::class);
+    }
 }
