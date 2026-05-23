@@ -71,8 +71,6 @@ class AgencyNoteController extends Controller
             'ids.*' => 'exists:agency_notes,id'
         ]);
 
-        AgencyNote::whereIn('id', $request->ids)->get();
-
         AgencyNote::whereIn('id', $request->ids)->delete();
 
         return $this->sendResponse([], 'Notes deleted successfully');
@@ -98,8 +96,6 @@ class AgencyNoteController extends Controller
             'ids' => 'required|array',
             'ids.*' => 'exists:agency_notes,id',
         ]);
-
-        AgencyNote::whereIn('id', $request->ids)->get();
 
         AgencyNote::whereIn('id', $request->ids)->update([
             'is_read' => true

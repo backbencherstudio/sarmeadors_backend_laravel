@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Agency\AgencyNoteController;
 use App\Http\Controllers\Agency\MessageTemplateController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
@@ -25,10 +24,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
 
     Route::get('message_template', [MessageTemplateController::class, 'index']);
     Route::post('message_template', [MessageTemplateController::class, 'store']);
-    Route::get('message_template/show/{agency_note}', [MessageTemplateController::class, 'show']);
-    Route::put('message_template/{agency_note}', [AgencyNoteController::class, 'update']);
-    Route::put('message_template/pin_note/{agency_note}', [MessageTemplateController::class, 'pin_note']);
-    Route::put('message_template/mark_read/{agency_note}', [MessageTemplateController::class, 'mark_read']);
+    Route::get('message_template/{messageTemplate}', [MessageTemplateController::class, 'show']);
+    Route::put('message_template/{messageTemplate}', [MessageTemplateController::class, 'update']);
     Route::delete('message_template', [MessageTemplateController::class, 'destroy']);
 });
 
