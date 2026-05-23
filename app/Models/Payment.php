@@ -9,6 +9,7 @@ class Payment extends Model
     protected $fillable = [
         'agency_id',
         'client_id',
+        'short_term_job_id',
         'stripe_checkout_session_id',
         'stripe_payment_intent_id',
         'amount',
@@ -31,6 +32,11 @@ class Payment extends Model
 
     public function client()
     {
-        $this->belongsTo(Client::class);
+        return $this->belongsTo(Client::class);
+    }
+
+    public function shortTermJob()
+    {
+        return $this->belongsTo(ShortTermJob::class);
     }
 }
