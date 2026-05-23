@@ -28,6 +28,10 @@ class Agency extends Model
         'stripe_publishable_key',
         'stripe_secret_key',
         'stripe_webhook_secret',
+        'short_term_payment_required',
+        'short_term_job_fee',
+        'short_term_job_fee_currency',
+        'short_term_auto_approve',
         'status',
         'max_users',
         'max_clients',
@@ -36,6 +40,17 @@ class Agency extends Model
         'total_clients',
         'total_candidates',
     ];
+
+    protected $casts = [
+        'short_term_payment_required' => 'boolean',
+        'short_term_auto_approve'     => 'boolean',
+        'short_term_job_fee'          => 'decimal:2',
+    ];
+
+    public function hasStripeKeys(): bool
+    {
+        return !empty($this->stripe_publishable_key) && !empty($this->stripe_secret_key);
+    }
 
     protected $hidden = [
         'stripe_secret_key',
