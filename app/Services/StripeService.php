@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Agency;
 use App\Models\Client;
+use App\Models\ShortTermJob;
 use Stripe\StripeClient;
 
 class StripeService
@@ -117,6 +118,57 @@ class StripeService
                 'agency_id' => $agency->id,
             ],
         ]);
+    }
+
+    /**
+     * Create a PaymentIntent for job posting fee — returns client_secret for custom form
+     */
+    public function createJobPaymentIntent(
+        Client        $client,
+        Agency        $agency,
+        ?ShortTermJob $job,
+        float         $amount,
+        string        $currency = 'usd'
+    ): \Stripe\PaymentIntent {
+
+        $stripe = $this->getClient($agency);
+
+        return $stripe->paymentIntents->create([
+            'amount'      => (int) ($amount * 100),
+            'currency'    => strtolower($currency),
+            'description' => 'Job Posting Fee' . ($job ? ' – ' . $job->title : ''),
+            'metadata'    => [
+                'job_id'    => $job?->id,
+                'client_id' => $client->id,
+                'agency_id' => $agency->id,
+                'job_type'  => 'short_term',
+            ],
+        ]);
+    }
+
+    /**
+     * Confirm a PaymentIntent on the backend using payment_method_id from frontend
+     */
+    public function confirmPaymentIntent(
+        Agency $agency,
+        string $paymentIntentId,
+        string $paymentMethodId
+    ): \Stripe\PaymentIntent {
+        $stripe = $this->getClient($agency);
+
+        return $stripe->paymentIntents->confirm($paymentIntentId, [
+            'payment_method' => $paymentMethodId,
+        ]);
+    }
+
+    /**
+     * Retrieve a PaymentIntent using AGENCY's keys
+     */
+    public function retrievePaymentIntent(Agency $agency, string $paymentIntentId): \Stripe\PaymentIntent
+    {
+        $stripe = $this->getClient($agency);
+
+        return $stripe->paymentIntents->retrieve($paymentIntentId);
     }
 
     /**

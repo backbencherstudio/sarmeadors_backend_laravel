@@ -66,6 +66,7 @@ class ClientController extends Controller
             }
         }
 
+
         $request->validate($rules);
 
         DB::beginTransaction();

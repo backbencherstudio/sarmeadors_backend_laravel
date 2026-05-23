@@ -26,18 +26,17 @@ class ClientController extends Controller
                 'mobile'      => 'nullable|string|max:20',
                 'location_id' => 'nullable|array',
                 'location_id.*' => 'integer|exists:locations,id',
-                'about_us'    => 'nullable|string',
+                'hear_about_us' => 'nullable|string',
             ]);
 
-            // dd($validated);
             $client = Client::create([
-                'agency_id'   => $agency->id,
-                'first_name'  => $validated['first_name'],
-                'last_name'   => $validated['last_name'] ?? null,
-                'email'       => $validated['email'],
-                'mobile'      => $validated['mobile'] ?? null,
-                'location_id' => $validated['location_id'] ?? null,
-                'about_us'    => $validated['about_us'] ?? null,
+                'agency_id'     => $agency->id,
+                'first_name'    => $validated['first_name'],
+                'last_name'     => $validated['last_name'] ?? null,
+                'email'         => $validated['email'],
+                'mobile'        => $validated['mobile'] ?? null,
+                'location_id'   => $validated['location_id'] ?? null,
+                'hear_about_us' => $validated['hear_about_us'] ?? null,
             ]);
 
             return $this->sendResponse($client, 'Client created successfully', 201);

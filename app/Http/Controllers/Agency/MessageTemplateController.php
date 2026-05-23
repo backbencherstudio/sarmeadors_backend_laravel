@@ -66,7 +66,7 @@ class MessageTemplateController extends Controller
      */
     public function show(MessageTemplate $messageTemplate)
     {
-        //
+        return $this->sendResponse($messageTemplate);
     }
 
     /**
@@ -74,14 +74,46 @@ class MessageTemplateController extends Controller
      */
     public function update(Request $request, MessageTemplate $messageTemplate)
     {
-        //
+        $data = $request->validate([
+            'name'           => 'sometimes|required|string',
+            'subject'        => 'sometimes|required|string',
+            'body'           => 'sometimes|required|string',
+            'user_type'      => 'nullable|integer',
+            'status'         => 'nullable|integer',
+            'type'           => 'nullable|string',
+            'sender_email'   => 'nullable|email',
+            'receiver_email' => 'nullable|email',
+            'cc'             => 'nullable|string',
+            'bcc'            => 'nullable|string',
+            'location'       => 'nullable|string',
+            'attachments.*'  => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
+        ]);
+
+        if ($request->hasFile('attachments')) {
+            $attachments = [];
+            foreach ($request->file('attachments') as $file) {
+                $attachments[] = $file->store('attachments', 'public');
+            }
+            $data['attachments'] = $attachments;
+        }
+
+        $messageTemplate->update($data);
+
+        return $this->sendResponse($messageTemplate, 'Template updated successfully');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified resources from storage.
      */
-    public function destroy(MessageTemplate $messageTemplate)
+    public function destroy(Request $request)
     {
-        //
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'exists:message_templates,id',
+        ]);
+
+        MessageTemplate::whereIn('id', $request->ids)->delete();
+
+        return $this->sendResponse([], 'Templates deleted successfully');
     }
 }
