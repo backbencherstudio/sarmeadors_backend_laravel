@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
+use App\Models\AgencyBusinessHour;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +80,20 @@ class AgencyController extends Controller
                 'total_clients' => 0,
                 'total_candidates' => 0,
             ]);
+
+            //create default business hours for the agency
+            $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+            foreach ($days as $day) {
+                AgencyBusinessHour::create([
+                    'agency_id'  => $agency->id,
+                    'day'        => $day,
+                    'start_time' => '09:00:00',
+                    'end_time'   => '17:00:00',
+                    'is_open'    => in_array($day, ['Saturday', 'Sunday']) ? false : true,
+                ]);
+            }
+            //end of business hour creation
 
             $user = User::create([
                 'first_name' => $data['name'],
@@ -326,7 +341,7 @@ class AgencyController extends Controller
     public function infoUpdate(Request $request, $id)
     {
         $authUser = auth('api')->user();
-        
+
         if ($authUser->agency_id != $id) {
 
             return response()->json([
