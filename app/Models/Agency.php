@@ -111,4 +111,10 @@ class Agency extends Model
     {
         return $this->hasMany(Service::class);
     }
+
+    protected $casts = [
+        'countries' => 'array',
+        'location_ids' => 'array',
+        'is_open' => 'boolean'
+    ];
 }
