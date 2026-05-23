@@ -10,6 +10,7 @@ use App\Http\Controllers\Agency\DocumentTemplateController;
 use App\Http\Controllers\Agency\ServiceController;
 use App\Http\Controllers\Agency\StatusTemplateController;
 use App\Http\Controllers\Agency\SubLocationController;
+use App\Http\Controllers\Agency\SettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,15 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::put('/service-update/{id}', [ServiceController::class, 'update']);
     Route::delete('/service-destroy/{id}', [ServiceController::class, 'destroy']);
     Route::patch('/service-change-status/{id}', [ServiceController::class, 'changeStatus']);
+
+    //agency business details management route for global settings
+    Route::get('/business-details', [SettingsController::class, 'getBusinessDetails']);
+    Route::post('/business-holiday-store', [SettingsController::class, 'storeHoliday']);
+    Route::delete('/business-holiday-delete/{id}', [SettingsController::class, 'destroyHoliday']);
+    Route::post('/business-setting-update', [SettingsController::class, 'updateBusinessSettings']);
+    Route::post('/business-hour-update', [SettingsController::class, 'updateBusinessHours']);
+    Route::patch('/business-hours/{id}/status', [SettingsController::class, 'toggleBusinessHourStatus']);
+
 
 });
 
