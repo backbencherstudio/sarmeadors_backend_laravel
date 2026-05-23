@@ -7,6 +7,7 @@ use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
 use App\Http\Controllers\Agency\DocumentTemplateController;
+use App\Http\Controllers\Agency\ServiceController;
 use App\Http\Controllers\Agency\StatusTemplateController;
 use App\Http\Controllers\Agency\SubLocationController;
 use Illuminate\Http\Request;
@@ -21,12 +22,20 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->pr
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
 
-    //agency sub-location management route
+    //agency sub-location management route for global settings
     Route::get('sub-locations', [SubLocationController::class, 'index']);
     Route::post('sub-location-store', [SubLocationController::class, 'store']);
     Route::get('sub-location/{id}', [SubLocationController::class, 'show']);
     Route::put('sub-location-update/{id}', [SubLocationController::class, 'update']);
     Route::delete('sub-location-destroy/{id}', [SubLocationController::class, 'destroy']);
+
+    //agency service management route for global settings
+    Route::get('/services', [ServiceController::class, 'index']);
+    Route::post('/service-store', [ServiceController::class, 'store']);
+    Route::get('/service/{id}', [ServiceController::class, 'show']);
+    Route::put('/service-update/{id}', [ServiceController::class, 'update']);
+    Route::delete('/service-destroy/{id}', [ServiceController::class, 'destroy']);
+    Route::patch('/service-change-status/{id}', [ServiceController::class, 'changeStatus']);
 
 });
 
