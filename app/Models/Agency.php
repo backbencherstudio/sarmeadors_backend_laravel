@@ -45,6 +45,9 @@ class Agency extends Model
         'short_term_payment_required' => 'boolean',
         'short_term_auto_approve'     => 'boolean',
         'short_term_job_fee'          => 'decimal:2',
+        'countries'                   => 'array',
+        'location_ids'                => 'array',
+        'is_open'                     => 'boolean',
     ];
 
     public function hasStripeKeys(): bool
@@ -127,9 +130,4 @@ class Agency extends Model
         return $this->hasMany(Service::class);
     }
 
-    protected $casts = [
-        'countries' => 'array',
-        'location_ids' => 'array',
-        'is_open' => 'boolean'
-    ];
 }
