@@ -47,26 +47,40 @@ class LongTermJob extends Model
         'payment_norms',
         'consent_description',
         'child_attachment',
+        // Contact
+        'primary_first_name', 'primary_last_name', 'primary_email', 'primary_phone',
+        'secondary_first_name', 'secondary_last_name', 'secondary_email', 'secondary_phone',
+        // Extra requirements
+        'prepare_meals', 'travel_with_family', 'spouse_work_from_home', 'nanny_own_car',
+        // Status
         'status',
         'rejection_reason',
+        'cancellation_reason',
+        'cancelled_at',
+        'broadcast_requested',
+        'broadcast_requested_at',
     ];
 
     protected $casts = [
         'bilingual_preference' => 'boolean',
-        'special_needs'        => 'boolean',
-        'school_activity'      => 'boolean',
-        'has_housekeeper'      => 'boolean',
-        'live_in_required'     => 'boolean',
-        'paid_vacation'        => 'boolean',
-        'room_with_wifi'       => 'boolean',
-        'start_date'           => 'date',
-        'end_date'             => 'date',
-        'compensation_amount'  => 'decimal:2',
+        'special_needs' => 'boolean',
+        'school_activity' => 'boolean',
+        'has_housekeeper' => 'boolean',
+        'live_in_required' => 'boolean',
+        'room_with_wifi' => 'boolean',
+        'prepare_meals' => 'boolean',
+        'travel_with_family' => 'boolean',
+        'broadcast_requested' => 'boolean',
+        'cancelled_at' => 'datetime',
+        'broadcast_requested_at' => 'datetime',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'compensation_amount' => 'decimal:2',
     ];
 
     public function getCoverImageUrlAttribute(): ?string
     {
-        return $this->cover_image ? asset('storage/' . $this->cover_image) : null;
+        return $this->cover_image ? asset('storage/'.$this->cover_image) : null;
     }
 
     public function agency()
@@ -104,8 +118,28 @@ class LongTermJob extends Model
         return $this->hasMany(LongTermJobAttendance::class);
     }
 
+    public function latestAttendance()
+    {
+        return $this->hasOne(LongTermJobAttendance::class)->latestOfMany('date');
+    }
+
     public function nannyPayments()
     {
         return $this->hasMany(LongTermJobNannyPayment::class);
+    }
+
+    public function applications()
+    {
+        return $this->hasMany(LongTermJobApplication::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(LongTermJobReview::class);
+    }
+
+    public function refundRequest()
+    {
+        return $this->hasOne(LongTermJobRefundRequest::class);
     }
 }
