@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('subdomain', 100)->unique();
             $table->string('subdomain_prefix', 50)->unique();
             $table->string('email', 100)->unique();
+            $table->string('default_from_email')->nullable();
+            $table->string('default_reply_email')->nullable();
             $table->string('mobile', 20)->nullable();
             $table->text('address', 500)->nullable();
             $table->string('logo', 255)->nullable();

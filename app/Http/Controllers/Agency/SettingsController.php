@@ -9,7 +9,6 @@ use App\Models\AgencyHoliday;
 use App\Models\Location;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
 {
@@ -18,17 +17,17 @@ class SettingsController extends Controller
         $agency_id = auth('api')->user()->agency_id;
 
         $masterCommonHolidays = [
-            "New Years Day",
-            "Martin Luther King JL Day",
+            'New Years Day',
+            'Martin Luther King JL Day',
             "Presidents' Day",
-            "Memorial Day",
-            "Juneteenth National Independence Day",
-            "Labor Day",
-            "Columbus Day",
-            "Veterans Day",
-            "Thanksgiving Day",
-            "Independence Day",
-            "Christmas Day"
+            'Memorial Day',
+            'Juneteenth National Independence Day',
+            'Labor Day',
+            'Columbus Day',
+            'Veterans Day',
+            'Thanksgiving Day',
+            'Independence Day',
+            'Christmas Day',
         ];
 
         $locations = Location::where('agency_id', $agency_id)
@@ -38,15 +37,16 @@ class SettingsController extends Controller
 
         $savedHolidays->transform(function ($holiday) use ($locations) {
             $details = [];
-            if (!empty($holiday->location_ids)) {
+            if (! empty($holiday->location_ids)) {
                 foreach ($holiday->location_ids as $id) {
                     $details[] = [
                         'id' => $id,
-                        'location' => $locations[$id] ?? 'Unknown Location'
+                        'location' => $locations[$id] ?? 'Unknown Location',
                     ];
                 }
             }
             $holiday->location_details = $details;
+
             return $holiday;
         });
 
@@ -56,9 +56,9 @@ class SettingsController extends Controller
                 'agency' => Agency::find($agency_id, ['id', 'currency', 'countries']),
                 'common_holidays_master' => $masterCommonHolidays,
                 'saved_holidays' => $savedHolidays,
-                'all_agency_locations' => $locations->map(fn($location, $id) => ['id' => $id, 'location' => $location])->values(),
+                'all_agency_locations' => $locations->map(fn ($location, $id) => ['id' => $id, 'location' => $location])->values(),
                 'business_hours' => AgencyBusinessHour::where('agency_id', $agency_id)->get(),
-            ]
+            ],
         ]);
     }
 
@@ -68,17 +68,17 @@ class SettingsController extends Controller
 
         $validator = Validator::make($request->all(), [
             'holiday_name' => 'required|string|max:255',
-            'date'         => 'required_if:is_common,false|nullable|date',
+            'date' => 'required_if:is_common,false|nullable|date',
             'location_ids' => 'nullable|array',
             'location_ids.*' => 'integer',
-            'is_common'    => 'nullable|boolean',
+            'is_common' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
         }
 
-        if ($request->has('location_ids') && !empty($request->location_ids)) {
+        if ($request->has('location_ids') && ! empty($request->location_ids)) {
 
             $validLocationsCount = Location::where('agency_id', $agency_id)
                 ->whereIn('id', $request->location_ids)
@@ -87,23 +87,23 @@ class SettingsController extends Controller
             if ($validLocationsCount !== count($request->location_ids)) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'One or more Location IDs are invalid or do not belong to your agency.'
+                    'message' => 'One or more Location IDs are invalid or do not belong to your agency.',
                 ], 403);
             }
         }
 
         $holiday = AgencyHoliday::create([
-            'agency_id'    => $agency_id,
+            'agency_id' => $agency_id,
             'holiday_name' => $request->holiday_name,
-            'date'         => $request->is_common ? null : $request->date,
+            'date' => $request->is_common ? null : $request->date,
             'location_ids' => $request->location_ids,
-            'is_common'    => $request->is_common,
+            'is_common' => $request->is_common,
         ]);
 
         return response()->json([
             'status' => true,
             'message' => 'Holiday added successfully',
-            'data' => $holiday
+            'data' => $holiday,
         ], 201);
     }
 
@@ -115,10 +115,10 @@ class SettingsController extends Controller
             ->where('agency_id', $agency_id)
             ->first();
 
-        if (!$holiday) {
+        if (! $holiday) {
             return response()->json([
                 'status' => false,
-                'message' => 'Holiday not found or you do not have permission to delete it.'
+                'message' => 'Holiday not found or you do not have permission to delete it.',
             ], 404);
         }
 
@@ -126,7 +126,7 @@ class SettingsController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Holiday deleted successfully'
+            'message' => 'Holiday deleted successfully',
         ]);
     }
 
@@ -135,7 +135,7 @@ class SettingsController extends Controller
         $agency_id = auth('api')->user()->agency_id;
 
         $validator = Validator::make($request->all(), [
-            'currency'  => 'required|string|max:10',
+            'currency' => 'required|string|max:10',
             'countries' => 'required|array',
         ]);
 
@@ -144,7 +144,7 @@ class SettingsController extends Controller
         }
 
         Agency::where('id', $agency_id)->update([
-            'currency'  => $request->currency,
+            'currency' => $request->currency,
             'countries' => $request->countries,
         ]);
 
@@ -156,11 +156,11 @@ class SettingsController extends Controller
         $agency_id = auth('api')->user()->agency_id;
 
         $validator = Validator::make($request->all(), [
-            'business_hours'            => 'required|array',
-            'business_hours.*.day'      => 'required|string',
+            'business_hours' => 'required|array',
+            'business_hours.*.day' => 'required|string',
             'business_hours.*.start_time' => 'nullable',
-            'business_hours.*.end_time'  => 'nullable',
-            'business_hours.*.is_open'   => 'required|boolean',
+            'business_hours.*.end_time' => 'nullable',
+            'business_hours.*.is_open' => 'required|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -172,12 +172,55 @@ class SettingsController extends Controller
                 ->where('day', $hour['day'])
                 ->update([
                     'start_time' => $hour['start_time'],
-                    'end_time'   => $hour['end_time'],
-                    'is_open'    => $hour['is_open'],
+                    'end_time' => $hour['end_time'],
+                    'is_open' => $hour['is_open'],
                 ]);
         }
 
         return response()->json(['status' => true, 'message' => 'Business hours updated successfully']);
+    }
+
+    public function getCommunicationSettings()
+    {
+        $agency_id = auth('api')->user()->agency_id;
+
+        $agency = Agency::find($agency_id, ['id', 'email', 'default_from_email', 'default_reply_email']);
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'admin_email' => $agency->email,
+                'default_from_email' => $agency->default_from_email,
+                'default_reply_email' => $agency->default_reply_email,
+            ],
+        ]);
+    }
+
+    public function updateCommunicationSettings(Request $request)
+    {
+        $agency_id = auth('api')->user()->agency_id;
+
+        $validator = Validator::make($request->all(), [
+            'admin_email' => 'required|email|max:255',
+            'default_from_email' => 'required|email|max:255',
+            'default_reply_email' => 'required|email|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $user = auth('api')->user();
+
+        Agency::where('id', $agency_id)->update([
+            'email' => $request->admin_email,
+            'default_from_email' => $request->default_from_email,
+            'default_reply_email' => $request->default_reply_email,
+        ]);
+
+        $user->update(['email' => $request->admin_email]);
+
+        return response()->json(['status' => true, 'message' => 'Communication settings updated successfully']);
     }
 
     public function toggleBusinessHourStatus(Request $request, $id)
@@ -189,7 +232,7 @@ class SettingsController extends Controller
             ->firstOrFail();
 
         $validator = Validator::make($request->all(), [
-            'is_open' => 'required|boolean'
+            'is_open' => 'required|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -197,12 +240,12 @@ class SettingsController extends Controller
         }
 
         $businessHour->update([
-            'is_open' => $request->is_open
+            'is_open' => $request->is_open,
         ]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Status updated for ' . $businessHour->day
+            'message' => 'Status updated for '.$businessHour->day,
         ]);
     }
 }

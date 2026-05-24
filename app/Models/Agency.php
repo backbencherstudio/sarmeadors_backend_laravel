@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Agency extends Model
 {
@@ -25,6 +24,10 @@ class Agency extends Model
         'font',
         'tax_id',
         'language',
+        'currency',
+        'countries',
+        'default_from_email',
+        'default_reply_email',
         'stripe_publishable_key',
         'stripe_secret_key',
         'stripe_webhook_secret',
@@ -43,16 +46,16 @@ class Agency extends Model
 
     protected $casts = [
         'short_term_payment_required' => 'boolean',
-        'short_term_auto_approve'     => 'boolean',
-        'short_term_job_fee'          => 'decimal:2',
-        'countries'                   => 'array',
-        'location_ids'                => 'array',
-        'is_open'                     => 'boolean',
+        'short_term_auto_approve' => 'boolean',
+        'short_term_job_fee' => 'decimal:2',
+        'countries' => 'array',
+        'location_ids' => 'array',
+        'is_open' => 'boolean',
     ];
 
     public function hasStripeKeys(): bool
     {
-        return !empty($this->stripe_publishable_key) && !empty($this->stripe_secret_key);
+        return ! empty($this->stripe_publishable_key) && ! empty($this->stripe_secret_key);
     }
 
     protected $hidden = [
@@ -64,24 +67,24 @@ class Agency extends Model
     protected function stripeSecretKey(): Attribute
     {
         return Attribute::make(
-            get: fn(?string $value) => $value ? decrypt($value) : null,
-            set: fn(?string $value) => $value ? encrypt($value) : null,
+            get: fn (?string $value) => $value ? decrypt($value) : null,
+            set: fn (?string $value) => $value ? encrypt($value) : null,
         );
     }
 
     protected function stripePublishableKey(): Attribute
     {
         return Attribute::make(
-            get: fn(?string $value) => $value ? decrypt($value) : null,
-            set: fn(?string $value) => $value ? encrypt($value) : null,
+            get: fn (?string $value) => $value ? decrypt($value) : null,
+            set: fn (?string $value) => $value ? encrypt($value) : null,
         );
     }
 
     protected function stripeWebhookSecret(): Attribute
     {
         return Attribute::make(
-            get: fn(?string $value) => $value ? decrypt($value) : null,
-            set: fn(?string $value) => $value ? encrypt($value) : null,
+            get: fn (?string $value) => $value ? decrypt($value) : null,
+            set: fn (?string $value) => $value ? encrypt($value) : null,
         );
     }
 
@@ -112,12 +115,12 @@ class Agency extends Model
 
     public function getLogoAttribute($value)
     {
-        return $value ? asset('storage/' . $value) : null;
+        return $value ? asset('storage/'.$value) : null;
     }
 
     public function getFaviconAttribute($value)
     {
-        return $value ? asset('storage/' . $value) : null;
+        return $value ? asset('storage/'.$value) : null;
     }
 
     public function subLocations()
@@ -129,5 +132,4 @@ class Agency extends Model
     {
         return $this->hasMany(Service::class);
     }
-
 }
