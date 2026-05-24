@@ -9,6 +9,8 @@ use App\Models\LongTermJobNannyPayment;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class LongTermJobAttendanceController extends Controller
 {
@@ -21,15 +23,15 @@ class LongTermJobAttendanceController extends Controller
     public function calendar(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
-            if (!$this->resolveJob($request, $longTermJob)) {
+            if (! $this->resolveJob($request, $longTermJob)) {
                 return $this->sendError('Not found', [], 404);
             }
 
             $month = $request->query('month', Carbon::now()->format('Y-m'));
 
             try {
-                $start = Carbon::parse($month . '-01')->startOfMonth();
-                $end   = $start->copy()->endOfMonth();
+                $start = Carbon::parse($month.'-01')->startOfMonth();
+                $end = $start->copy()->endOfMonth();
             } catch (\Exception) {
                 return $this->sendError('Invalid month format. Use Y-m (e.g. 2026-01).', [], 422);
             }
@@ -43,10 +45,10 @@ class LongTermJobAttendanceController extends Controller
             $summary = $this->buildSummary($longTermJob);
 
             return $this->sendResponse([
-                'job'        => $longTermJob->load(['candidate', 'schedules']),
-                'month'      => $month,
+                'job' => $longTermJob->load(['candidate', 'schedules']),
+                'month' => $month,
                 'attendance' => $attendance,
-                'summary'    => $summary,
+                'summary' => $summary,
             ], 'Attendance calendar retrieved successfully', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -58,20 +60,20 @@ class LongTermJobAttendanceController extends Controller
     public function upsert(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
-            if (!$this->resolveJob($request, $longTermJob)) {
+            if (! $this->resolveJob($request, $longTermJob)) {
                 return $this->sendError('Not found', [], 404);
             }
 
-            if (!$longTermJob->candidate_id) {
+            if (! $longTermJob->candidate_id) {
                 return $this->sendError('No nanny assigned to this job yet.', [], 422);
             }
 
             $validated = $request->validate([
-                'date'       => 'required|date',
-                'check_in'   => 'nullable|date_format:H:i|required_unless:is_absent,true',
-                'check_out'  => 'nullable|date_format:H:i|after:check_in',
-                'is_absent'  => 'nullable|boolean',
-                'notes'      => 'nullable|string|max:500',
+                'date' => 'required|date',
+                'check_in' => 'nullable|date_format:H:i|required_unless:is_absent,true',
+                'check_out' => 'nullable|date_format:H:i|after:check_in',
+                'is_absent' => 'nullable|boolean',
+                'notes' => 'nullable|string|max:500',
             ]);
 
             $isAbsent = $validated['is_absent'] ?? false;
@@ -79,19 +81,19 @@ class LongTermJobAttendanceController extends Controller
             $record = LongTermJobAttendance::updateOrCreate(
                 [
                     'long_term_job_id' => $longTermJob->id,
-                    'candidate_id'     => $longTermJob->candidate_id,
-                    'date'             => $validated['date'],
+                    'candidate_id' => $longTermJob->candidate_id,
+                    'date' => $validated['date'],
                 ],
                 [
-                    'check_in'  => $isAbsent ? null : ($validated['check_in'] ?? null),
+                    'check_in' => $isAbsent ? null : ($validated['check_in'] ?? null),
                     'check_out' => $isAbsent ? null : ($validated['check_out'] ?? null),
                     'is_absent' => $isAbsent,
-                    'notes'     => $validated['notes'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
                 ]
             );
 
             return $this->sendResponse($record, 'Attendance saved.', 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -102,7 +104,7 @@ class LongTermJobAttendanceController extends Controller
     public function assignNanny(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
-            if (!$this->resolveJob($request, $longTermJob)) {
+            if (! $this->resolveJob($request, $longTermJob)) {
                 return $this->sendError('Not found', [], 404);
             }
 
@@ -112,7 +114,7 @@ class LongTermJobAttendanceController extends Controller
 
             $longTermJob->update([
                 'candidate_id' => $validated['candidate_id'],
-                'status'       => 'running',
+                'status' => 'running',
             ]);
 
             return $this->sendResponse(
@@ -120,7 +122,7 @@ class LongTermJobAttendanceController extends Controller
                 'Nanny assigned and job is now running.',
                 200
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -131,7 +133,7 @@ class LongTermJobAttendanceController extends Controller
     public function listNannyPayments(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
-            if (!$this->resolveJob($request, $longTermJob)) {
+            if (! $this->resolveJob($request, $longTermJob)) {
                 return $this->sendError('Not found', [], 404);
             }
 
@@ -147,33 +149,40 @@ class LongTermJobAttendanceController extends Controller
     public function recordNannyPayment(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
-            if (!$this->resolveJob($request, $longTermJob)) {
+            if (! $this->resolveJob($request, $longTermJob)) {
                 return $this->sendError('Not found', [], 404);
             }
 
-            if (!$longTermJob->candidate_id) {
+            if (! $longTermJob->candidate_id) {
                 return $this->sendError('No nanny assigned to this job.', [], 422);
             }
 
             $validated = $request->validate([
-                'amount'       => 'required|numeric|min:0.01',
-                'currency'     => 'nullable|string|size:3',
+                'amount' => 'required|numeric|min:0.01',
+                'currency' => 'nullable|string|size:3',
+                'payment_method' => 'nullable|string|max:100',
                 'payment_date' => 'required|date',
-                'notes'        => 'nullable|string|max:500',
+                'notes' => 'nullable|string|max:500',
             ]);
+
+            do {
+                $invoiceNumber = strtoupper(Str::random(14));
+            } while (LongTermJobNannyPayment::where('invoice_number', $invoiceNumber)->exists());
 
             $payment = LongTermJobNannyPayment::create([
                 'long_term_job_id' => $longTermJob->id,
-                'candidate_id'     => $longTermJob->candidate_id,
-                'agency_id'        => $longTermJob->agency_id,
-                'amount'           => $validated['amount'],
-                'currency'         => $validated['currency'] ?? $longTermJob->compensation_currency,
-                'payment_date'     => $validated['payment_date'],
-                'notes'            => $validated['notes'] ?? null,
+                'candidate_id' => $longTermJob->candidate_id,
+                'agency_id' => $longTermJob->agency_id,
+                'invoice_number' => $invoiceNumber,
+                'amount' => $validated['amount'],
+                'currency' => $validated['currency'] ?? $longTermJob->compensation_currency,
+                'payment_method' => $validated['payment_method'] ?? null,
+                'payment_date' => $validated['payment_date'],
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             return $this->sendResponse($payment, 'Payment recorded.', 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -188,7 +197,7 @@ class LongTermJobAttendanceController extends Controller
             ->get();
 
         $totalMinutes = $attendance->sum(fn ($a) => $a->duration_minutes);
-        $totalHours   = round($totalMinutes / 60, 2);
+        $totalHours = round($totalMinutes / 60, 2);
 
         $totalPayable = 0;
         if ($job->compensation_type === 'per_hour') {
@@ -196,16 +205,16 @@ class LongTermJobAttendanceController extends Controller
         }
 
         $totalPaid = (float) LongTermJobNannyPayment::where('long_term_job_id', $job->id)->sum('amount');
-        $due       = max(0, round($totalPayable - $totalPaid, 2));
+        $due = max(0, round($totalPayable - $totalPaid, 2));
 
         return [
             'compensation_amount' => (float) $job->compensation_amount,
-            'compensation_type'   => $job->compensation_type,
+            'compensation_type' => $job->compensation_type,
             'compensation_currency' => $job->compensation_currency,
-            'total_hours_worked'  => $totalHours,
-            'total_payable'       => $totalPayable,
-            'total_paid'          => $totalPaid,
-            'due_payment'         => $due,
+            'total_hours_worked' => $totalHours,
+            'total_payable' => $totalPayable,
+            'total_paid' => $totalPaid,
+            'due_payment' => $due,
         ];
     }
 }

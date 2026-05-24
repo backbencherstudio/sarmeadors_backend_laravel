@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LongTermJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class LongTermJobController extends Controller
 {
@@ -14,14 +15,14 @@ class LongTermJobController extends Controller
         try {
             $request->validate([
                 'client_id' => 'required|integer|exists:clients,id',
-                'status'    => 'nullable|string',
+                'status' => 'nullable|string',
             ]);
 
-            $agency   = $request->current_agency;
+            $agency = $request->current_agency;
             $clientId = $request->query('client_id');
-            $status   = $request->query('status');
+            $status = $request->query('status');
 
-            $query = LongTermJob::with(['schedules', 'children', 'location'])
+            $query = LongTermJob::with(['schedules', 'children', 'location', 'latestAttendance'])
                 ->where('agency_id', $agency->id)
                 ->where('client_id', $clientId);
 
@@ -39,9 +40,9 @@ class LongTermJobController extends Controller
 
             return $this->sendResponse([
                 'counts' => $counts,
-                'jobs'   => $jobs,
+                'jobs' => $jobs,
             ], 'Jobs retrieved successfully', 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -57,7 +58,7 @@ class LongTermJobController extends Controller
                 return $this->sendError('Not found', [], 404);
             }
 
-            $longTermJob->load(['client', 'schedules', 'children', 'location']);
+            $longTermJob->load(['client', 'candidate', 'schedules', 'children', 'location']);
 
             return $this->sendResponse($longTermJob, 'Job retrieved successfully', 200);
         } catch (\Exception $e) {
@@ -86,6 +87,27 @@ class LongTermJobController extends Controller
         }
     }
 
+    public function complete(Request $request, LongTermJob $longTermJob): JsonResponse
+    {
+        try {
+            $agency = $request->current_agency;
+
+            if ($longTermJob->agency_id !== $agency->id) {
+                return $this->sendError('Not found', [], 404);
+            }
+
+            if ($longTermJob->status !== 'running') {
+                return $this->sendError('Only running jobs can be marked as completed.', [], 422);
+            }
+
+            $longTermJob->update(['status' => 'completed']);
+
+            return $this->sendResponse($longTermJob, 'Job marked as completed.', 200);
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
     public function reject(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
@@ -104,12 +126,12 @@ class LongTermJobController extends Controller
             ]);
 
             $longTermJob->update([
-                'status'           => 'rejected',
+                'status' => 'rejected',
                 'rejection_reason' => $validated['reason'] ?? null,
             ]);
 
             return $this->sendResponse($longTermJob, 'Job rejected.', 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
