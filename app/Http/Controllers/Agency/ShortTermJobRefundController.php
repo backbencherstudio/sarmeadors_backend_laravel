@@ -71,8 +71,8 @@ class ShortTermJobRefundController extends Controller
                 return $this->sendError('No refund request has been submitted for this job.', [], 422);
             }
 
-            if (($metadata['refund_status'] ?? null) === 'approved') {
-                return $this->sendError('Refund has already been approved.', [], 422);
+            if (! is_null($metadata['refund_status'] ?? null)) {
+                return $this->sendError('Refund request has already been resolved.', [], 422);
             }
 
             $validated = $request->validate([

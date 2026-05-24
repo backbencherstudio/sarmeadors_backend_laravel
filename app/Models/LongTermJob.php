@@ -142,4 +142,9 @@ class LongTermJob extends Model
     {
         return $this->hasOne(LongTermJobRefundRequest::class);
     }
+
+    public function review()
+    {
+        return $this->hasOne(LongTermJobReview::class);
+    }
 }

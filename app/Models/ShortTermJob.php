@@ -80,4 +80,14 @@ class ShortTermJob extends Model
     {
         return $this->hasMany(ShortTermJobAttendance::class);
     }
+
+    public function latestAttendance()
+    {
+        return $this->hasOne(ShortTermJobAttendance::class)->latestOfMany('booking_date');
+    }
+
+    public function review()
+    {
+        return $this->hasOne(ShortTermJobReview::class);
+    }
 }

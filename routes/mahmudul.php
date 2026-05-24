@@ -12,15 +12,20 @@ use App\Http\Controllers\Agency\ShortTermJobApplicationController as AgencyShort
 use App\Http\Controllers\Agency\ShortTermJobAttendanceController as AgencyShortTermJobAttendanceController;
 use App\Http\Controllers\Agency\ShortTermJobController as AgencyShortTermJobController;
 use App\Http\Controllers\Agency\ShortTermJobRefundController as AgencyShortTermJobRefundController;
+use App\Http\Controllers\Candidate\CandidateAvailabilityController;
+use App\Http\Controllers\Candidate\CandidateClientsController;
+use App\Http\Controllers\Candidate\CandidateDashboardController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
 use App\Http\Controllers\Candidate\JobMessageController as CandidateJobMessageController;
 use App\Http\Controllers\Candidate\LongTermJobApplicationController as CandidateLongTermJobApplicationController;
 use App\Http\Controllers\Candidate\LongTermJobAttendanceController as CandidateLongTermJobAttendanceController;
 use App\Http\Controllers\Candidate\LongTermJobController as CandidateLongTermJobController;
+use App\Http\Controllers\Candidate\LongTermJobReviewController as CandidateLongTermJobReviewController;
 use App\Http\Controllers\Candidate\ShortTermJobApplicationController as CandidateShortTermJobApplicationController;
 use App\Http\Controllers\Candidate\ShortTermJobAttendanceController as CandidateShortTermJobAttendanceController;
 use App\Http\Controllers\Candidate\ShortTermJobController as CandidateShortTermJobController;
+use App\Http\Controllers\Candidate\ShortTermJobReviewController as CandidateShortTermJobReviewController;
 use App\Http\Controllers\Client\ClientCandidateController;
 use App\Http\Controllers\Client\ClientDashboardController;
 use App\Http\Controllers\Client\ClientInterviewController;
@@ -52,7 +57,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::get('agency_notes/show/{agency_note}', [AgencyNoteController::class, 'show']);
     Route::put('agency_notes/{agency_note}', [AgencyNoteController::class, 'update']);
     Route::put('agency_notes/pin_note/{agency_note}', [AgencyNoteController::class, 'pin_note']);
-    Route::put('agency_notes/mark_read/{agency_note}', [AgencyNoteController::class, 'mark_read']);
+    Route::put('agency_notes/mark_read', [AgencyNoteController::class, 'mark_read']);
     Route::delete('agency_notes', [AgencyNoteController::class, 'destroy']);
 
     Route::get('message_template', [MessageTemplateController::class, 'index']);
@@ -229,11 +234,25 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {
+    // Dashboard
+    Route::get('dashboard', [CandidateDashboardController::class, 'index']);
+
     // Profile management
     Route::get('profile', [CandidateProfileController::class, 'show']);
     Route::put('profile', [CandidateProfileController::class, 'update']);
     Route::put('profile/password', [CandidateProfileController::class, 'updatePassword']);
     Route::delete('profile', [CandidateProfileController::class, 'destroy']);
+
+    // Availability
+    Route::get('availability', [CandidateAvailabilityController::class, 'show']);
+    Route::put('availability', [CandidateAvailabilityController::class, 'update']);
+    Route::get('availability/unavailabilities', [CandidateAvailabilityController::class, 'indexUnavailabilities']);
+    Route::post('availability/unavailabilities', [CandidateAvailabilityController::class, 'storeUnavailability']);
+    Route::delete('availability/unavailabilities/{unavailability}', [CandidateAvailabilityController::class, 'destroyUnavailability']);
+
+    // My Clients
+    Route::get('clients', [CandidateClientsController::class, 'index']);
+    Route::get('clients/{client}', [CandidateClientsController::class, 'show']);
 
     // Interviews
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
@@ -252,6 +271,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/short-term/{shortTermJob}/attendance', [CandidateShortTermJobAttendanceController::class, 'index']);
     Route::post('jobs/short-term/{shortTermJob}/check-in', [CandidateShortTermJobAttendanceController::class, 'checkIn']);
     Route::post('jobs/short-term/{shortTermJob}/check-out', [CandidateShortTermJobAttendanceController::class, 'checkOut']);
+
+    // Candidate short-term reviews
+    Route::get('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'index']);
+    Route::post('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'store']);
 
     // Candidate short-term messages
     Route::get('jobs/short-term/{shortTermJob}/messages', [ShortTermJobMessageController::class, 'index']);
@@ -272,6 +295,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/long-term/{longTermJob}/attendance', [CandidateLongTermJobAttendanceController::class, 'calendar']);
     Route::post('jobs/long-term/{longTermJob}/check-in', [CandidateLongTermJobAttendanceController::class, 'checkIn']);
     Route::post('jobs/long-term/{longTermJob}/check-out', [CandidateLongTermJobAttendanceController::class, 'checkOut']);
+
+    // Candidate long-term reviews
+    Route::get('jobs/long-term/{longTermJob}/reviews', [CandidateLongTermJobReviewController::class, 'index']);
+    Route::post('jobs/long-term/{longTermJob}/reviews', [CandidateLongTermJobReviewController::class, 'store']);
 
     // Candidate long-term job messages (candidate thread only)
     Route::get('jobs/long-term/{longTermJob}/messages', [CandidateJobMessageController::class, 'index']);

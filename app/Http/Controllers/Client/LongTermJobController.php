@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\LongTermJob;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -98,10 +99,11 @@ class LongTermJobController extends Controller
                 'force_cancel' => 'nullable|boolean', // true = client accepts the fee
             ]);
 
-            // 8-hour rule: if running and started more than 8 hours ago, warn unless forced
+            // 8-hour rule: if running and the nanny's current workday has exceeded 8 hours, warn unless forced.
+            // We compare against the start of today (midnight) so fee triggers after 8am on any running-job day.
             $feeApplies = false;
-            if ($longTermJob->status === 'running' && $longTermJob->cancelled_at === null) {
-                $hoursSinceStart = now()->diffInHours($longTermJob->start_date, false);
+            if ($longTermJob->status === 'running') {
+                $hoursSinceStart = now()->diffInHours(Carbon::today(), false);
                 if ($hoursSinceStart > 8 && empty($validated['force_cancel'])) {
                     return $this->sendResponse([
                         'fee_applies' => true,

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\Client;
-use App\Models\LongTermJobReview;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobReview;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -82,7 +82,7 @@ class ShortTermJobApplicationController extends Controller
                 return $this->sendError('Not found.', [], 404);
             }
 
-            $reviews = LongTermJobReview::with('client')
+            $reviews = ShortTermJobReview::with('client')
                 ->where('candidate_id', $applicationId)
                 ->latest()
                 ->paginate(10);

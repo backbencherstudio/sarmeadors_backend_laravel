@@ -27,13 +27,13 @@ class AgencyNoteController extends Controller
      */
     public function store(Request $request, User $user)
     {
-        $agency_id = auth()->user()->agency()->first()->id;
+        $agency_id = request()->current_agency->id;
 
         $note = AgencyNote::create([
             'agency_id' => $agency_id,
-            'user_id'   => $user->id,
-            'note'      => 'Untitled',
-            'pin_note'  => false,
+            'user_id' => $user->id,
+            'note' => 'Untitled',
+            'pin_note' => false,
         ]);
 
         return $this->sendResponse($note);
@@ -53,7 +53,7 @@ class AgencyNoteController extends Controller
     public function update(Request $request, AgencyNote $agencyNote)
     {
         $data = $request->validate([
-            'note' => 'required'
+            'note' => 'required',
         ]);
 
         $agencyNote->update($data);
@@ -68,7 +68,7 @@ class AgencyNoteController extends Controller
     {
         $request->validate([
             'ids' => 'required|array',
-            'ids.*' => 'exists:agency_notes,id'
+            'ids.*' => 'exists:agency_notes,id',
         ]);
 
         AgencyNote::whereIn('id', $request->ids)->delete();
@@ -81,7 +81,7 @@ class AgencyNoteController extends Controller
      */
     public function pin_note(AgencyNote $agencyNote)
     {
-        $agencyNote->pin_note = !$agencyNote->pin_note;
+        $agencyNote->pin_note = ! $agencyNote->pin_note;
         $agencyNote->save();
 
         return $this->sendResponse($agencyNote, 'Pin status updated successfully');
@@ -98,7 +98,7 @@ class AgencyNoteController extends Controller
         ]);
 
         AgencyNote::whereIn('id', $request->ids)->update([
-            'is_read' => true
+            'is_read' => true,
         ]);
 
         return $this->sendResponse([], 'Selected notes marked as read');
