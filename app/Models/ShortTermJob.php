@@ -9,6 +9,7 @@ class ShortTermJob extends Model
     protected $fillable = [
         'agency_id',
         'client_id',
+        'candidate_id',
         'location_id',
         'title',
         'description',
@@ -24,11 +25,15 @@ class ShortTermJob extends Model
         'status',
         'stripe_payment_intent_id',
         'rejection_reason',
+        'cancellation_reason',
+        'cancelled_at',
+        'broadcast_requested',
+        'broadcast_requested_at',
     ];
 
     public function getCoverImageUrlAttribute(): ?string
     {
-        return $this->cover_image ? asset('storage/' . $this->cover_image) : null;
+        return $this->cover_image ? asset('storage/'.$this->cover_image) : null;
     }
 
     public function agency()
@@ -39,6 +44,11 @@ class ShortTermJob extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function candidate()
+    {
+        return $this->belongsTo(Candidate::class);
     }
 
     public function location()
@@ -59,5 +69,15 @@ class ShortTermJob extends Model
     public function payment()
     {
         return $this->hasOne(Payment::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(ShortTermJobReview::class);
+    }
+
+    public function attendance()
+    {
+        return $this->hasMany(ShortTermJobAttendance::class);
     }
 }
