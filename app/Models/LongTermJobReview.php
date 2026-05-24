@@ -3,33 +3,35 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class LongTermJobNannyPayment extends Model
+class LongTermJobReview extends Model
 {
     protected $fillable = [
         'long_term_job_id',
         'candidate_id',
+        'client_id',
         'agency_id',
-        'invoice_number',
-        'amount',
-        'currency',
-        'payment_method',
-        'payment_date',
-        'notes',
+        'rating',
+        'review',
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
-        'amount' => 'decimal:2',
+        'rating' => 'integer',
     ];
 
-    public function job()
+    public function job(): BelongsTo
     {
         return $this->belongsTo(LongTermJob::class, 'long_term_job_id');
     }
 
-    public function candidate()
+    public function candidate(): BelongsTo
     {
         return $this->belongsTo(Candidate::class);
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 }
