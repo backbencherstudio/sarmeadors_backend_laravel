@@ -28,7 +28,13 @@
         "interview_id": 1,
         "payment_id": 1,
         "candidate_id": 1,
-        "client_id": 1
+        "client_id": 1,
+        "document_id": 1,
+        "notification_id": 1,
+        "thread_id": 1,
+        "invoice_id": 5833,
+        "location_q": "New York",
+        "unavailability_id": 1
       }
     },
 
@@ -45,12 +51,20 @@
     { "_id": "fld_client_interviews", "_type": "request_group", "parentId": "fld_client", "name": "Interviews" },
     { "_id": "fld_client_st", "_type": "request_group", "parentId": "fld_client", "name": "Short-term Jobs" },
     { "_id": "fld_client_lt", "_type": "request_group", "parentId": "fld_client", "name": "Long-term Jobs" },
+    { "_id": "fld_client_locations", "_type": "request_group", "parentId": "fld_client", "name": "Locations" },
+    { "_id": "fld_client_notifications", "_type": "request_group", "parentId": "fld_client", "name": "Notifications" },
+    { "_id": "fld_client_dm", "_type": "request_group", "parentId": "fld_client", "name": "Direct Messages" },
+    { "_id": "fld_client_documents", "_type": "request_group", "parentId": "fld_client", "name": "Documents / Agreements" },
+    { "_id": "fld_client_payments", "_type": "request_group", "parentId": "fld_client", "name": "Payments Hub" },
+    { "_id": "fld_client_candidate_extras", "_type": "request_group", "parentId": "fld_client_candidates", "name": "Reviews & Requests" },
 
     { "_id": "fld_candidate", "_type": "request_group", "parentId": "wrk_sarmeadors", "name": "Candidate" },
     { "_id": "fld_candidate_profile", "_type": "request_group", "parentId": "fld_candidate", "name": "Profile" },
     { "_id": "fld_candidate_interviews", "_type": "request_group", "parentId": "fld_candidate", "name": "Interviews" },
     { "_id": "fld_candidate_st", "_type": "request_group", "parentId": "fld_candidate", "name": "Short-term Jobs" },
     { "_id": "fld_candidate_lt", "_type": "request_group", "parentId": "fld_candidate", "name": "Long-term Jobs" },
+    { "_id": "fld_candidate_availability", "_type": "request_group", "parentId": "fld_candidate", "name": "Availability" },
+    { "_id": "fld_candidate_clients", "_type": "request_group", "parentId": "fld_candidate", "name": "My Clients" },
 
     {
       "_id": "req_an_01", "_type": "request", "parentId": "fld_agency_notes",
@@ -90,7 +104,7 @@
     {
       "_id": "req_an_06", "_type": "request", "parentId": "fld_agency_notes",
       "name": "Mark Notes as Read", "method": "PUT",
-      "url": "{{ base_url }}/agency/agency_notes/mark_read/{{ agency_note_id }}",
+      "url": "{{ base_url }}/agency/agency_notes/mark_read",
       "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
       "body": {"mimeType": "application/json", "text": "{\n  \"ids\": [1, 2, 3]\n}"}
     },
@@ -1050,6 +1064,248 @@
       "_id": "req_client_dash", "_type": "request", "parentId": "fld_client",
       "name": "Dashboard", "method": "GET",
       "url": "{{ base_url }}/client/dashboard",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cloc_01", "_type": "request", "parentId": "fld_client_locations",
+      "name": "List Locations (typeahead)", "method": "GET",
+      "url": "{{ base_url }}/client/locations?q={{ location_q }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cnot_01", "_type": "request", "parentId": "fld_client_notifications",
+      "name": "List Notifications", "method": "GET",
+      "url": "{{ base_url }}/client/notifications?filter=all",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cnot_02", "_type": "request", "parentId": "fld_client_notifications",
+      "name": "Mark Notification as Read", "method": "PUT",
+      "url": "{{ base_url }}/client/notifications/{{ notification_id }}/read",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cnot_03", "_type": "request", "parentId": "fld_client_notifications",
+      "name": "Mark All Notifications Read", "method": "PUT",
+      "url": "{{ base_url }}/client/notifications/mark-all-read",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cnot_04", "_type": "request", "parentId": "fld_client_notifications",
+      "name": "Delete Notification", "method": "DELETE",
+      "url": "{{ base_url }}/client/notifications/{{ notification_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cdm_01", "_type": "request", "parentId": "fld_client_dm",
+      "name": "List Threads (tab=admin)", "method": "GET",
+      "url": "{{ base_url }}/client/messages/threads?tab=admin",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cdm_02", "_type": "request", "parentId": "fld_client_dm",
+      "name": "List Threads (tab=candidate)", "method": "GET",
+      "url": "{{ base_url }}/client/messages/threads?tab=candidate",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cdm_03", "_type": "request", "parentId": "fld_client_dm",
+      "name": "Get Thread Messages", "method": "GET",
+      "url": "{{ base_url }}/client/messages/threads/{{ thread_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cdm_04", "_type": "request", "parentId": "fld_client_dm",
+      "name": "Send Message in Thread", "method": "POST",
+      "url": "{{ base_url }}/client/messages/threads/{{ thread_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"message\": \"How confident are we on presenting this?\",\n  \"type\": \"text\"\n}"}
+    },
+    {
+      "_id": "req_cdm_05", "_type": "request", "parentId": "fld_client_dm",
+      "name": "Unread Counts", "method": "GET",
+      "url": "{{ base_url }}/client/messages/unread-counts",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cdoc_01", "_type": "request", "parentId": "fld_client_documents",
+      "name": "List Documents", "method": "GET",
+      "url": "{{ base_url }}/client/documents",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cdoc_02", "_type": "request", "parentId": "fld_client_documents",
+      "name": "Show Document", "method": "GET",
+      "url": "{{ base_url }}/client/documents/{{ document_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cdoc_03", "_type": "request", "parentId": "fld_client_documents",
+      "name": "Sign Document", "method": "POST",
+      "url": "{{ base_url }}/client/documents/{{ document_id }}/sign",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"signature\": \"Jenny Wilson\",\n  \"agree\": true\n}"}
+    },
+    {
+      "_id": "req_cdoc_04", "_type": "request", "parentId": "fld_client_documents",
+      "name": "Download Document (PDF URL)", "method": "GET",
+      "url": "{{ base_url }}/client/documents/{{ document_id }}/download",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cpay_01", "_type": "request", "parentId": "fld_client_payments",
+      "name": "Payments Overview & History", "method": "GET",
+      "url": "{{ base_url }}/client/payments",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cpay_02", "_type": "request", "parentId": "fld_client_payments",
+      "name": "Advance Invoice Manager", "method": "GET",
+      "url": "{{ base_url }}/client/payments/invoices",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cpay_03", "_type": "request", "parentId": "fld_client_payments",
+      "name": "Show Invoice", "method": "GET",
+      "url": "{{ base_url }}/client/payments/invoices/{{ invoice_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_cpay_04", "_type": "request", "parentId": "fld_client_payments",
+      "name": "Pay Invoice (Stripe card)", "method": "POST",
+      "url": "{{ base_url }}/client/payments/invoices/{{ invoice_id }}/pay",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"card_number\": \"4242424242424242\",\n  \"expiry\": \"12/27\",\n  \"cvc\": \"123\",\n  \"amount\": 7592.40\n}"}
+    },
+    {
+      "_id": "req_cpay_05", "_type": "request", "parentId": "fld_client_payments",
+      "name": "Download Payment Receipt", "method": "GET",
+      "url": "{{ base_url }}/client/payments/{{ payment_id }}/download",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_ccext_01", "_type": "request", "parentId": "fld_client_candidate_extras",
+      "name": "List Candidate Reviews", "method": "GET",
+      "url": "{{ base_url }}/client/candidates/{{ candidate_id }}/reviews",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_ccext_02", "_type": "request", "parentId": "fld_client_candidate_extras",
+      "name": "Leave Candidate Review", "method": "POST",
+      "url": "{{ base_url }}/client/candidates/{{ candidate_id }}/reviews",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"rating\": 2,\n  \"review\": \"I like it, and I learnt a lot about how to become a better writer.\"\n}"}
+    },
+    {
+      "_id": "req_ccext_03", "_type": "request", "parentId": "fld_client_candidate_extras",
+      "name": "Hire Request (broadcast)", "method": "POST",
+      "url": "{{ base_url }}/client/candidates/{{ candidate_id }}/hire-request",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"job_type\": \"long-term\",\n  \"note\": \"Please connect this candidate with our family for the After School Nanny role.\"\n}"}
+    },
+    {
+      "_id": "req_ccext_04", "_type": "request", "parentId": "fld_client_candidate_extras",
+      "name": "Interview Request (schedule)", "method": "POST",
+      "url": "{{ base_url }}/client/candidates/{{ candidate_id }}/interview-request",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"job_type\": \"long-term\",\n  \"interview_type\": \"zoom\",\n  \"description\": \"Initial screening interview for the After School Nanny position.\",\n  \"scheduled_date\": \"2026-06-15\",\n  \"available_from\": \"10:00\",\n  \"available_to\": \"11:00\",\n  \"special_note\": \"Please be prepared to discuss childcare experience.\"\n}"}
+    },
+
+    {
+      "_id": "req_civ_show", "_type": "request", "parentId": "fld_client_interviews",
+      "name": "Show Interview (with join link)", "method": "GET",
+      "url": "{{ base_url }}/client/interviews/{{ interview_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_cst_resubmit", "_type": "request", "parentId": "fld_client_st",
+      "name": "Resubmit Rejected Short-term Job", "method": "PUT",
+      "url": "{{ base_url }}/client/jobs/short-term/{{ short_term_job_id }}/resubmit",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_clt_resubmit", "_type": "request", "parentId": "fld_client_lt",
+      "name": "Resubmit Rejected Long-term Job", "method": "PUT",
+      "url": "{{ base_url }}/client/jobs/long-term/{{ long_term_job_id }}/resubmit",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_ndav_01", "_type": "request", "parentId": "fld_candidate_availability",
+      "name": "Get Weekly Availability", "method": "GET",
+      "url": "{{ base_url }}/candidate/availability",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_ndav_02", "_type": "request", "parentId": "fld_candidate_availability",
+      "name": "Update Weekly Availability", "method": "PUT",
+      "url": "{{ base_url }}/candidate/availability",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"days\": [\n    {\"day\": \"monday\", \"is_available\": true, \"from\": \"09:00\", \"to\": \"17:00\"},\n    {\"day\": \"tuesday\", \"is_available\": true, \"from\": \"09:00\", \"to\": \"17:00\"},\n    {\"day\": \"wednesday\", \"is_available\": true, \"from\": \"09:00\", \"to\": \"17:00\"},\n    {\"day\": \"thursday\", \"is_available\": true, \"from\": \"09:00\", \"to\": \"17:00\"},\n    {\"day\": \"friday\", \"is_available\": true, \"from\": \"09:00\", \"to\": \"17:00\"},\n    {\"day\": \"saturday\", \"is_available\": false},\n    {\"day\": \"sunday\", \"is_available\": false}\n  ]\n}"}
+    },
+    {
+      "_id": "req_ndav_03", "_type": "request", "parentId": "fld_candidate_availability",
+      "name": "List Unavailabilities (Time Off)", "method": "GET",
+      "url": "{{ base_url }}/candidate/availability/unavailabilities",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_ndav_04", "_type": "request", "parentId": "fld_candidate_availability",
+      "name": "Add Unavailability (Time Off)", "method": "POST",
+      "url": "{{ base_url }}/candidate/availability/unavailabilities",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}, {"name": "Content-Type", "value": "application/json"}],
+      "body": {"mimeType": "application/json", "text": "{\n  \"start_date\": \"2026-06-01\",\n  \"end_date\": \"2026-06-07\",\n  \"reason\": \"Family vacation\"\n}"}
+    },
+    {
+      "_id": "req_ndav_05", "_type": "request", "parentId": "fld_candidate_availability",
+      "name": "Delete Unavailability", "method": "DELETE",
+      "url": "{{ base_url }}/candidate/availability/unavailabilities/{{ unavailability_id }}",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+
+    {
+      "_id": "req_ndcl_01", "_type": "request", "parentId": "fld_candidate_clients",
+      "name": "List My Clients", "method": "GET",
+      "url": "{{ base_url }}/candidate/clients",
+      "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
+      "body": {}
+    },
+    {
+      "_id": "req_ndcl_02", "_type": "request", "parentId": "fld_candidate_clients",
+      "name": "Show Client Detail", "method": "GET",
+      "url": "{{ base_url }}/candidate/clients/{{ client_id }}",
       "headers": [{"name": "Authorization", "value": "Bearer {{ token }}"}, {"name": "Accept", "value": "application/json"}],
       "body": {}
     }
