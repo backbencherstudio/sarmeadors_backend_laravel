@@ -3,6 +3,7 @@
 use App\Http\Controllers\Agency\AgencyChecklistController;
 use App\Http\Controllers\Agency\AgencyEventController;
 use App\Http\Controllers\Agency\AgencyEventTypeController;
+use App\Http\Controllers\Agency\AgencyGlobalJobSettingsController;
 use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
@@ -45,6 +46,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::post('/business-setting-update', [SettingsController::class, 'updateBusinessSettings']);
     Route::post('/business-hour-update', [SettingsController::class, 'updateBusinessHours']);
     Route::patch('/business-hours/{id}/status', [SettingsController::class, 'toggleBusinessHourStatus']);
+
+    //agency job settings management route for global settings
+    Route::get('/get-global-job-settings', [AgencyGlobalJobSettingsController::class, 'getGlobalJobSettings']);
+    Route::post('/update-global-job-settings', [AgencyGlobalJobSettingsController::class, 'updateGlobalJobSettings']);
 
 
 });
