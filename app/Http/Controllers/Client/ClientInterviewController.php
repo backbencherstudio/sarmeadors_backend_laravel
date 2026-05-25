@@ -90,6 +90,32 @@ class ClientInterviewController extends Controller
         }
     }
 
+    // GET /client/interviews/{interview}
+    public function show(Request $request, LongTermJobInterview $interview): JsonResponse
+    {
+        try {
+            $client = $this->resolveClient($request);
+
+            if (! $client) {
+                return $this->sendError('Client profile not found.', [], 404);
+            }
+
+            $job = LongTermJob::find($interview->long_term_job_id);
+
+            if (! $job || $job->client_id !== $client->id) {
+                return $this->sendError('Not found.', [], 404);
+            }
+
+            return $this->sendResponse(
+                $interview->load(['job', 'candidate', 'application']),
+                'Interview retrieved successfully.',
+                200
+            );
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
     // PUT /client/interviews/{interview}/reschedule
     public function reschedule(Request $request, LongTermJobInterview $interview): JsonResponse
     {
