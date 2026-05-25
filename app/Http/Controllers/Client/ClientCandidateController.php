@@ -146,4 +146,132 @@ class ClientCandidateController extends Controller
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
     }
+
+    // GET /client/candidates/{candidate}/reviews
+    public function reviews(Request $request, Candidate $candidate): JsonResponse
+    {
+        $client = $this->resolveClient($request);
+
+        if (! $client) {
+            return $this->sendError('Client profile not found.', [], 404);
+        }
+
+        if ($candidate->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $reviews = LongTermJobReview::with('client')
+            ->where('candidate_id', $candidate->id)
+            ->latest()
+            ->get();
+
+        return $this->sendResponse([
+            'average_rating' => round($reviews->avg('rating') ?? 0, 1),
+            'reviews_count' => $reviews->count(),
+            'my_review' => $reviews->firstWhere('client_id', $client->id),
+            'reviews' => $reviews,
+        ], 'Reviews retrieved successfully.', 200);
+    }
+
+    // POST /client/candidates/{candidate}/reviews
+    public function storeReview(Request $request, Candidate $candidate): JsonResponse
+    {
+        $client = $this->resolveClient($request);
+
+        if (! $client) {
+            return $this->sendError('Client profile not found.', [], 404);
+        }
+
+        if ($candidate->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $validated = $request->validate([
+            'rating' => 'required|numeric|min:1|max:5',
+            'review' => 'nullable|string|max:5000',
+        ]);
+
+        $existingJob = LongTermJob::where('client_id', $client->id)
+            ->where('candidate_id', $candidate->id)
+            ->latest()
+            ->first();
+
+        $review = LongTermJobReview::updateOrCreate(
+            [
+                'client_id' => $client->id,
+                'candidate_id' => $candidate->id,
+                'long_term_job_id' => $existingJob?->id,
+            ],
+            [
+                'rating' => $validated['rating'],
+                'review' => $validated['review'] ?? null,
+            ]
+        );
+
+        return $this->sendResponse($review->load('client'), 'Review submitted.', 201);
+    }
+
+    // POST /client/candidates/{candidate}/hire-request
+    // Triggers the job-creation flow for a specific candidate (short-term or long-term)
+    public function hireRequest(Request $request, Candidate $candidate): JsonResponse
+    {
+        $client = $this->resolveClient($request);
+
+        if (! $client) {
+            return $this->sendError('Client profile not found.', [], 404);
+        }
+
+        if ($candidate->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $validated = $request->validate([
+            'job_type' => 'required|in:short-term,long-term',
+            'note' => 'nullable|string|max:1000',
+        ]);
+
+        return $this->sendResponse([
+            'candidate_id' => $candidate->id,
+            'job_type' => $validated['job_type'],
+            'status' => 'broadcast_requested',
+            'message' => 'The job has been forwarded to the admin for broadcasting. Once the admin starts the broadcast, we will keep you updated.',
+            'requested_at' => now()->toDateTimeString(),
+        ], 'Hire request sent for broadcasting.', 201);
+    }
+
+    // POST /client/candidates/{candidate}/interview-request
+    // Request an interview directly from the candidate detail page
+    public function interviewRequest(Request $request, Candidate $candidate): JsonResponse
+    {
+        $client = $this->resolveClient($request);
+
+        if (! $client) {
+            return $this->sendError('Client profile not found.', [], 404);
+        }
+
+        if ($candidate->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $validated = $request->validate([
+            'job_type' => 'required|in:short-term,long-term',
+            'interview_type' => 'required|in:in_person,zoom,google_meet',
+            'description' => 'nullable|string|max:2000',
+            'scheduled_date' => 'required|date|after_or_equal:today',
+            'available_from' => 'required|date_format:H:i',
+            'available_to' => 'required|date_format:H:i|after:available_from',
+            'special_note' => 'nullable|string|max:1000',
+        ]);
+
+        return $this->sendResponse([
+            'candidate_id' => $candidate->id,
+            'job_type' => $validated['job_type'],
+            'interview_type' => $validated['interview_type'],
+            'scheduled_date' => $validated['scheduled_date'],
+            'available_from' => $validated['available_from'],
+            'available_to' => $validated['available_to'],
+            'status' => 'scheduled',
+            'requested_at' => now()->toDateTimeString(),
+        ], 'Interview request created.', 201);
+    }
 }
