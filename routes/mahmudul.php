@@ -28,7 +28,12 @@ use App\Http\Controllers\Candidate\ShortTermJobController as CandidateShortTermJ
 use App\Http\Controllers\Candidate\ShortTermJobReviewController as CandidateShortTermJobReviewController;
 use App\Http\Controllers\Client\ClientCandidateController;
 use App\Http\Controllers\Client\ClientDashboardController;
+use App\Http\Controllers\Client\ClientDirectMessageController;
+use App\Http\Controllers\Client\ClientDocumentController;
 use App\Http\Controllers\Client\ClientInterviewController;
+use App\Http\Controllers\Client\ClientLocationController;
+use App\Http\Controllers\Client\ClientNotificationController;
+use App\Http\Controllers\Client\ClientPaymentController;
 use App\Http\Controllers\Client\ClientProfileController;
 use App\Http\Controllers\Client\JobMessageController as ClientJobMessageController;
 use App\Http\Controllers\Client\LongTermJobApplicationController as ClientLongTermJobApplicationController;
@@ -147,13 +152,50 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::put('profile/password', [ClientProfileController::class, 'updatePassword']);
     Route::delete('profile', [ClientProfileController::class, 'destroy']);
 
+    // Locations (dropdown source for profile / job address)
+    Route::get('locations', [ClientLocationController::class, 'index']);
+
+    // Notifications
+    Route::get('notifications', [ClientNotificationController::class, 'index']);
+    Route::put('notifications/mark-all-read', [ClientNotificationController::class, 'markAllRead']);
+    Route::put('notifications/{id}/read', [ClientNotificationController::class, 'markRead']);
+    Route::delete('notifications/{id}', [ClientNotificationController::class, 'destroy']);
+
+    // Direct messages (header chat: Admin & Candidate threads)
+    Route::get('messages/threads', [ClientDirectMessageController::class, 'threads']);
+    Route::get('messages/unread-counts', [ClientDirectMessageController::class, 'unreadCounts']);
+    Route::get('messages/threads/{thread}', [ClientDirectMessageController::class, 'show']);
+    Route::post('messages/threads/{thread}', [ClientDirectMessageController::class, 'store']);
+
+    // Documents / Agreements
+    Route::get('documents', [ClientDocumentController::class, 'index']);
+    Route::get('documents/{document}', [ClientDocumentController::class, 'show']);
+    Route::post('documents/{document}/sign', [ClientDocumentController::class, 'sign']);
+    Route::get('documents/{document}/download', [ClientDocumentController::class, 'download']);
+
+    // Aggregated payments hub
+    Route::get('payments', [ClientPaymentController::class, 'index']);
+    Route::get('payments/invoices', [ClientPaymentController::class, 'invoices']);
+    Route::get('payments/invoices/{invoice}', [ClientPaymentController::class, 'showInvoice']);
+    Route::post('payments/invoices/{invoice}/pay', [ClientPaymentController::class, 'payInvoice']);
+    Route::get('payments/{paymentId}/download', [ClientPaymentController::class, 'download']);
+
     // Candidates browsing
     Route::get('candidates/discover', [ClientCandidateController::class, 'discover']);
     Route::get('candidates', [ClientCandidateController::class, 'index']);
     Route::get('candidates/{candidate}', [ClientCandidateController::class, 'show']);
 
+    // Candidate reviews (not tied to a single job)
+    Route::get('candidates/{candidate}/reviews', [ClientCandidateController::class, 'reviews']);
+    Route::post('candidates/{candidate}/reviews', [ClientCandidateController::class, 'storeReview']);
+
+    // Hire / Interview requests from candidate detail page
+    Route::post('candidates/{candidate}/hire-request', [ClientCandidateController::class, 'hireRequest']);
+    Route::post('candidates/{candidate}/interview-request', [ClientCandidateController::class, 'interviewRequest']);
+
     // Interviews management
     Route::get('interviews', [ClientInterviewController::class, 'index']);
+    Route::get('interviews/{interview}', [ClientInterviewController::class, 'show']);
     Route::put('interviews/{interview}/reschedule', [ClientInterviewController::class, 'reschedule']);
     Route::delete('interviews/{interview}', [ClientInterviewController::class, 'cancel']);
 
@@ -167,6 +209,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::put('jobs/short-term/{shortTermJob}', [ShortTermJobController::class, 'update']);
     Route::delete('jobs/short-term/{shortTermJob}', [ShortTermJobController::class, 'destroy']);
     Route::put('jobs/short-term/{shortTermJob}/cancel', [ShortTermJobController::class, 'cancel']);
+    Route::put('jobs/short-term/{shortTermJob}/resubmit', [ShortTermJobController::class, 'resubmit']);
     Route::post('jobs/short-term/{shortTermJob}/broadcast', [ShortTermJobController::class, 'broadcastRequest']);
 
     // Client short-term applicants
@@ -201,6 +244,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::put('jobs/long-term/{longTermJob}', [LongTermJobController::class, 'update']);
     Route::delete('jobs/long-term/{longTermJob}', [LongTermJobController::class, 'destroy']);
     Route::put('jobs/long-term/{longTermJob}/cancel', [LongTermJobController::class, 'cancel']);
+    Route::put('jobs/long-term/{longTermJob}/resubmit', [LongTermJobController::class, 'resubmit']);
     Route::post('jobs/long-term/{longTermJob}/broadcast', [LongTermJobController::class, 'broadcastRequest']);
 
     // Client long-term attendance calendar (read-only)
