@@ -177,6 +177,35 @@ class LongTermJobController extends Controller
         }
     }
 
+    // PUT /client/jobs/long-term/{longTermJob}/resubmit
+    public function resubmit(Request $request, LongTermJob $longTermJob): JsonResponse
+    {
+        try {
+            $client = $this->resolveClient($request);
+
+            if (! $client || $longTermJob->client_id !== $client->id) {
+                return $this->sendError('Not found', [], 404);
+            }
+
+            if ($longTermJob->status !== 'rejected') {
+                return $this->sendError('Only rejected jobs can be resubmitted.', [], 422);
+            }
+
+            $longTermJob->update([
+                'status' => 'pending_approval',
+                'rejection_reason' => null,
+            ]);
+
+            return $this->sendResponse(
+                $longTermJob->fresh(),
+                'Job resubmitted for approval.',
+                200
+            );
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
     public function update(Request $request, LongTermJob $longTermJob): JsonResponse
     {
         try {
