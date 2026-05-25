@@ -9,6 +9,11 @@ use App\Http\Controllers\Agency\ClientController;
 use App\Http\Controllers\Agency\FormFieldController;
 use App\Http\Controllers\Agency\AgencyNoteController;
 use App\Http\Controllers\Agency\MessageTemplateController;
+use App\Http\Controllers\Agency\FormBuilderController;
+use App\Http\Controllers\Agency\FormBuilderBlockController;
+use App\Http\Controllers\Agency\FormBuilderSectionController;
+use App\Http\Controllers\Agency\FormBuilderFieldController;
+use App\Http\Controllers\Agency\FormBuilderSubmissionController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
@@ -90,8 +95,45 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     //Client Registration
     Route::post('/clients',[ClientController::class,'store']);
     Route::get('/clients/{id}',[ClientController::class,'show']);
+
+    // ── Form Builder ────────────────────────────────────────────────
+    // Form Builder CRUD
+    Route::get('/form-builders', [FormBuilderController::class, 'index']);
+    Route::post('/form-builders', [FormBuilderController::class, 'store']);
+    Route::get('/form-builders/{id}', [FormBuilderController::class, 'show']);
+    Route::post('/form-builders/{id}', [FormBuilderController::class, 'update']); // POST supports file upload
+    Route::delete('/form-builders/{id}', [FormBuilderController::class, 'destroy']);
+    Route::patch('/form-builders/{id}/publish', [FormBuilderController::class, 'publish']);
+
+    // Blocks
+    Route::post('/form-builders/{formBuilderId}/blocks', [FormBuilderBlockController::class, 'store']);
+    Route::put('/form-builder-blocks/{id}', [FormBuilderBlockController::class, 'update']);
+    Route::delete('/form-builder-blocks/{id}', [FormBuilderBlockController::class, 'destroy']);
+    Route::post('/form-builder-blocks/reorder', [FormBuilderBlockController::class, 'reorder']);
+
+    // Sections
+    Route::post('/form-builder-blocks/{blockId}/sections', [FormBuilderSectionController::class, 'store']);
+    Route::put('/form-builder-sections/{id}', [FormBuilderSectionController::class, 'update']);
+    Route::delete('/form-builder-sections/{id}', [FormBuilderSectionController::class, 'destroy']);
+
+    // Fields
+    Route::post('/form-builder-sections/{sectionId}/fields', [FormBuilderFieldController::class, 'store']);
+    Route::put('/form-builder-fields/{id}', [FormBuilderFieldController::class, 'update']);
+    Route::delete('/form-builder-fields/{id}', [FormBuilderFieldController::class, 'destroy']);
+    Route::post('/form-builder-fields/reorder', [FormBuilderFieldController::class, 'reorder']);
+
+    // Submissions (agency view)
+    Route::get('/form-builders/{id}/submissions', [FormBuilderSubmissionController::class, 'index']);
+    Route::get('/form-builder-submissions/{id}', [FormBuilderSubmissionController::class, 'show']);
 });
 
+// ── Public routes (no auth) ─────────────────────────────────────────────────
+Route::middleware('subdomain')->prefix('public')->group(function () {
+    // Get published form by slug
+    Route::get('/form-builders/{slug}', [FormBuilderController::class, 'publicShow']);
+    // Submit a form
+    Route::post('/form-builders/{slug}/submit', [FormBuilderSubmissionController::class, 'submit']);
+});
 
 Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {});
 

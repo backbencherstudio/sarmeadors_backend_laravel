@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\Payment;
 use App\Models\ShortTermJob;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
@@ -206,6 +207,16 @@ class ShortTermJobController extends Controller
             foreach ($validated['children'] as $child) {
                 $job->children()->create($child);
             }
+
+            Payment::create([
+                'agency_id'                => $agency->id,
+                'client_id'                => $client->id,
+                'short_term_job_id'        => $job->id,
+                'stripe_payment_intent_id' => $stripePaymentIntentId,
+                'amount'                   => $paymentRequired ? (float) $agency->short_term_job_fee : 0,
+                'currency'                 => $agency->short_term_job_fee_currency ?? 'usd',
+                'status'                   => $paymentRequired ? 'succeeded' : 'pending',
+            ]);
 
             $message = $agency->short_term_auto_approve
                 ? 'Job created and listed on marketplace'

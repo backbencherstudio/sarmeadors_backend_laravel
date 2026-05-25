@@ -19,4 +19,9 @@ class Location extends Model
     {
         return $this->belongsTo(Agency::class);
     }
+
+    public function subLocations()
+    {
+        return $this->hasMany(SubLocation::class);
+    }
 }
