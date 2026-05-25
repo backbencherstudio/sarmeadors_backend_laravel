@@ -255,6 +255,35 @@ class ShortTermJobController extends Controller
         }
     }
 
+    // PUT /client/jobs/short-term/{shortTermJob}/resubmit
+    public function resubmit(Request $request, ShortTermJob $shortTermJob): JsonResponse
+    {
+        try {
+            $client = $this->resolveClient($request);
+
+            if (! $client || $shortTermJob->client_id !== $client->id) {
+                return $this->sendError('Not found', [], 404);
+            }
+
+            if ($shortTermJob->status !== 'rejected') {
+                return $this->sendError('Only rejected jobs can be resubmitted.', [], 422);
+            }
+
+            $shortTermJob->update([
+                'status' => 'pending_approval',
+                'rejection_reason' => null,
+            ]);
+
+            return $this->sendResponse(
+                $shortTermJob->fresh(),
+                'Job resubmitted for approval.',
+                200
+            );
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
     public function store(Request $request): JsonResponse
     {
         try {
