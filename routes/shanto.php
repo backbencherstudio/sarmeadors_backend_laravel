@@ -96,12 +96,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('/clients',[ClientController::class,'store']);
     Route::get('/clients/{id}',[ClientController::class,'show']);
 
-    // ── Form Builder ────────────────────────────────────────────────
     // Form Builder CRUD
     Route::get('/form-builders', [FormBuilderController::class, 'index']);
     Route::post('/form-builders', [FormBuilderController::class, 'store']);
     Route::get('/form-builders/{id}', [FormBuilderController::class, 'show']);
-    Route::post('/form-builders/{id}', [FormBuilderController::class, 'update']); // POST supports file upload
+    Route::post('/form-builders/{id}', [FormBuilderController::class, 'update']);
     Route::delete('/form-builders/{id}', [FormBuilderController::class, 'destroy']);
     Route::patch('/form-builders/{id}/publish', [FormBuilderController::class, 'publish']);
 
@@ -122,14 +121,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::delete('/form-builder-fields/{id}', [FormBuilderFieldController::class, 'destroy']);
     Route::post('/form-builder-fields/reorder', [FormBuilderFieldController::class, 'reorder']);
 
-    // Submissions (agency view)
     Route::get('/form-builders/{id}/submissions', [FormBuilderSubmissionController::class, 'index']);
     Route::get('/form-builder-submissions/{id}', [FormBuilderSubmissionController::class, 'show']);
 });
 
-// ── Public routes (no auth) ─────────────────────────────────────────────────
 Route::middleware('subdomain')->prefix('public')->group(function () {
-    // Get published form by slug
     Route::get('/form-builders/{slug}', [FormBuilderController::class, 'publicShow']);
     // Submit a form
     Route::post('/form-builders/{slug}/submit', [FormBuilderSubmissionController::class, 'submit']);
