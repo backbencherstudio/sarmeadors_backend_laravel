@@ -22,14 +22,6 @@ class FormBuilderController extends Controller
         return response()->json(['status' => true, 'data' => $forms]);
     }
 
-    // ─────────────────────────────────────────────
-    // Create a new form builder (+ first introduction block)
-    // POST /agency/form-builders
-    // Body (application type):
-    //   form_type, application_type, user_type, job_type
-    // Body (section type):
-    //   form_type = 'section'
-    // ─────────────────────────────────────────────
     public function store(Request $request)
     {
         $request->validate([
