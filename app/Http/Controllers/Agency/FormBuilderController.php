@@ -13,10 +13,6 @@ use Illuminate\Support\Str;
 
 class FormBuilderController extends Controller
 {
-    // ─────────────────────────────────────────────
-    // List all form builders for the agency
-    // GET /agency/form-builders
-    // ─────────────────────────────────────────────
     public function index()
     {
         $forms = FormBuilder::where('agency_id', $this->agencyId())
@@ -59,7 +55,6 @@ class FormBuilderController extends Controller
                 'select_type'      => $request->select_type,
             ]);
 
-            // Always seed an Introduction block as first block
             $introBlock = FormBuilderBlock::create([
                 'form_builder_id' => $form->id,
                 'title'           => 'Introduction',
@@ -67,14 +62,12 @@ class FormBuilderController extends Controller
                 'serial'          => 0,
             ]);
 
-            // Default first section inside Introduction
             FormBuilderSection::create([
                 'form_builder_block_id' => $introBlock->id,
                 'name'                  => 'Intro Section',
                 'serial'                => 0,
             ]);
 
-            // Seed predefined blocks for known builder types
             $this->seedPredefinedBlocks($form);
 
             DB::commit();
