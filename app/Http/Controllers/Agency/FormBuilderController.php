@@ -84,10 +84,6 @@ class FormBuilderController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────
-    // Get full form builder with blocks → sections → fields → items
-    // GET /agency/form-builders/{id}
-    // ─────────────────────────────────────────────
     public function show($id)
     {
         $this->ownerForm($id);
@@ -98,10 +94,6 @@ class FormBuilderController extends Controller
         ]);
     }
 
-    // ─────────────────────────────────────────────
-    // Update form builder meta / introduction settings
-    // PUT /agency/form-builders/{id}
-    // ─────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $form = $this->ownerForm($id);
@@ -129,10 +121,6 @@ class FormBuilderController extends Controller
         return response()->json(['status' => true, 'message' => 'Updated', 'data' => $form->fresh()]);
     }
 
-    // ─────────────────────────────────────────────
-    // Toggle publish state
-    // PATCH /agency/form-builders/{id}/publish
-    // ─────────────────────────────────────────────
     public function publish($id)
     {
         $form = $this->ownerForm($id);
@@ -143,10 +131,6 @@ class FormBuilderController extends Controller
         return response()->json(['status' => true, 'message' => $msg, 'is_published' => $form->is_published]);
     }
 
-    // ─────────────────────────────────────────────
-    // Delete form builder
-    // DELETE /agency/form-builders/{id}
-    // ─────────────────────────────────────────────
     public function destroy($id)
     {
         $form = $this->ownerForm($id);
@@ -160,10 +144,6 @@ class FormBuilderController extends Controller
         return response()->json(['status' => true, 'message' => 'Deleted']);
     }
 
-    // ─────────────────────────────────────────────
-    // Public form fetch by slug (no auth)
-    // GET /public/form-builders/{slug}
-    // ─────────────────────────────────────────────
     public function publicShow($slug)
     {
         $form = FormBuilder::where('slug', $slug)
@@ -177,7 +157,6 @@ class FormBuilderController extends Controller
         ]);
     }
 
-    // ───────────── helpers ─────────────
 
     private function agencyId()
     {
@@ -221,7 +200,6 @@ class FormBuilderController extends Controller
         ], 500);
     }
 
-    // Seed commonly used predefined blocks for known builder types
     private function seedPredefinedBlocks(FormBuilder $form)
     {
         $blocks = [];
