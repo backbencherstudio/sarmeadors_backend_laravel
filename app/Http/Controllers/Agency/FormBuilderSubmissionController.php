@@ -16,21 +16,6 @@ use Illuminate\Support\Facades\Validator;
 
 class FormBuilderSubmissionController extends Controller
 {
-    // ─────────────────────────────────────────────
-    // Public form submission (no auth required)
-    // POST /public/form-builders/{slug}/submit
-    //
-    // Required body fields for registration forms:
-    //   first_name, last_name, email, mobile,
-    //   hear_about_us, type_id (array), location_id (array)
-    //
-    // Optional body:
-    //   image (file)
-    //
-    // Custom field answers:
-    //   answers: { "<field_id>": <value>, ... }
-    //   Files for file fields: files.<field_id> (multipart)
-    // ─────────────────────────────────────────────
     public function submit(Request $request, $slug)
     {
         $form = FormBuilder::where('slug', $slug)
