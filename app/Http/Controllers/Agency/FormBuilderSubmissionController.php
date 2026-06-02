@@ -38,7 +38,6 @@ class FormBuilderSubmissionController extends Controller
             ->where('status', true)
             ->firstOrFail();
 
-        // ── 1. Validate required registration fields ──────────────────
         $baseRules = [];
 
         if ($form->application_type === 'registration') {
@@ -57,7 +56,6 @@ class FormBuilderSubmissionController extends Controller
             $baseRules['email'] = "required|email|max:255|unique:{$emailTable},email";
         }
 
-        // ── 2. Build dynamic rules from mandatory custom fields ────────
         $customFields = $this->getPublishedFields($form);
         $dynamicRules = [];
 
@@ -79,7 +77,6 @@ class FormBuilderSubmissionController extends Controller
             $entityType = null;
             $entityId   = null;
 
-            // ── 3. Create Client or Candidate for registration forms ───
             if ($form->application_type === 'registration') {
 
                 $imagePath = null;
@@ -123,7 +120,6 @@ class FormBuilderSubmissionController extends Controller
                 $entityId = $entity->id ?? null;
             }
 
-            // ── 4. Create submission record ────────────────────────────
             $submission = FormBuilderSubmission::create([
                 'form_builder_id' => $form->id,
                 'entity_type'     => $entityType,
@@ -132,7 +128,6 @@ class FormBuilderSubmissionController extends Controller
                 'user_agent'      => $request->userAgent(),
             ]);
 
-            // ── 5. Store custom field answers ──────────────────────────
             $allowedFieldIds = $customFields->pluck('id')->flip();
             $answers         = $request->input('answers', []);
             $insertData      = [];
@@ -144,7 +139,6 @@ class FormBuilderSubmissionController extends Controller
 
                 $field = $customFields->firstWhere('id', (int) $fieldId);
 
-                // Handle file / media fields submitted as multipart
                 if (in_array($field->field_type, ['file_upload', 'file_with_additional_info', 'list_files', 'signature_field'])) {
                     if ($request->hasFile("files.{$fieldId}")) {
                         $uploaded = [];
@@ -186,10 +180,6 @@ class FormBuilderSubmissionController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────
-    // List submissions for a form builder (agency only)
-    // GET /agency/form-builders/{id}/submissions
-    // ─────────────────────────────────────────────
     public function index($id)
     {
         $form = $this->ownerForm($id);
@@ -202,10 +192,6 @@ class FormBuilderSubmissionController extends Controller
         return response()->json(['status' => true, 'data' => $submissions]);
     }
 
-    // ─────────────────────────────────────────────
-    // Get single submission detail
-    // GET /agency/form-builder-submissions/{id}
-    // ─────────────────────────────────────────────
     public function show($id)
     {
         $agencyId = auth('api')->user()->agency_id;
@@ -216,8 +202,6 @@ class FormBuilderSubmissionController extends Controller
 
         return response()->json(['status' => true, 'data' => $submission]);
     }
-
-    // ───────────── helpers ─────────────
 
     private function ownerForm($id)
     {
