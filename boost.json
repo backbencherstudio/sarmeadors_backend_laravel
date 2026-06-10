@@ -13,7 +13,6 @@
     "sail": false,
     "skills": [
         "laravel-best-practices",
-        "tailwindcss-development",
         "laravel-query-builder"
     ]
 }
