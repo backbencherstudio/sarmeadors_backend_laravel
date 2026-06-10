@@ -1,54 +1,51 @@
 <?php
 
-use App\Http\Controllers\Agency\ClientController;
-use App\Http\Controllers\Agency\FormController;
-use App\Http\Controllers\Api\AgencyController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Agency\StatusController;
-use App\Http\Controllers\Api\ForgotPasswordController;
-use App\Http\Controllers\Agency\FormFieldController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Client\ClientController as ClientClientController;
+use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Public / shared authentication routes (not tied to a single role)
+|--------------------------------------------------------------------------
+*/
+Route::get('/login', function () {
+    return response()->json([
+        'success' => false,
+        'message' => 'Please login to continue',
+    ], 401);
+})->name('api.login');
+
+Route::post('/refresh', [AuthController::class, 'refresh']);
 
 Route::middleware('subdomain')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
 
+    Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
+    Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
+    Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
+
+    // Public client registration
     Route::prefix('client')->group(function () {
         Route::post('/register', [ClientClientController::class, 'store']);
     });
 });
 
-
 Route::middleware('auth:api')->group(function () {
-
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/update-password', [UserController::class, 'updatePass']);
+    Route::post('/update-profile', [UserController::class, 'updateProfile']);
 });
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {
-
-});
-
-require __DIR__.'/niaz.php';
-require __DIR__.'/mahmudul.php';
-require __DIR__.'/shanto.php';
+/*
+|--------------------------------------------------------------------------
+| Role-scoped route files
+|--------------------------------------------------------------------------
+*/
+require __DIR__.'/superadmin.php';
+require __DIR__.'/agency.php';
+require __DIR__.'/client.php';
+require __DIR__.'/candidate.php';

@@ -13,7 +13,7 @@ class MessageTemplateController extends Controller
      */
     public function index()
     {
-        $all_templates = MessageTemplate::where('agency_id', auth()->user()->agency->id)->latest()->paginate();
+        $all_templates = MessageTemplate::where('agency_id', request()->current_agency->id)->latest()->paginate();
 
         return $this->sendResponse($all_templates);
     }
@@ -27,7 +27,7 @@ class MessageTemplateController extends Controller
             'name' => 'required|string',
             'subject' => 'required|string',
             'body' => 'required|string',
-            'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:2048'
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
 
         $attachments = [];
@@ -55,7 +55,7 @@ class MessageTemplateController extends Controller
             'bcc' => $request->bcc,
             'location' => $request->location,
             'attachments' => $attachments,
-            'agency_id' => auth()->user()->agency->id
+            'agency_id' => request()->current_agency->id,
         ]);
 
         return $this->sendResponse($message);
@@ -75,18 +75,18 @@ class MessageTemplateController extends Controller
     public function update(Request $request, MessageTemplate $messageTemplate)
     {
         $data = $request->validate([
-            'name'           => 'sometimes|required|string',
-            'subject'        => 'sometimes|required|string',
-            'body'           => 'sometimes|required|string',
-            'user_type'      => 'nullable|integer',
-            'status'         => 'nullable|integer',
-            'type'           => 'nullable|string',
-            'sender_email'   => 'nullable|email',
+            'name' => 'sometimes|required|string',
+            'subject' => 'sometimes|required|string',
+            'body' => 'sometimes|required|string',
+            'user_type' => 'nullable|integer',
+            'status' => 'nullable|integer',
+            'type' => 'nullable|string',
+            'sender_email' => 'nullable|email',
             'receiver_email' => 'nullable|email',
-            'cc'             => 'nullable|string',
-            'bcc'            => 'nullable|string',
-            'location'       => 'nullable|string',
-            'attachments.*'  => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
+            'cc' => 'nullable|string',
+            'bcc' => 'nullable|string',
+            'location' => 'nullable|string',
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
 
         if ($request->hasFile('attachments')) {
@@ -108,7 +108,7 @@ class MessageTemplateController extends Controller
     public function destroy(Request $request)
     {
         $request->validate([
-            'ids'   => 'required|array',
+            'ids' => 'required|array',
             'ids.*' => 'exists:message_templates,id',
         ]);
 
