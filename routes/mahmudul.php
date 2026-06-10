@@ -13,6 +13,7 @@ use App\Http\Controllers\Agency\ShortTermJobAttendanceController as AgencyShortT
 use App\Http\Controllers\Agency\ShortTermJobController as AgencyShortTermJobController;
 use App\Http\Controllers\Agency\ShortTermJobRefundController as AgencyShortTermJobRefundController;
 use App\Http\Controllers\Candidate\CandidateAvailabilityController;
+use App\Http\Controllers\Candidate\CandidateClientReportController;
 use App\Http\Controllers\Candidate\CandidateClientsController;
 use App\Http\Controllers\Candidate\CandidateDashboardController;
 use App\Http\Controllers\Candidate\CandidateDocumentController;
@@ -344,6 +345,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     // Candidate short-term reviews
     Route::get('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'index']);
     Route::post('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'store']);
+    Route::post('jobs/short-term/{shortTermJob}/client-report', [CandidateClientReportController::class, 'reportShortTerm']);
 
     // Candidate short-term messages
     Route::get('jobs/short-term/{shortTermJob}/messages', [ShortTermJobMessageController::class, 'index']);
@@ -370,6 +372,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     // Candidate long-term reviews
     Route::get('jobs/long-term/{longTermJob}/reviews', [CandidateLongTermJobReviewController::class, 'index']);
     Route::post('jobs/long-term/{longTermJob}/reviews', [CandidateLongTermJobReviewController::class, 'store']);
+    Route::post('jobs/long-term/{longTermJob}/client-report', [CandidateClientReportController::class, 'reportLongTerm']);
 
     // Candidate long-term job messages (candidate thread only)
     Route::get('jobs/long-term/{longTermJob}/messages', [CandidateJobMessageController::class, 'index']);

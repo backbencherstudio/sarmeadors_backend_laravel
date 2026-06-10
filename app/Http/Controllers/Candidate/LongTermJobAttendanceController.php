@@ -25,15 +25,15 @@ class LongTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (!$candidate || $longTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $longTermJob->candidate_id !== $candidate->id || $longTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found', [], 404);
             }
 
             $month = $request->query('month', Carbon::now()->format('Y-m'));
 
             try {
-                $start = Carbon::parse($month . '-01')->startOfMonth();
-                $end   = $start->copy()->endOfMonth();
+                $start = Carbon::parse($month.'-01')->startOfMonth();
+                $end = $start->copy()->endOfMonth();
             } catch (\Exception) {
                 return $this->sendError('Invalid month format. Use Y-m (e.g. 2026-01).', [], 422);
             }
@@ -46,8 +46,8 @@ class LongTermJobAttendanceController extends Controller
                 ->keyBy(fn ($a) => $a->date->toDateString());
 
             return $this->sendResponse([
-                'job'        => $longTermJob->load('schedules'),
-                'month'      => $month,
+                'job' => $longTermJob->load('schedules'),
+                'month' => $month,
                 'attendance' => $attendance,
             ], 'Attendance retrieved successfully', 200);
         } catch (\Exception $e) {
@@ -61,7 +61,7 @@ class LongTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (!$candidate || $longTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $longTermJob->candidate_id !== $candidate->id || $longTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found', [], 404);
             }
 
@@ -71,26 +71,34 @@ class LongTermJobAttendanceController extends Controller
 
             $today = Carbon::today()->toDateString();
 
+            if (! $this->hasScheduleToday($longTermJob)) {
+                return $this->sendError('No schedule found for today.', [], 422);
+            }
+
             $existing = LongTermJobAttendance::where('long_term_job_id', $longTermJob->id)
                 ->where('candidate_id', $candidate->id)
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->first();
 
             if ($existing && $existing->check_in) {
                 return $this->sendError('Already checked in today.', [], 422);
             }
 
-            $record = LongTermJobAttendance::updateOrCreate(
-                [
-                    'long_term_job_id' => $longTermJob->id,
-                    'candidate_id'     => $candidate->id,
-                    'date'             => $today,
-                ],
-                [
-                    'check_in'  => Carbon::now()->format('H:i'),
+            if ($existing) {
+                $existing->update([
+                    'check_in' => Carbon::now()->format('H:i'),
                     'is_absent' => false,
-                ]
-            );
+                ]);
+                $record = $existing->fresh();
+            } else {
+                $record = LongTermJobAttendance::create([
+                    'long_term_job_id' => $longTermJob->id,
+                    'candidate_id' => $candidate->id,
+                    'date' => $today,
+                    'check_in' => Carbon::now()->format('H:i'),
+                    'is_absent' => false,
+                ]);
+            }
 
             return $this->sendResponse($record, 'Checked in successfully.', 200);
         } catch (\Exception $e) {
@@ -104,7 +112,7 @@ class LongTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (!$candidate || $longTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $longTermJob->candidate_id !== $candidate->id || $longTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found', [], 404);
             }
 
@@ -116,10 +124,10 @@ class LongTermJobAttendanceController extends Controller
 
             $record = LongTermJobAttendance::where('long_term_job_id', $longTermJob->id)
                 ->where('candidate_id', $candidate->id)
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->first();
 
-            if (!$record || !$record->check_in) {
+            if (! $record || ! $record->check_in) {
                 return $this->sendError('You have not checked in today.', [], 422);
             }
 
@@ -131,11 +139,28 @@ class LongTermJobAttendanceController extends Controller
 
             return $this->sendResponse(
                 $record->fresh(),
-                'Checked out successfully. Duration: ' . $record->fresh()->duration_minutes . ' minutes.',
+                'Checked out successfully. Duration: '.$record->fresh()->duration_minutes.' minutes.',
                 200
             );
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
+    }
+
+    private function hasScheduleToday(LongTermJob $longTermJob): bool
+    {
+        $today = Carbon::today();
+
+        if ($longTermJob->start_date && $today->lt(Carbon::parse($longTermJob->start_date))) {
+            return false;
+        }
+
+        if ($longTermJob->end_date && $today->gt(Carbon::parse($longTermJob->end_date))) {
+            return false;
+        }
+
+        return $longTermJob->schedules()
+            ->where('day_of_week', $today->dayOfWeek)
+            ->exists();
     }
 }

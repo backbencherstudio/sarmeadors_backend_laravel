@@ -25,7 +25,7 @@ class ShortTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id || $shortTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found.', [], 404);
             }
 
@@ -50,7 +50,7 @@ class ShortTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id || $shortTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found.', [], 404);
             }
 
@@ -61,7 +61,7 @@ class ShortTermJobAttendanceController extends Controller
             $today = Carbon::today()->toDateString();
 
             $bookingDate = $shortTermJob->dates()
-                ->where('booking_date', $today)
+                ->whereDate('booking_date', $today)
                 ->first();
 
             if (! $bookingDate) {
@@ -70,21 +70,24 @@ class ShortTermJobAttendanceController extends Controller
 
             $existing = ShortTermJobAttendance::where('short_term_job_id', $shortTermJob->id)
                 ->where('candidate_id', $candidate->id)
-                ->where('booking_date', $today)
+                ->whereDate('booking_date', $today)
                 ->first();
 
             if ($existing && $existing->check_in) {
                 return $this->sendError('Already checked in for today.', [], 422);
             }
 
-            $record = ShortTermJobAttendance::updateOrCreate(
-                [
+            if ($existing) {
+                $existing->update(['check_in' => Carbon::now()->format('H:i')]);
+                $record = $existing->fresh();
+            } else {
+                $record = ShortTermJobAttendance::create([
                     'short_term_job_id' => $shortTermJob->id,
                     'candidate_id' => $candidate->id,
                     'booking_date' => $today,
-                ],
-                ['check_in' => Carbon::now()->format('H:i')]
-            );
+                    'check_in' => Carbon::now()->format('H:i'),
+                ]);
+            }
 
             return $this->sendResponse($record, 'Checked in successfully.', 200);
         } catch (\Exception $e) {
@@ -98,7 +101,7 @@ class ShortTermJobAttendanceController extends Controller
         try {
             $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id) {
+            if (! $candidate || $shortTermJob->candidate_id !== $candidate->id || $shortTermJob->agency_id !== $request->current_agency->id) {
                 return $this->sendError('Not found.', [], 404);
             }
 
@@ -110,7 +113,7 @@ class ShortTermJobAttendanceController extends Controller
 
             $record = ShortTermJobAttendance::where('short_term_job_id', $shortTermJob->id)
                 ->where('candidate_id', $candidate->id)
-                ->where('booking_date', $today)
+                ->whereDate('booking_date', $today)
                 ->first();
 
             if (! $record || ! $record->check_in) {

@@ -6,6 +6,7 @@ use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\LongTermJob;
+use App\Models\LongTermJobAttendance;
 use App\Models\LongTermJobChild;
 use App\Models\LongTermJobReview;
 use App\Models\LongTermJobSchedule;
@@ -74,6 +75,17 @@ class CandidateMyJobsTest extends TestCase
             ->assertJsonPath('data.events_by_date.2026-01-18.0.modal.can_check_in', true)
             ->assertJsonPath('data.events_by_date.2026-01-18.0.time.range', '10:00 AM - 11:00 AM')
             ->assertJsonPath('data.events_by_date.2026-01-18.1.job_type', 'long_term');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$shortTermJob->id}/check-in")
+            ->assertOk();
+
+        $this->assertDatabaseHas('short_term_job_attendance', [
+            'short_term_job_id' => $shortTermJob->id,
+            'candidate_id' => $candidate->id,
+        ]);
     }
 
     public function test_candidate_my_jobs_list_returns_running_completed_and_cancelled_screen_payloads(): void
@@ -114,6 +126,14 @@ class CandidateMyJobsTest extends TestCase
             'end_time' => '11:00',
         ]);
 
+        LongTermJobAttendance::create([
+            'long_term_job_id' => $completedJob->id,
+            'candidate_id' => $candidate->id,
+            'date' => '2026-01-18',
+            'check_in' => '10:00',
+            'check_out' => '12:05',
+        ]);
+
         LongTermJobReview::create([
             'long_term_job_id' => $completedJob->id,
             'candidate_id' => $candidate->id,
@@ -140,7 +160,7 @@ class CandidateMyJobsTest extends TestCase
         $runningResponse = $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/jobs?view=list&filter[status]=running');
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=running&filter[search]=Running');
 
         $runningResponse
             ->assertOk()
@@ -148,7 +168,9 @@ class CandidateMyJobsTest extends TestCase
             ->assertJsonPath('data.jobs.0.title', 'Running Nanny')
             ->assertJsonPath('data.jobs.0.attendance.checked_in_at', '8:52 AM')
             ->assertJsonPath('data.jobs.0.attendance.checked_out_at', '9:05 AM')
-            ->assertJsonPath('data.jobs.0.actions.can_check_in', false);
+            ->assertJsonPath('data.jobs.0.actions.can_check_in', false)
+            ->assertJsonPath('data.jobs.0.actions.check_in_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-in")
+            ->assertJsonPath('data.jobs.0.actions.check_out_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-out");
 
         $completedResponse = $this
             ->actingAs($user, 'api')
@@ -159,8 +181,28 @@ class CandidateMyJobsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.title', 'Completed Job')
             ->assertJsonPath('data.jobs.0.title', 'Completed Nanny')
+            ->assertJsonPath('data.jobs.0.working_time.total_minutes', 125)
+            ->assertJsonPath('data.jobs.0.working_time.total_label', '2h 5m')
             ->assertJsonPath('data.jobs.0.actions.can_view_review', true)
-            ->assertJsonPath('data.jobs.0.actions.can_leave_review', false);
+            ->assertJsonPath('data.jobs.0.actions.can_leave_review', false)
+            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/long-term/{$completedJob->id}/client-report");
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/long-term/{$completedJob->id}/client-report", [
+                'reason' => 'Client did not follow the agreed work terms.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'pending');
+
+        $this->assertDatabaseHas('candidate_client_reports', [
+            'candidate_id' => $candidate->id,
+            'client_id' => $client->id,
+            'long_term_job_id' => $completedJob->id,
+            'job_type' => 'long_term',
+            'status' => 'pending',
+        ]);
 
         $cancelledResponse = $this
             ->actingAs($user, 'api')
@@ -172,7 +214,114 @@ class CandidateMyJobsTest extends TestCase
             ->assertJsonPath('data.title', 'Cancelled Job')
             ->assertJsonPath('data.jobs.0.title', 'Cancelled Nanny')
             ->assertJsonPath('data.jobs.0.cancellation.reason', 'Family plans changed.')
-            ->assertJsonPath('data.jobs.0.actions.can_report_client', true);
+            ->assertJsonPath('data.jobs.0.actions.can_report_client', true)
+            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/short-term/{$cancelledJob->id}/client-report");
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$cancelledJob->id}/client-report", [
+                'reason' => 'Client cancelled after I had reserved the time.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'pending');
+
+        $this->assertDatabaseHas('candidate_client_reports', [
+            'candidate_id' => $candidate->id,
+            'client_id' => $client->id,
+            'short_term_job_id' => $cancelledJob->id,
+            'job_type' => 'short_term',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_candidate_attendance_check_in_and_check_out_routes_validate_job_schedule(): void
+    {
+        Carbon::setTestNow('2026-01-18 09:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $shortTermJob = $this->createShortTermJob($agency, $candidate, $client, [
+            'status' => 'running',
+        ]);
+
+        ShortTermJobDate::create([
+            'short_term_job_id' => $shortTermJob->id,
+            'booking_date' => '2026-01-18',
+            'start_time' => '09:00',
+            'end_time' => '11:00',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$shortTermJob->id}/check-in")
+            ->assertOk()
+            ->assertJsonPath('data.check_in', '09:00');
+
+        Carbon::setTestNow('2026-01-18 10:15:00');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$shortTermJob->id}/check-out")
+            ->assertOk()
+            ->assertJsonPath('data.check_out', '10:15');
+
+        $longTermJob = $this->createLongTermJob($agency, $candidate, $client, [
+            'status' => 'running',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-01-31',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $longTermJob->id,
+            'day_of_week' => 0,
+            'start_time' => '12:00',
+            'end_time' => '13:00',
+        ]);
+
+        Carbon::setTestNow('2026-01-18 12:05:00');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/long-term/{$longTermJob->id}/check-in")
+            ->assertOk()
+            ->assertJsonPath('data.check_in', '12:05');
+
+        Carbon::setTestNow('2026-01-18 13:10:00');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/long-term/{$longTermJob->id}/check-out")
+            ->assertOk()
+            ->assertJsonPath('data.check_out', '13:10');
+
+        $unscheduledJob = $this->createLongTermJob($agency, $candidate, $client, [
+            'status' => 'running',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-01-31',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $unscheduledJob->id,
+            'day_of_week' => 1,
+            'start_time' => '12:00',
+            'end_time' => '13:00',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/long-term/{$unscheduledJob->id}/check-in")
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('long_term_job_attendance', [
+            'long_term_job_id' => $unscheduledJob->id,
+            'candidate_id' => $candidate->id,
+        ]);
     }
 
     private function createCandidateScenario(): array
