@@ -13,6 +13,7 @@
         "laravel/tinker": "^3.0",
         "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-permission": "^6.24",
+        "spatie/laravel-query-builder": "^7.3",
         "stripe/stripe-php": "^19.4",
         "tymon/jwt-auth": "^2.2"
     },
