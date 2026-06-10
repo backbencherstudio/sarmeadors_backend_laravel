@@ -321,6 +321,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/short-term-marketplace', [CandidateShortTermJobApplicationController::class, 'marketplace']);
     Route::get('jobs/short-term-marketplace/{shortTermJob}', [CandidateShortTermJobApplicationController::class, 'showMarketplace']);
     Route::get('jobs/short-term-applications', [CandidateShortTermJobApplicationController::class, 'index']);
+    Route::get('jobs/short-term-applications/{shortTermJob}', [CandidateShortTermJobApplicationController::class, 'show']);
     Route::post('jobs/short-term/{shortTermJob}/apply', [CandidateShortTermJobApplicationController::class, 'store']);
     Route::delete('jobs/short-term/{shortTermJob}/apply', [CandidateShortTermJobApplicationController::class, 'destroy']);
 
@@ -346,6 +347,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/long-term-marketplace', [CandidateLongTermJobApplicationController::class, 'marketplace']);
     Route::get('jobs/long-term-marketplace/{longTermJob}', [CandidateLongTermJobApplicationController::class, 'showMarketplace']);
     Route::get('jobs/long-term-applications', [CandidateLongTermJobApplicationController::class, 'index']);
+    Route::get('jobs/long-term-applications/{application}', [CandidateLongTermJobApplicationController::class, 'show']);
     Route::post('jobs/long-term/{longTermJob}/apply', [CandidateLongTermJobApplicationController::class, 'store']);
     Route::delete('jobs/long-term/{longTermJob}/apply', [CandidateLongTermJobApplicationController::class, 'destroy']);
 

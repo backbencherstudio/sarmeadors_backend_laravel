@@ -114,7 +114,65 @@ class ShortTermJobApplicationController extends Controller
                 return $this->sendError('Candidate profile not found.', [], 404);
             }
 
-            return $this->sendResponse([], 'Short-term jobs do not use a separate applications table. Use the assigned jobs endpoint instead.', 200);
+            $this->mergeSearchFilter($request);
+
+            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
+                ->where('agency_id', $request->current_agency->id)
+                ->where('candidate_id', $candidate->id);
+
+            $query = QueryBuilder::for($baseQuery, $request)
+                ->allowedFilters(
+                    AllowedFilter::exact('status'),
+                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                        $search = $this->normalizeSearchValue($value);
+
+                        if ($search === '') {
+                            return;
+                        }
+
+                        $query->where(function (Builder $query) use ($search): void {
+                            $query->where('title', 'like', "%{$search}%")
+                                ->orWhere('home_city', 'like', "%{$search}%")
+                                ->orWhere('home_province', 'like', "%{$search}%")
+                                ->orWhere('country', 'like', "%{$search}%")
+                                ->orWhere('job_address', 'like', "%{$search}%")
+                                ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
+                                    $clientQuery->where('first_name', 'like', "%{$search}%")
+                                        ->orWhere('last_name', 'like', "%{$search}%");
+                                });
+                        });
+                    })
+                );
+
+            $jobs = $query->latest()->paginate($request->integer('per_page', 10));
+            $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatAppliedJobCard($job, $candidate));
+
+            return $this->sendResponse([
+                'notice' => 'Applied job records that have been closed for more than 30 days will be automatically deleted.',
+                'jobs' => $jobs,
+            ], 'Applied short-term jobs retrieved.', 200);
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
+    // GET /candidate/jobs/short-term-applications/{shortTermJob}
+    public function show(Request $request, ShortTermJob $shortTermJob): JsonResponse
+    {
+        try {
+            $candidate = $this->resolveCandidate($request);
+
+            if (! $candidate) {
+                return $this->sendError('Candidate profile not found.', [], 404);
+            }
+
+            if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->candidate_id !== $candidate->id) {
+                return $this->sendError('Applied job not found.', [], 404);
+            }
+
+            $shortTermJob->load(['client', 'children', 'dates']);
+
+            return $this->sendResponse($this->formatAppliedJobDetails($shortTermJob, $candidate), 'Applied short-term job retrieved.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
@@ -190,6 +248,42 @@ class ShortTermJobApplicationController extends Controller
             'has_applied' => $job->candidate_id === $candidate->id,
             'can_apply' => $job->status === 'marketplace' && is_null($job->candidate_id),
         ];
+    }
+
+    private function formatAppliedJobCard(ShortTermJob $job, Candidate $candidate): array
+    {
+        return array_merge($this->formatJobCard($job, $candidate), [
+            'application' => [
+                'id' => $job->id,
+                'type' => 'short_term_assignment',
+                'status' => $job->status,
+                'status_label' => $this->formatStatusLabel($job->status),
+                'applied_at' => $job->updated_at?->toISOString(),
+            ],
+            'interview' => null,
+            'actions' => [
+                'can_view_details' => true,
+                'can_open_interview' => false,
+            ],
+        ]);
+    }
+
+    private function formatAppliedJobDetails(ShortTermJob $job, Candidate $candidate): array
+    {
+        return array_merge($this->formatJobDetails($job, $candidate), [
+            'application' => [
+                'id' => $job->id,
+                'type' => 'short_term_assignment',
+                'status' => $job->status,
+                'status_label' => $this->formatStatusLabel($job->status),
+                'applied_at' => $job->updated_at?->toISOString(),
+            ],
+            'interview' => null,
+            'actions' => [
+                'can_view_details' => true,
+                'can_open_interview' => false,
+            ],
+        ]);
     }
 
     private function formatJobDetails(ShortTermJob $job, Candidate $candidate): array
@@ -282,5 +376,37 @@ class ShortTermJobApplicationController extends Controller
     private function formatTime(?string $time): ?string
     {
         return $time ? Carbon::parse($time)->format('g:i A') : null;
+    }
+
+    private function formatStatusLabel(?string $status): ?string
+    {
+        return match ($status) {
+            'pending', 'pending_approval' => 'Pending',
+            'marketplace' => 'Available',
+            'running' => 'Running Job',
+            'completed' => 'Closed Job',
+            'cancelled' => 'Cancelled',
+            'rejected' => 'Rejected',
+            default => $status ? Str::headline($status) : null,
+        };
+    }
+
+    private function mergeSearchFilter(Request $request): void
+    {
+        if ($request->filled('search') && ! $request->has('filter.search')) {
+            $request->merge([
+                'filter' => array_merge((array) $request->query('filter', []), [
+                    'search' => $request->query('search'),
+                ]),
+            ]);
+        }
+    }
+
+    private function normalizeSearchValue(mixed $value): string
+    {
+        return collect(is_array($value) ? $value : [$value])
+            ->map(fn (mixed $term): string => trim((string) $term))
+            ->filter()
+            ->implode(' ');
     }
 }

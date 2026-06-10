@@ -115,13 +115,65 @@ class LongTermJobApplicationController extends Controller
                 return $this->sendError('Candidate profile not found.', [], 404);
             }
 
-            $applications = LongTermJobApplication::with(['job.client', 'job.schedules'])
-                ->where('candidate_id', $candidate->id)
-                ->where('agency_id', $request->current_agency->id)
-                ->latest()
-                ->paginate(10);
+            $this->mergeSearchFilter($request);
 
-            return $this->sendResponse($applications, 'Applications retrieved.', 200);
+            $baseQuery = LongTermJobApplication::with(['job.client', 'job.children', 'job.schedules', 'interview'])
+                ->where('candidate_id', $candidate->id)
+                ->where('agency_id', $request->current_agency->id);
+
+            $query = QueryBuilder::for($baseQuery, $request)
+                ->allowedFilters(
+                    AllowedFilter::exact('status'),
+                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                        $search = $this->normalizeSearchValue($value);
+
+                        if ($search === '') {
+                            return;
+                        }
+
+                        $query->whereHas('job', function (Builder $jobQuery) use ($search): void {
+                            $jobQuery->where('title', 'like', "%{$search}%")
+                                ->orWhere('home_city', 'like', "%{$search}%")
+                                ->orWhere('home_province', 'like', "%{$search}%")
+                                ->orWhere('country', 'like', "%{$search}%")
+                                ->orWhere('job_address', 'like', "%{$search}%")
+                                ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
+                                    $clientQuery->where('first_name', 'like', "%{$search}%")
+                                        ->orWhere('last_name', 'like', "%{$search}%");
+                                });
+                        });
+                    })
+                );
+
+            $applications = $query->latest()->paginate($request->integer('per_page', 10));
+            $applications->getCollection()->transform(fn (LongTermJobApplication $application): array => $this->formatApplicationCard($application, $candidate));
+
+            return $this->sendResponse([
+                'notice' => 'Applied job records that have been closed for more than 30 days will be automatically deleted.',
+                'jobs' => $applications,
+            ], 'Applied long-term jobs retrieved.', 200);
+        } catch (\Exception $e) {
+            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        }
+    }
+
+    // GET /candidate/jobs/long-term-applications/{application}
+    public function show(Request $request, LongTermJobApplication $application): JsonResponse
+    {
+        try {
+            $candidate = $this->resolveCandidate($request);
+
+            if (! $candidate) {
+                return $this->sendError('Candidate profile not found.', [], 404);
+            }
+
+            if ($application->candidate_id !== $candidate->id || $application->agency_id !== $request->current_agency->id) {
+                return $this->sendError('Applied job not found.', [], 404);
+            }
+
+            $application->load(['job.client', 'job.children', 'job.schedules', 'interview']);
+
+            return $this->sendResponse($this->formatApplicationDetails($application, $candidate), 'Applied long-term job retrieved.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
@@ -216,6 +268,104 @@ class LongTermJobApplicationController extends Controller
             'status' => $job->status,
             'has_applied' => $hasApplied,
             'can_apply' => $job->status === 'marketplace' && ! $hasApplied,
+        ];
+    }
+
+    private function formatApplicationCard(LongTermJobApplication $application, Candidate $candidate): array
+    {
+        $job = $application->job;
+
+        if (! $job) {
+            return [
+                'application_id' => $application->id,
+                'application' => $this->formatApplicationMeta($application),
+            ];
+        }
+
+        return array_merge($this->formatJobCard($job, $candidate), [
+            'application_id' => $application->id,
+            'application' => $this->formatApplicationMeta($application),
+            'interview' => $this->formatInterviewSummary($application),
+            'actions' => [
+                'can_view_details' => true,
+                'can_open_interview' => $application->interview !== null,
+            ],
+        ]);
+    }
+
+    private function formatApplicationDetails(LongTermJobApplication $application, Candidate $candidate): array
+    {
+        $job = $application->job;
+
+        if (! $job) {
+            return [
+                'application' => $this->formatApplicationMeta($application),
+                'interview' => null,
+                'actions' => [
+                    'can_view_details' => false,
+                    'can_open_interview' => false,
+                ],
+            ];
+        }
+
+        return array_merge($this->formatJobDetails($job, $candidate), [
+            'application_id' => $application->id,
+            'application' => $this->formatApplicationMeta($application),
+            'interview' => $this->formatInterviewSummary($application),
+            'actions' => [
+                'can_view_details' => true,
+                'can_open_interview' => $application->interview !== null,
+            ],
+        ]);
+    }
+
+    private function formatApplicationMeta(LongTermJobApplication $application): array
+    {
+        return [
+            'id' => $application->id,
+            'type' => 'long_term_application',
+            'message' => $application->application_message,
+            'status' => $application->status,
+            'status_label' => $this->formatStatusLabel($application->status),
+            'job_status' => $application->job?->status,
+            'job_status_label' => $this->formatStatusLabel($application->job?->status),
+            'applied_at' => $application->created_at?->toISOString(),
+        ];
+    }
+
+    private function formatInterviewSummary(LongTermJobApplication $application): ?array
+    {
+        $interview = $application->interview;
+        $job = $application->job;
+        $client = $job?->client;
+
+        if (! $interview) {
+            return null;
+        }
+
+        $description = $interview->description ?: $job?->description;
+
+        return [
+            'id' => $interview->id,
+            'status' => $interview->status,
+            'date' => $interview->scheduled_date?->toDateString(),
+            'time' => [
+                'from' => $this->formatTime($interview->available_from),
+                'to' => $this->formatTime($interview->available_to),
+                'range' => $this->formatTime($interview->available_from).' - '.$this->formatTime($interview->available_to),
+            ],
+            'meeting' => [
+                'type' => $interview->interview_type,
+                'link' => $interview->interview_link,
+                'can_join' => $interview->status === 'scheduled' && filled($interview->interview_link),
+            ],
+            'modal' => [
+                'title' => $job?->title,
+                'subtitle' => $client ? 'You and '.$this->formatClientName($client) : null,
+                'description' => $description,
+                'description_preview' => $description ? Str::limit($description, 120) : null,
+                'special_note' => $interview->special_note,
+            ],
         ];
     }
 
@@ -328,5 +478,38 @@ class LongTermJobApplicationController extends Controller
     private function formatDayName(int $day): string
     {
         return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][$day] ?? 'Unknown';
+    }
+
+    private function formatStatusLabel(?string $status): ?string
+    {
+        return match ($status) {
+            'pending', 'pending_approval' => 'Pending',
+            'interviewed' => 'Interview',
+            'hired', 'running' => 'Running Job',
+            'marketplace' => 'Available',
+            'completed' => 'Closed Job',
+            'cancelled' => 'Cancelled',
+            'rejected' => 'Rejected',
+            default => $status ? Str::headline($status) : null,
+        };
+    }
+
+    private function mergeSearchFilter(Request $request): void
+    {
+        if ($request->filled('search') && ! $request->has('filter.search')) {
+            $request->merge([
+                'filter' => array_merge((array) $request->query('filter', []), [
+                    'search' => $request->query('search'),
+                ]),
+            ]);
+        }
+    }
+
+    private function normalizeSearchValue(mixed $value): string
+    {
+        return collect(is_array($value) ? $value : [$value])
+            ->map(fn (mixed $term): string => trim((string) $term))
+            ->filter()
+            ->implode(' ');
     }
 }
