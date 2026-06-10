@@ -15,6 +15,7 @@ use App\Http\Controllers\Agency\ShortTermJobRefundController as AgencyShortTermJ
 use App\Http\Controllers\Candidate\CandidateAvailabilityController;
 use App\Http\Controllers\Candidate\CandidateClientsController;
 use App\Http\Controllers\Candidate\CandidateDashboardController;
+use App\Http\Controllers\Candidate\CandidateDocumentController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
 use App\Http\Controllers\Candidate\JobMessageController as CandidateJobMessageController;
@@ -297,6 +298,16 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     // My Clients
     Route::get('clients', [CandidateClientsController::class, 'index']);
     Route::get('clients/{client}', [CandidateClientsController::class, 'show']);
+
+    // Documents
+    Route::get('documents', [CandidateDocumentController::class, 'index']);
+    Route::get('documents/agreements/{documentTemplate}', [CandidateDocumentController::class, 'showAgreement']);
+    Route::post('documents/agreements/{documentTemplate}/sign', [CandidateDocumentController::class, 'signAgreement']);
+    Route::post('documents/required/{documentKey}/upload', [CandidateDocumentController::class, 'uploadRequired']);
+    Route::delete('documents/required/{documentKey}', [CandidateDocumentController::class, 'deleteRequired']);
+    Route::post('documents/additional', [CandidateDocumentController::class, 'storeAdditional']);
+    Route::delete('documents/additional/{candidateDocument}', [CandidateDocumentController::class, 'destroyAdditional']);
+    Route::get('documents/files/{candidateDocument}/download', [CandidateDocumentController::class, 'downloadUploaded']);
 
     // Interviews
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
