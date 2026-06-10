@@ -1,21 +1,29 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        // Convert boolean (0/1) values before changing column type
-        DB::statement("UPDATE long_term_jobs SET paid_vacation = NULL WHERE paid_vacation = '0'");
-        DB::statement("UPDATE long_term_jobs SET paid_vacation = 'vacation' WHERE paid_vacation = '1'");
+        // The column was a boolean; map existing 0/1 values onto the new enum.
+        DB::table('long_term_jobs')->where('paid_vacation', 0)->update(['paid_vacation' => null]);
+        DB::table('long_term_jobs')->where('paid_vacation', 1)->update(['paid_vacation' => 'vacation']);
 
-        DB::statement("ALTER TABLE long_term_jobs MODIFY paid_vacation ENUM('vacation','holidays','vacation_and_holidays','none') NULL DEFAULT NULL");
+        Schema::table('long_term_jobs', function (Blueprint $table) {
+            $table->enum('paid_vacation', ['vacation', 'holidays', 'vacation_and_holidays', 'none'])
+                ->nullable()
+                ->change();
+        });
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE long_term_jobs MODIFY paid_vacation TINYINT(1) NOT NULL DEFAULT 0');
+        Schema::table('long_term_jobs', function (Blueprint $table) {
+            $table->boolean('paid_vacation')->default(false)->change();
+        });
     }
 };
