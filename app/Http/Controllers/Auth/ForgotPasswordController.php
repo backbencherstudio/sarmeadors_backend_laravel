@@ -3,30 +3,27 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\PasswordOtpMail;
-use Carbon\Carbon;
-use Illuminate\Support\Str;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use App\Notifications\PasswordOtpNotification;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class ForgotPasswordController extends Controller
 {
-
     public function sendOtp(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -44,11 +41,11 @@ class ForgotPasswordController extends Controller
         );
 
         // Queue email
-        Mail::to($user->email)->queue(new PasswordOtpMail($otp));
+        $user->notify(new PasswordOtpNotification($otp));
 
         return response()->json([
             'status' => true,
-            'message' => 'OTP sent to your email'
+            'message' => 'OTP sent to your email',
         ]);
     }
 
@@ -61,35 +58,35 @@ class ForgotPasswordController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $user = User::where('email', $request->email)->first();
 
         $otpRecord = DB::table('password_otps')
-                        ->where('user_id', $user->id)
-                        ->first();
+            ->where('user_id', $user->id)
+            ->first();
 
         if (! $otpRecord || $otpRecord->otp != $request->otp) {
             return response()->json([
                 'status' => false,
-                'message' => 'Invalid OTP'
+                'message' => 'Invalid OTP',
             ], 400);
         }
 
         if (Carbon::now()->gt(Carbon::parse($otpRecord->expires_at))) {
             return response()->json([
                 'status' => false,
-                'message' => 'OTP expired'
+                'message' => 'OTP expired',
             ], 400);
         }
 
         return response()->json([
             'status' => true,
-            'message' => 'OTP verified successfully'
+            'message' => 'OTP verified successfully',
         ]);
     }
 
@@ -103,22 +100,22 @@ class ForgotPasswordController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $user = User::where('email', $request->email)->first();
 
         $otpRecord = DB::table('password_otps')
-                        ->where('user_id', $user->id)
-                        ->first();
+            ->where('user_id', $user->id)
+            ->first();
 
         if (! $otpRecord || $otpRecord->otp != $request->otp || Carbon::now()->gt(Carbon::parse($otpRecord->expires_at))) {
             return response()->json([
                 'status' => false,
-                'message' => 'Invalid or expired OTP'
+                'message' => 'Invalid or expired OTP',
             ], 400);
         }
 
@@ -129,8 +126,7 @@ class ForgotPasswordController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Password reset successfully'
+            'message' => 'Password reset successfully',
         ]);
     }
-
 }
