@@ -17,6 +17,7 @@ use App\Http\Controllers\Candidate\CandidateClientsController;
 use App\Http\Controllers\Candidate\CandidateDashboardController;
 use App\Http\Controllers\Candidate\CandidateDocumentController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
+use App\Http\Controllers\Candidate\CandidateNotificationController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
 use App\Http\Controllers\Candidate\JobMessageController as CandidateJobMessageController;
 use App\Http\Controllers\Candidate\LongTermJobApplicationController as CandidateLongTermJobApplicationController;
@@ -29,7 +30,6 @@ use App\Http\Controllers\Candidate\ShortTermJobController as CandidateShortTermJ
 use App\Http\Controllers\Candidate\ShortTermJobReviewController as CandidateShortTermJobReviewController;
 use App\Http\Controllers\Client\ClientCandidateController;
 use App\Http\Controllers\Client\ClientDashboardController;
-use App\Http\Controllers\Client\ClientDirectMessageController;
 use App\Http\Controllers\Client\ClientDocumentController;
 use App\Http\Controllers\Client\ClientInterviewController;
 use App\Http\Controllers\Client\ClientLocationController;
@@ -162,12 +162,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::put('notifications/{id}/read', [ClientNotificationController::class, 'markRead']);
     Route::delete('notifications/{id}', [ClientNotificationController::class, 'destroy']);
 
-    // Direct messages (header chat: Admin & Candidate threads)
-    Route::get('messages/threads', [ClientDirectMessageController::class, 'threads']);
-    Route::get('messages/unread-counts', [ClientDirectMessageController::class, 'unreadCounts']);
-    Route::get('messages/threads/{thread}', [ClientDirectMessageController::class, 'show']);
-    Route::post('messages/threads/{thread}', [ClientDirectMessageController::class, 'store']);
-
     // Documents / Agreements
     Route::get('documents', [ClientDocumentController::class, 'index']);
     Route::get('documents/{document}', [ClientDocumentController::class, 'show']);
@@ -288,6 +282,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::put('profile/password', [CandidateProfileController::class, 'updatePassword']);
     Route::delete('profile', [CandidateProfileController::class, 'destroy']);
 
+    // Notifications
+    Route::get('notifications', [CandidateNotificationController::class, 'index']);
+    Route::put('notifications/mark-all-read', [CandidateNotificationController::class, 'markAllRead']);
+    Route::put('notifications/{id}/read', [CandidateNotificationController::class, 'markRead']);
+    Route::delete('notifications/{id}', [CandidateNotificationController::class, 'destroy']);
+
     // Availability
     Route::get('availability', [CandidateAvailabilityController::class, 'show']);
     Route::put('availability', [CandidateAvailabilityController::class, 'update']);
@@ -311,6 +311,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
 
     // Interviews
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
+    Route::get('interviews/{interview}', [CandidateInterviewController::class, 'show']);
 
     // Candidate short-term jobs (assigned jobs)
     Route::get('jobs/short-term', [CandidateShortTermJobController::class, 'index']);
