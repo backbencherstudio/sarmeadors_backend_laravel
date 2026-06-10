@@ -113,6 +113,7 @@ class CandidateClientsTest extends TestCase
             ->assertJsonPath('data.job_history.0.job_type_label', 'Short-Term Jobs')
             ->assertJsonPath('data.job_history.0.status', 'completed')
             ->assertJsonPath('data.job_history.0.can_view_review', true)
+            ->assertJsonPath('data.job_history.0.can_report_client', true)
             ->assertJsonMissingPath('data.short_term_jobs')
             ->assertJsonMissingPath('data.long_term_jobs');
     }

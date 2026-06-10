@@ -89,6 +89,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::post('jobs/short-term/{shortTermJob}/check-in', [CandidateShortTermJobAttendanceController::class, 'checkIn']);
     Route::post('jobs/short-term/{shortTermJob}/check-out', [CandidateShortTermJobAttendanceController::class, 'checkOut']);
 
+    // Candidate short-term invoice (earnings breakdown)
+    Route::get('jobs/short-term/{shortTermJob}/invoice', [CandidateShortTermJobController::class, 'invoice']);
+
     // Candidate short-term reviews
     Route::get('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'index']);
     Route::post('jobs/short-term/{shortTermJob}/reviews', [CandidateShortTermJobReviewController::class, 'store']);
@@ -115,6 +118,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/long-term/{longTermJob}/attendance', [CandidateLongTermJobAttendanceController::class, 'calendar']);
     Route::post('jobs/long-term/{longTermJob}/check-in', [CandidateLongTermJobAttendanceController::class, 'checkIn']);
     Route::post('jobs/long-term/{longTermJob}/check-out', [CandidateLongTermJobAttendanceController::class, 'checkOut']);
+
+    // Candidate long-term invoice (earnings breakdown)
+    Route::get('jobs/long-term/{longTermJob}/invoice', [CandidateLongTermJobController::class, 'invoice']);
 
     // Candidate long-term reviews
     Route::get('jobs/long-term/{longTermJob}/reviews', [CandidateLongTermJobReviewController::class, 'index']);

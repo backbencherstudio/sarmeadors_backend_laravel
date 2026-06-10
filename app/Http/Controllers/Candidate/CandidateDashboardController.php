@@ -157,7 +157,6 @@ class CandidateDashboardController extends Controller
                 'latest_attendance' => $attendance,
                 'can_check_in' => $job->status === 'running' && (! $attendance || ! $attendance->check_in),
                 'can_check_out' => $job->status === 'running' && $attendance?->check_in && ! $attendance?->check_out,
-                'raw' => $job,
             ];
         });
     }

@@ -78,6 +78,75 @@ class LongTermJobController extends Controller
         );
     }
 
+    // GET /candidate/jobs/long-term/{longTermJob}/invoice
+    public function invoice(Request $request, LongTermJob $longTermJob): JsonResponse
+    {
+        $candidate = $this->resolveCandidate($request);
+
+        if (! $candidate || $longTermJob->candidate_id !== $candidate->id || $longTermJob->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found', [], 404);
+        }
+
+        $longTermJob->load([
+            'client',
+            'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id)->orderBy('date'),
+            'nannyPayments' => fn ($query) => $query->where('candidate_id', $candidate->id),
+        ]);
+
+        return $this->sendResponse(
+            $this->formatInvoice($longTermJob, $candidate),
+            'Invoice retrieved successfully',
+            200
+        );
+    }
+
+    private function formatInvoice(LongTermJob $job, Candidate $candidate): array
+    {
+        $rate = (float) $job->compensation_amount;
+
+        $lineItems = $job->attendance
+            ->filter(fn (LongTermJobAttendance $attendance): bool => $attendance->duration_minutes > 0)
+            ->map(function (LongTermJobAttendance $attendance) use ($rate): array {
+                $hours = round($attendance->duration_minutes / 60, 2);
+
+                return [
+                    'date' => $attendance->date->toDateString(),
+                    'check_in' => $this->formatTime($attendance->check_in),
+                    'check_out' => $this->formatTime($attendance->check_out),
+                    'worked_minutes' => $attendance->duration_minutes,
+                    'worked_label' => $this->formatDuration($attendance->duration_minutes),
+                    'amount' => round($hours * $rate, 2),
+                ];
+            })
+            ->values();
+
+        $summary = $this->formatAttendanceSummary($job);
+
+        return [
+            'job_id' => $job->id,
+            'job_type' => 'long_term',
+            'title' => $job->title,
+            'candidate' => [
+                'id' => $candidate->id,
+                'name' => trim($candidate->first_name.' '.$candidate->last_name),
+            ],
+            'client' => [
+                'id' => $job->client?->id,
+                'name' => $this->formatClientName($job),
+            ],
+            'compensation' => $summary['compensation'],
+            'line_items' => $lineItems,
+            'totals' => [
+                'total_worked_minutes' => $summary['total_worked_minutes'],
+                'total_worked_label' => $summary['total_worked_label'],
+                'total_earning' => $summary['total_earning'],
+                'total_payment' => $summary['total_payment'],
+                'due_payment' => $summary['due_payment'],
+            ],
+            'generated_at' => now()->toISOString(),
+        ];
+    }
+
     private function formatJobDetails(Request $request, LongTermJob $job, Candidate $candidate): array
     {
         $month = Carbon::parse($request->query('month', now()->format('Y-m').'-01'))->startOfMonth();
@@ -118,7 +187,7 @@ class LongTermJobController extends Controller
                 'attendance_url' => "/api/candidate/jobs/long-term/{$job->id}/attendance",
                 'messages_url' => "/api/candidate/jobs/long-term/{$job->id}/messages",
                 'message_unread_counts_url' => "/api/candidate/jobs/long-term/{$job->id}/messages/unread-counts",
-                'invoice_url' => null,
+                'invoice_url' => "/api/candidate/jobs/long-term/{$job->id}/invoice",
             ],
         ];
     }

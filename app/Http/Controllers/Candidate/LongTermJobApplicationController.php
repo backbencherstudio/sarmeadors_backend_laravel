@@ -7,6 +7,7 @@ use App\Models\Candidate;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
 use App\Traits\FormatsJobPosting;
+use App\Traits\FormatsMoney;
 use App\Traits\FormatsTime;
 use App\Traits\MergesSearchFilter;
 use App\Traits\ResolvesCandidate;
@@ -20,6 +21,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 class LongTermJobApplicationController extends Controller
 {
     use FormatsJobPosting;
+    use FormatsMoney;
     use FormatsTime;
     use MergesSearchFilter;
     use ResolvesCandidate;
@@ -380,7 +382,6 @@ class LongTermJobApplicationController extends Controller
                 'consent_description' => $job->consent_description,
                 'child_attachment' => $job->child_attachment,
             ],
-            'raw' => $job,
         ];
     }
 
@@ -390,7 +391,7 @@ class LongTermJobApplicationController extends Controller
             'amount' => $job->compensation_amount,
             'currency' => $job->compensation_currency,
             'type' => $job->compensation_type,
-            'label' => '$'.rtrim(rtrim((string) $job->compensation_amount, '0'), '.').'/hr',
+            'label' => $this->formatHourlyRate($job->compensation_amount),
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobAttendance;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobAttendance;
+use App\Traits\FormatsMoney;
 use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateMyJobController extends Controller
 {
+    use FormatsMoney;
     use FormatsTime;
     use ResolvesCandidate;
 
@@ -394,7 +396,7 @@ class CandidateMyJobController extends Controller
             'amount' => $job->compensation_amount,
             'currency' => $job->compensation_currency,
             'type' => $job->compensation_type,
-            'label' => '$'.rtrim(rtrim((string) $job->compensation_amount, '0'), '.').'/hr',
+            'label' => $this->formatHourlyRate($job->compensation_amount),
         ];
     }
 

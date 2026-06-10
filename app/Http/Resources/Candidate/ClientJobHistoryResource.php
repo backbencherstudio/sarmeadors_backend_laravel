@@ -44,7 +44,7 @@ class ClientJobHistoryResource extends JsonResource
             'my_review' => $job->review,
             'can_leave_review' => $job->status === 'completed' && ! $job->review,
             'can_view_review' => (bool) $job->review,
-            'can_report_client' => false,
+            'can_report_client' => in_array($job->status, ['completed', 'cancelled'], true),
         ];
     }
 }

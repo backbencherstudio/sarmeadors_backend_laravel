@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
  */
 trait FormatsAssignedJob
 {
+    use FormatsMoney;
+
     /**
      * @param  Collection<int, mixed>  $children
      * @return Collection<int, array<string, mixed>>
@@ -62,6 +64,6 @@ trait FormatsAssignedJob
 
     protected function formatCompensation(ShortTermJob|LongTermJob $job): string
     {
-        return '$'.rtrim(rtrim((string) $job->compensation_amount, '0'), '.').' per '.Str::after($job->compensation_type, 'per_');
+        return '$'.$this->formatAmount($job->compensation_amount).' per '.Str::after($job->compensation_type, 'per_');
     }
 }

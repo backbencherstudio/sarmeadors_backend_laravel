@@ -73,6 +73,74 @@ class ShortTermJobController extends Controller
         );
     }
 
+    // GET /candidate/jobs/short-term/{shortTermJob}/invoice
+    public function invoice(Request $request, ShortTermJob $shortTermJob): JsonResponse
+    {
+        $candidate = $this->resolveCandidate($request);
+
+        if (! $candidate || $shortTermJob->candidate_id !== $candidate->id || $shortTermJob->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $shortTermJob->load([
+            'client',
+            'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id)->orderBy('booking_date'),
+        ]);
+
+        return $this->sendResponse(
+            $this->formatInvoice($shortTermJob, $candidate),
+            'Invoice retrieved successfully.',
+            200
+        );
+    }
+
+    private function formatInvoice(ShortTermJob $job, Candidate $candidate): array
+    {
+        $rate = (float) $job->compensation_amount;
+
+        $lineItems = $job->attendance
+            ->filter(fn (ShortTermJobAttendance $attendance): bool => $attendance->duration_minutes > 0)
+            ->map(function (ShortTermJobAttendance $attendance) use ($rate): array {
+                $hours = round($attendance->duration_minutes / 60, 2);
+
+                return [
+                    'date' => $attendance->booking_date->toDateString(),
+                    'check_in' => $this->formatTime($attendance->check_in),
+                    'check_out' => $this->formatTime($attendance->check_out),
+                    'worked_minutes' => $attendance->duration_minutes,
+                    'worked_label' => $this->formatDuration($attendance->duration_minutes),
+                    'amount' => round($hours * $rate, 2),
+                ];
+            })
+            ->values();
+
+        $summary = $this->formatAttendanceSummary($job);
+
+        return [
+            'job_id' => $job->id,
+            'job_type' => 'short_term',
+            'title' => $job->title,
+            'candidate' => [
+                'id' => $candidate->id,
+                'name' => trim($candidate->first_name.' '.$candidate->last_name),
+            ],
+            'client' => [
+                'id' => $job->client?->id,
+                'name' => $this->formatClientName($job),
+            ],
+            'compensation' => $summary['compensation'],
+            'line_items' => $lineItems,
+            'totals' => [
+                'total_worked_minutes' => $summary['total_worked_minutes'],
+                'total_worked_label' => $summary['total_worked_label'],
+                'total_earning' => $summary['total_earning'],
+                'total_payment' => $summary['total_payment'],
+                'due_payment' => $summary['due_payment'],
+            ],
+            'generated_at' => now()->toISOString(),
+        ];
+    }
+
     private function formatJobDetails(Request $request, ShortTermJob $job, Candidate $candidate): array
     {
         $month = Carbon::parse($request->query('month', now()->format('Y-m').'-01'))->startOfMonth();
@@ -113,7 +181,7 @@ class ShortTermJobController extends Controller
                 'attendance_url' => "/api/candidate/jobs/short-term/{$job->id}/attendance",
                 'messages_url' => "/api/candidate/jobs/short-term/{$job->id}/messages",
                 'message_unread_counts_url' => "/api/candidate/jobs/short-term/{$job->id}/messages/unread-counts",
-                'invoice_url' => null,
+                'invoice_url' => "/api/candidate/jobs/short-term/{$job->id}/invoice",
             ],
         ];
     }

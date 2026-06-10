@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\ShortTermJob;
 use App\Traits\FormatsJobPosting;
+use App\Traits\FormatsMoney;
 use App\Traits\FormatsTime;
 use App\Traits\MergesSearchFilter;
 use App\Traits\ResolvesCandidate;
@@ -19,6 +20,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 class ShortTermJobApplicationController extends Controller
 {
     use FormatsJobPosting;
+    use FormatsMoney;
     use FormatsTime;
     use MergesSearchFilter;
     use ResolvesCandidate;
@@ -286,7 +288,6 @@ class ShortTermJobApplicationController extends Controller
                 ]),
             'address' => $this->formatAddress($job),
             'budget' => $this->formatCompensation($job),
-            'raw' => $job,
         ];
     }
 
@@ -296,7 +297,7 @@ class ShortTermJobApplicationController extends Controller
             'amount' => $job->compensation_amount,
             'currency' => $job->compensation_currency,
             'type' => $job->compensation_type,
-            'label' => '$'.rtrim(rtrim((string) $job->compensation_amount, '0'), '.').'/hr',
+            'label' => $this->formatHourlyRate($job->compensation_amount),
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Candidate;
 
 use App\Models\Client;
+use App\Models\Location;
 use App\Models\LongTermJobReview;
 use App\Models\ShortTermJobReview;
 use Illuminate\Http\Request;
@@ -29,8 +30,29 @@ class ClientDetailResource extends JsonResource
             'email' => $client->email,
             'mobile' => $client->mobile,
             'image_url' => $client->image_url,
+            'area' => $this->resolveArea($client),
             'rating' => $this->ratingSummary($client, $agencyId),
         ];
+    }
+
+    /**
+     * Resolve the client's configured location names into a single area label
+     * (e.g. "DC Metro Area"). Returns null when no locations are set.
+     */
+    private function resolveArea(Client $client): ?string
+    {
+        $locationIds = collect($client->location_id ?? [])->filter()->values();
+
+        if ($locationIds->isEmpty()) {
+            return null;
+        }
+
+        $names = Location::whereIn('id', $locationIds)
+            ->pluck('location')
+            ->filter()
+            ->values();
+
+        return $names->isEmpty() ? null : $names->implode(', ');
     }
 
     /**
