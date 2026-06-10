@@ -9,10 +9,21 @@ use App\Models\CandidateAvailabilityDay;
 use App\Models\CandidateUnavailability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class CandidateAvailabilityController extends Controller
 {
+    private const DAY_NAMES = [
+        0 => 'Sunday',
+        1 => 'Monday',
+        2 => 'Tuesday',
+        3 => 'Wednesday',
+        4 => 'Thursday',
+        5 => 'Friday',
+        6 => 'Saturday',
+    ];
+
     private function resolveCandidate(Request $request): ?Candidate
     {
         return Candidate::where('email', $request->user()->email)
@@ -64,8 +75,8 @@ class CandidateAvailabilityController extends Controller
                 ->get();
 
             return $this->sendResponse([
-                'availability' => $availability,
-                'unavailabilities' => $unavailabilities,
+                'availability' => $this->formatAvailability($availability),
+                'unavailabilities' => $this->formatUnavailabilities($unavailabilities),
             ], 'Availability retrieved successfully.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -114,8 +125,14 @@ class CandidateAvailabilityController extends Controller
             }
 
             $availability->load('days');
+            $unavailabilities = CandidateUnavailability::where('candidate_id', $candidate->id)
+                ->orderBy('start_date')
+                ->get();
 
-            return $this->sendResponse($availability, 'Availability updated successfully.', 200);
+            return $this->sendResponse([
+                'availability' => $this->formatAvailability($availability),
+                'unavailabilities' => $this->formatUnavailabilities($unavailabilities),
+            ], 'Availability updated successfully.', 200);
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
@@ -137,7 +154,7 @@ class CandidateAvailabilityController extends Controller
                 ->orderBy('start_date')
                 ->get();
 
-            return $this->sendResponse($unavailabilities, 'Unavailabilities retrieved successfully.', 200);
+            return $this->sendResponse($this->formatUnavailabilities($unavailabilities), 'Unavailabilities retrieved successfully.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
@@ -166,7 +183,7 @@ class CandidateAvailabilityController extends Controller
                 'end_date' => $validated['end_date'],
             ]);
 
-            return $this->sendResponse($unavailability, 'Unavailability created successfully.', 201);
+            return $this->sendResponse($this->formatUnavailability($unavailability), 'Unavailability created successfully.', 201);
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
@@ -190,5 +207,47 @@ class CandidateAvailabilityController extends Controller
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
+    }
+
+    private function formatAvailability(CandidateAvailability $availability): array
+    {
+        return [
+            'id' => $availability->id,
+            'timezone' => $availability->timezone,
+            'days' => $availability->days
+                ->sortBy('day_of_week')
+                ->values()
+                ->map(fn (CandidateAvailabilityDay $day): array => $this->formatAvailabilityDay($day))
+                ->all(),
+        ];
+    }
+
+    private function formatAvailabilityDay(CandidateAvailabilityDay $day): array
+    {
+        return [
+            'id' => $day->id,
+            'day_of_week' => $day->day_of_week,
+            'day_name' => self::DAY_NAMES[$day->day_of_week] ?? null,
+            'is_available' => $day->is_available,
+            'start_time' => $day->start_time,
+            'end_time' => $day->end_time,
+        ];
+    }
+
+    private function formatUnavailabilities(Collection $unavailabilities): array
+    {
+        return $unavailabilities
+            ->map(fn (CandidateUnavailability $unavailability): array => $this->formatUnavailability($unavailability))
+            ->all();
+    }
+
+    private function formatUnavailability(CandidateUnavailability $unavailability): array
+    {
+        return [
+            'id' => $unavailability->id,
+            'title' => $unavailability->title,
+            'start_date' => $unavailability->start_date?->toDateString(),
+            'end_date' => $unavailability->end_date?->toDateString(),
+        ];
     }
 }
