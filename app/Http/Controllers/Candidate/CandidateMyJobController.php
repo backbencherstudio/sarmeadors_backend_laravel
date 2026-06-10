@@ -8,6 +8,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobAttendance;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobAttendance;
+use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -21,6 +22,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateMyJobController extends Controller
 {
+    use FormatsTime;
     use ResolvesCandidate;
 
     // GET /candidate/jobs?view=calendar|list
@@ -399,11 +401,6 @@ class CandidateMyJobController extends Controller
     private function formatClientName(ShortTermJob|LongTermJob $job): ?string
     {
         return $job->client ? trim($job->client->first_name.' '.$job->client->last_name) : null;
-    }
-
-    private function formatTime(?string $time): ?string
-    {
-        return $time ? Carbon::parse($time)->format('g:i A') : null;
     }
 
     private function formatDuration(int $minutes): string

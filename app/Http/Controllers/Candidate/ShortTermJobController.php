@@ -8,15 +8,17 @@ use App\Models\JobMessage;
 use App\Models\Payment;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobAttendance;
+use App\Traits\FormatsAssignedJob;
+use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 class ShortTermJobController extends Controller
 {
+    use FormatsAssignedJob;
+    use FormatsTime;
     use ResolvesCandidate;
 
     // GET /candidate/jobs/short-term
@@ -221,56 +223,5 @@ class ShortTermJobController extends Controller
         return $job->status === 'running'
             && filled($attendance?->check_in)
             && blank($attendance?->check_out);
-    }
-
-    private function formatChildren(Collection $children): Collection
-    {
-        return $children->map(fn ($child): array => [
-            'id' => $child->id,
-            'name' => trim($child->first_name.' '.$child->last_name),
-            'date_of_birth' => $child->date_of_birth,
-            'gender' => $child->gender,
-            'interests' => $child->interests,
-            'allergies' => $child->allergies,
-        ]);
-    }
-
-    private function formatAddress(ShortTermJob $job): array
-    {
-        return [
-            'street_address' => $job->job_address,
-            'city' => $job->home_city,
-            'province' => $job->home_province,
-            'postal_code' => $job->home_postal_code,
-            'country' => $job->country,
-            'label' => collect([$job->job_address, $job->home_city, $job->home_province, $job->country])->filter()->implode(', '),
-        ];
-    }
-
-    private function formatClientName(ShortTermJob $job): ?string
-    {
-        return $job->client ? trim($job->client->first_name.' '.$job->client->last_name) : null;
-    }
-
-    private function formatCompensation(ShortTermJob $job): string
-    {
-        return '$'.rtrim(rtrim((string) $job->compensation_amount, '0'), '.').' per '.Str::after($job->compensation_type, 'per_');
-    }
-
-    private function formatTime(?string $time): ?string
-    {
-        return $time ? Carbon::parse($time)->format('g:i A') : null;
-    }
-
-    private function formatDuration(int $minutes): string
-    {
-        $hours = intdiv($minutes, 60);
-        $remainingMinutes = $minutes % 60;
-
-        if ($hours === 0) {
-            return "{$remainingMinutes} min";
-        }
-
-        return trim($hours.' hr '.$remainingMinutes.' min');
     }
 }

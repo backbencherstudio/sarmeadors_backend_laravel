@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\LongTermJobInterview;
+use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +16,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateInterviewController extends Controller
 {
+    use FormatsTime;
     use ResolvesCandidate;
 
     // GET /candidate/interviews
@@ -191,15 +192,6 @@ class CandidateInterviewController extends Controller
             ],
             'special_note' => $interview->special_note,
         ];
-    }
-
-    private function formatTime(?string $time): ?string
-    {
-        if (! $time) {
-            return null;
-        }
-
-        return Carbon::parse($time)->format('g:i A');
     }
 
     private function formatTimeRange(?string $from, ?string $to): ?string

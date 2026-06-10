@@ -5,18 +5,22 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\ShortTermJob;
+use App\Traits\FormatsJobPosting;
+use App\Traits\FormatsTime;
+use App\Traits\MergesSearchFilter;
 use App\Traits\ResolvesCandidate;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class ShortTermJobApplicationController extends Controller
 {
+    use FormatsJobPosting;
+    use FormatsTime;
+    use MergesSearchFilter;
     use ResolvesCandidate;
 
     // GET /candidate/jobs/short-term-marketplace
@@ -286,50 +290,6 @@ class ShortTermJobApplicationController extends Controller
         ];
     }
 
-    private function formatChildren(Collection $children): Collection
-    {
-        return $children->map(fn ($child): array => [
-            'id' => $child->id,
-            'name' => trim($child->first_name.' '.$child->last_name),
-            'first_name' => $child->first_name,
-            'last_name' => $child->last_name,
-            'date_of_birth' => $child->date_of_birth,
-            'gender' => $child->gender,
-            'interests' => $child->interests,
-            'allergies' => $child->allergies,
-        ]);
-    }
-
-    private function formatServices(ShortTermJob $job): array
-    {
-        return collect(['Nanny'])
-            ->when($job->has_housekeeper ?? false, fn (Collection $services) => $services->push('House Manager'))
-            ->when($job->children?->isNotEmpty(), fn (Collection $services) => $services->push('Baby/Night Nurse'))
-            ->values()
-            ->all();
-    }
-
-    private function formatLocation(ShortTermJob $job): array
-    {
-        return [
-            'label' => collect([$job->home_city, $job->home_province, $job->country])->filter()->implode(', '),
-            'city' => $job->home_city,
-            'province' => $job->home_province,
-            'country' => $job->country,
-        ];
-    }
-
-    private function formatAddress(ShortTermJob $job): array
-    {
-        return [
-            'street_address' => $job->job_address,
-            'city' => $job->home_city,
-            'province' => $job->home_province,
-            'postal_code' => $job->home_postal_code,
-            'country' => $job->country,
-        ];
-    }
-
     private function formatCompensation(ShortTermJob $job): array
     {
         return [
@@ -345,11 +305,6 @@ class ShortTermJobApplicationController extends Controller
         return $client ? trim($client->first_name.' '.$client->last_name) : null;
     }
 
-    private function formatTime(?string $time): ?string
-    {
-        return $time ? Carbon::parse($time)->format('g:i A') : null;
-    }
-
     private function formatStatusLabel(?string $status): ?string
     {
         return match ($status) {
@@ -361,24 +316,5 @@ class ShortTermJobApplicationController extends Controller
             'rejected' => 'Rejected',
             default => $status ? Str::headline($status) : null,
         };
-    }
-
-    private function mergeSearchFilter(Request $request): void
-    {
-        if ($request->filled('search') && ! $request->has('filter.search')) {
-            $request->merge([
-                'filter' => array_merge((array) $request->query('filter', []), [
-                    'search' => $request->query('search'),
-                ]),
-            ]);
-        }
-    }
-
-    private function normalizeSearchValue(mixed $value): string
-    {
-        return collect(is_array($value) ? $value : [$value])
-            ->map(fn (mixed $term): string => trim((string) $term))
-            ->filter()
-            ->implode(' ');
     }
 }
