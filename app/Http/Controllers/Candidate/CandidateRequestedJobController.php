@@ -8,6 +8,7 @@ use App\Models\CandidateJobRequest;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
 use App\Models\ShortTermJob;
+use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -19,169 +20,148 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateRequestedJobController extends Controller
 {
-    private function resolveCandidate(Request $request): ?Candidate
-    {
-        return Candidate::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
-    }
+    use ResolvesCandidate;
 
     // GET /candidate/jobs/requested
     public function index(Request $request): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $this->mergeSearchFilter($request);
-
-            $baseQuery = CandidateJobRequest::with($this->relations())
-                ->where('agency_id', $request->current_agency->id)
-                ->where('candidate_id', $candidate->id);
-
-            if (! $request->has('filter.status')) {
-                $baseQuery->where('status', 'pending');
-            }
-
-            $query = QueryBuilder::for($baseQuery, $request)
-                ->allowedFilters(
-                    AllowedFilter::exact('status'),
-                    AllowedFilter::exact('job_type'),
-                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                        $search = $this->normalizeSearchValue($value);
-
-                        if ($search === '') {
-                            return;
-                        }
-
-                        $query->where(function (Builder $query) use ($search): void {
-                            $query->whereHas('client', function (Builder $clientQuery) use ($search): void {
-                                $clientQuery->where('first_name', 'like', "%{$search}%")
-                                    ->orWhere('last_name', 'like', "%{$search}%");
-                            })->orWhereHas('shortTermJob', function (Builder $jobQuery) use ($search): void {
-                                $this->applyJobSearch($jobQuery, $search);
-                            })->orWhereHas('longTermJob', function (Builder $jobQuery) use ($search): void {
-                                $this->applyJobSearch($jobQuery, $search);
-                            });
-                        });
-                    })
-                );
-
-            $requests = $query->latest()->paginate($request->integer('per_page', 10));
-            $requests->getCollection()->transform(fn (CandidateJobRequest $jobRequest): array => $this->formatRequestCard($jobRequest));
-
-            return $this->sendResponse([
-                'notice' => 'These requests come from your previous Clients to work with them again.',
-                'requests' => $requests,
-            ], 'Requested jobs retrieved.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        $this->mergeSearchFilter($request);
+
+        $baseQuery = CandidateJobRequest::with($this->relations())
+            ->where('agency_id', $request->current_agency->id)
+            ->where('candidate_id', $candidate->id);
+
+        if (! $request->has('filter.status')) {
+            $baseQuery->where('status', 'pending');
+        }
+
+        $query = QueryBuilder::for($baseQuery, $request)
+            ->allowedFilters(
+                AllowedFilter::exact('status'),
+                AllowedFilter::exact('job_type'),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $search = $this->normalizeSearchValue($value);
+
+                    if ($search === '') {
+                        return;
+                    }
+
+                    $query->where(function (Builder $query) use ($search): void {
+                        $query->whereHas('client', function (Builder $clientQuery) use ($search): void {
+                            $clientQuery->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%");
+                        })->orWhereHas('shortTermJob', function (Builder $jobQuery) use ($search): void {
+                            $this->applyJobSearch($jobQuery, $search);
+                        })->orWhereHas('longTermJob', function (Builder $jobQuery) use ($search): void {
+                            $this->applyJobSearch($jobQuery, $search);
+                        });
+                    });
+                })
+            );
+
+        $requests = $query->latest()->paginate($request->integer('per_page', 10));
+        $requests->getCollection()->transform(fn (CandidateJobRequest $jobRequest): array => $this->formatRequestCard($jobRequest));
+
+        return $this->sendResponse([
+            'notice' => 'These requests come from your previous Clients to work with them again.',
+            'requests' => $requests,
+        ], 'Requested jobs retrieved.', 200);
     }
 
     // GET /candidate/jobs/requested/{candidateJobRequest}
     public function show(Request $request, CandidateJobRequest $candidateJobRequest): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
-                return $this->sendError('Requested job not found.', [], 404);
-            }
-
-            return $this->sendResponse(
-                $this->formatRequestDetails($candidateJobRequest->load($this->relations())),
-                'Requested job retrieved.',
-                200
-            );
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
+            return $this->sendError('Requested job not found.', [], 404);
+        }
+
+        return $this->sendResponse(
+            $this->formatRequestDetails($candidateJobRequest->load($this->relations())),
+            'Requested job retrieved.',
+            200
+        );
     }
 
     // PUT /candidate/jobs/requested/{candidateJobRequest}/approve
     public function approve(Request $request, CandidateJobRequest $candidateJobRequest): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
-                return $this->sendError('Requested job not found.', [], 404);
-            }
-
-            if ($candidateJobRequest->status !== 'pending') {
-                return $this->sendError('Only pending requests can be approved.', [], 422);
-            }
-
-            if ($candidateJobRequest->job_type === 'short_term') {
-                $this->approveShortTermRequest($candidateJobRequest, $candidate);
-            } else {
-                $this->approveLongTermRequest($candidateJobRequest, $candidate);
-            }
-
-            $candidateJobRequest->update([
-                'status' => 'approved',
-                'responded_at' => now(),
-            ]);
-
-            return $this->sendResponse(
-                $this->formatRequestDetails($candidateJobRequest->fresh($this->relations())),
-                'Request approved.',
-                200
-            );
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
+            return $this->sendError('Requested job not found.', [], 404);
+        }
+
+        if ($candidateJobRequest->status !== 'pending') {
+            return $this->sendError('Only pending requests can be approved.', [], 422);
+        }
+
+        if ($candidateJobRequest->job_type === 'short_term') {
+            $this->approveShortTermRequest($candidateJobRequest, $candidate);
+        } else {
+            $this->approveLongTermRequest($candidateJobRequest, $candidate);
+        }
+
+        $candidateJobRequest->update([
+            'status' => 'approved',
+            'responded_at' => now(),
+        ]);
+
+        return $this->sendResponse(
+            $this->formatRequestDetails($candidateJobRequest->fresh($this->relations())),
+            'Request approved.',
+            200
+        );
     }
 
     // PUT /candidate/jobs/requested/{candidateJobRequest}/reject
     public function reject(Request $request, CandidateJobRequest $candidateJobRequest): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
-                return $this->sendError('Requested job not found.', [], 404);
-            }
-
-            if ($candidateJobRequest->status !== 'pending') {
-                return $this->sendError('Only pending requests can be rejected.', [], 422);
-            }
-
-            if ($candidateJobRequest->job_type === 'short_term') {
-                $this->rejectShortTermRequest($candidateJobRequest, $candidate);
-            } else {
-                $this->rejectLongTermRequest($candidateJobRequest);
-            }
-
-            $candidateJobRequest->update([
-                'status' => 'rejected',
-                'responded_at' => now(),
-            ]);
-
-            return $this->sendResponse(
-                $this->formatRequestDetails($candidateJobRequest->fresh($this->relations())),
-                'Request rejected.',
-                200
-            );
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if (! $this->canAccessRequest($request, $candidate, $candidateJobRequest)) {
+            return $this->sendError('Requested job not found.', [], 404);
+        }
+
+        if ($candidateJobRequest->status !== 'pending') {
+            return $this->sendError('Only pending requests can be rejected.', [], 422);
+        }
+
+        if ($candidateJobRequest->job_type === 'short_term') {
+            $this->rejectShortTermRequest($candidateJobRequest, $candidate);
+        } else {
+            $this->rejectLongTermRequest($candidateJobRequest);
+        }
+
+        $candidateJobRequest->update([
+            'status' => 'rejected',
+            'responded_at' => now(),
+        ]);
+
+        return $this->sendResponse(
+            $this->formatRequestDetails($candidateJobRequest->fresh($this->relations())),
+            'Request rejected.',
+            200
+        );
     }
 
     private function approveShortTermRequest(CandidateJobRequest $jobRequest, Candidate $candidate): void

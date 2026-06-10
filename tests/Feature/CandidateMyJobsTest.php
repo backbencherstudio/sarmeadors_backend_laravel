@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Events\NewJobMessage;
 use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\Client;
+use App\Models\JobMessage;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobAttendance;
 use App\Models\LongTermJobChild;
+use App\Models\LongTermJobNannyPayment;
 use App\Models\LongTermJobReview;
 use App\Models\LongTermJobSchedule;
 use App\Models\ShortTermJob;
@@ -17,6 +20,7 @@ use App\Models\ShortTermJobDate;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -321,6 +325,152 @@ class CandidateMyJobsTest extends TestCase
         $this->assertDatabaseMissing('long_term_job_attendance', [
             'long_term_job_id' => $unscheduledJob->id,
             'candidate_id' => $candidate->id,
+        ]);
+    }
+
+    public function test_candidate_my_job_details_return_attendance_details_messages_and_broadcast_channels(): void
+    {
+        Carbon::setTestNow('2026-01-18 09:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $sender = User::factory()->create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Davis',
+            'last_name' => 'Rosser',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $shortTermJob = $this->createShortTermJob($agency, $candidate, $client, [
+            'title' => 'After School Nanny',
+            'status' => 'running',
+        ]);
+
+        ShortTermJobDate::create([
+            'short_term_job_id' => $shortTermJob->id,
+            'booking_date' => '2026-01-18',
+            'start_time' => '09:00',
+            'end_time' => '11:00',
+        ]);
+
+        JobMessage::create([
+            'short_term_job_id' => $shortTermJob->id,
+            'sender_id' => $sender->id,
+            'thread' => 'candidate',
+            'message' => 'Please confirm the schedule.',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/candidate/jobs/short-term/{$shortTermJob->id}?month=2026-01")
+            ->assertOk()
+            ->assertJsonPath('data.job_type', 'short_term')
+            ->assertJsonPath('data.tabs.attendance_calendar.today.is_booked', true)
+            ->assertJsonPath('data.tabs.job_details.booking_details.dates.0.date', '2026-01-18')
+            ->assertJsonPath('data.tabs.messages.total', 1)
+            ->assertJsonPath('data.tabs.messages.unread', 1)
+            ->assertJsonPath('data.tabs.messages.channel', "private-short-term-job-messages.{$shortTermJob->id}")
+            ->assertJsonPath('data.actions.messages_url', "/api/candidate/jobs/short-term/{$shortTermJob->id}/messages");
+
+        $longTermJob = $this->createLongTermJob($agency, $candidate, $client, [
+            'title' => 'Long Term Nanny',
+            'status' => 'running',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-01-31',
+            'family_schedule' => 'Structured weekly routine.',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $longTermJob->id,
+            'day_of_week' => 0,
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+        ]);
+
+        LongTermJobAttendance::create([
+            'long_term_job_id' => $longTermJob->id,
+            'candidate_id' => $candidate->id,
+            'date' => '2026-01-18',
+            'check_in' => '10:00',
+            'check_out' => '12:05',
+        ]);
+
+        LongTermJobNannyPayment::create([
+            'long_term_job_id' => $longTermJob->id,
+            'candidate_id' => $candidate->id,
+            'agency_id' => $agency->id,
+            'invoice_number' => 'INV-TEST-001',
+            'amount' => 50,
+            'currency' => 'usd',
+            'payment_method' => 'bank',
+            'payment_date' => '2026-01-19',
+        ]);
+
+        JobMessage::create([
+            'long_term_job_id' => $longTermJob->id,
+            'sender_id' => $sender->id,
+            'thread' => 'candidate',
+            'message' => 'Long-term thread message.',
+        ]);
+
+        $response = $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/candidate/jobs/long-term/{$longTermJob->id}?month=2026-01");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.job_type', 'long_term')
+            ->assertJsonPath('data.tabs.attendance_calendar.summary.total_worked_minutes', 125)
+            ->assertJsonPath('data.tabs.attendance_calendar.summary.total_payment', 50)
+            ->assertJsonPath('data.tabs.attendance_calendar.today.is_scheduled', true)
+            ->assertJsonPath('data.tabs.job_details.requirements.has_housekeeper', true)
+            ->assertJsonPath('data.tabs.job_details.additional_information.family_schedule', 'Structured weekly routine.')
+            ->assertJsonPath('data.tabs.messages.total', 1)
+            ->assertJsonPath('data.tabs.messages.channel', "private-job-messages.{$longTermJob->id}")
+            ->assertJsonPath('data.actions.messages_url', "/api/candidate/jobs/long-term/{$longTermJob->id}/messages");
+    }
+
+    public function test_candidate_job_messages_dispatch_pusher_broadcast_event(): void
+    {
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $shortTermJob = $this->createShortTermJob($agency, $candidate, $client);
+        $longTermJob = $this->createLongTermJob($agency, $candidate, $client);
+
+        Event::fake([NewJobMessage::class]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$shortTermJob->id}/messages", [
+                'message' => 'Short-term message from candidate.',
+            ])
+            ->assertCreated();
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/long-term/{$longTermJob->id}/messages", [
+                'message' => 'Long-term message from candidate.',
+            ])
+            ->assertCreated();
+
+        Event::assertDispatched(NewJobMessage::class, 2);
+
+        $this->assertDatabaseHas('job_messages', [
+            'short_term_job_id' => $shortTermJob->id,
+            'sender_id' => $user->id,
+            'thread' => 'candidate',
+            'message' => 'Short-term message from candidate.',
+        ]);
+
+        $this->assertDatabaseHas('job_messages', [
+            'long_term_job_id' => $longTermJob->id,
+            'sender_id' => $user->id,
+            'thread' => 'candidate',
+            'message' => 'Long-term message from candidate.',
         ]);
     }
 

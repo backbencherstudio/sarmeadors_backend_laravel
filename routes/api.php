@@ -1,17 +1,7 @@
 <?php
 
-use App\Http\Controllers\Agency\ClientController;
-use App\Http\Controllers\Agency\FormController;
-use App\Http\Controllers\Api\AgencyController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Agency\StatusController;
-use App\Http\Controllers\Api\ForgotPasswordController;
-use App\Http\Controllers\Agency\FormFieldController;
 use App\Http\Controllers\Client\ClientController as ClientClientController;
-
+use Illuminate\Support\Facades\Route;
 
 Route::middleware('subdomain')->group(function () {
 
@@ -20,34 +10,19 @@ Route::middleware('subdomain')->group(function () {
     });
 });
 
+Route::middleware('auth:api')->group(function () {});
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {});
 
-});
+Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {});
 
-});
+Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {});
 
-Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {
+Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {});
 
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agency')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {
-
-});
-
-Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {
-
-});
+Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidate')->group(function () {});
 
 require __DIR__.'/niaz.php';
 require __DIR__.'/mahmudul.php';

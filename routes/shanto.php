@@ -1,17 +1,14 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AgencyController;
-use App\Http\Controllers\Agency\FormController;
-use App\Http\Controllers\Agency\StatusController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Agency\AgencyController;
 use App\Http\Controllers\Agency\ClientController;
+use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Agency\FormFieldController;
-use App\Http\Controllers\Agency\AgencyNoteController;
-use App\Http\Controllers\Agency\MessageTemplateController;
-use App\Http\Controllers\Api\ForgotPasswordController;
-use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Agency\StatusController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/login', function () {
     return response()->json([
@@ -52,8 +49,8 @@ Route::middleware('auth:api')->group(function () {});
 Route::middleware(['subdomain', 'auth:api', 'role:super_admin'])->prefix('admin')->group(function () {});
 
 Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->prefix('admin')->group(function () {
-    
-    //Agency
+
+    // Agency
     Route::get('/agencies', [AgencyController::class, 'data']);
     Route::post('/agency-store', [AgencyController::class, 'store']);
     Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
@@ -70,28 +67,27 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
 
-    //Client Status
+    // Client Status
     Route::get('/statuses', [StatusController::class, 'index']);
     Route::post('/status-store', [StatusController::class, 'store']);
     Route::get('/status-edit/{id}', [StatusController::class, 'edit']);
     Route::put('/status-update/{id}', [StatusController::class, 'update']);
     Route::patch('/status-serial-update/{id}', [StatusController::class, 'serial']);
     Route::delete('/status-delete/{id}', [StatusController::class, 'destroy']);
-    //reasons
+    // reasons
     Route::post('/status-reasons', [StatusController::class, 'storeReasons']);
 
-    //Form
+    // Form
     Route::post('/forms', [FormController::class, 'store']);
     Route::post('/form-fields', [FormFieldController::class, 'store']);
 
-    Route::post('/form-fields/reorder',[FormFieldController::class,'reorder']);
-    Route::get('/forms/{slug}',[FormController::class,'show']);
+    Route::post('/form-fields/reorder', [FormFieldController::class, 'reorder']);
+    Route::get('/forms/{slug}', [FormController::class, 'show']);
 
-    //Client Registration
-    Route::post('/clients',[ClientController::class,'store']);
-    Route::get('/clients/{id}',[ClientController::class,'show']);
+    // Client Registration
+    Route::post('/clients', [ClientController::class, 'store']);
+    Route::get('/clients/{id}', [ClientController::class, 'show']);
 });
-
 
 Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->group(function () {});
 

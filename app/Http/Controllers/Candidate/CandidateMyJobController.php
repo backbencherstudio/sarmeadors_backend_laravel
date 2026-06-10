@@ -8,6 +8,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobAttendance;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobAttendance;
+use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,42 +21,29 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateMyJobController extends Controller
 {
-    private function resolveCandidate(Request $request): ?Candidate
-    {
-        return Candidate::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
-    }
+    use ResolvesCandidate;
 
     // GET /candidate/jobs?view=calendar|list
     public function index(Request $request): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->currentCandidateOrFail($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
+        $filters = $this->resolveFilters($request);
+        $jobs = $this->loadJobs($request, $candidate, $filters);
 
-            $filters = $this->resolveFilters($request);
-            $jobs = $this->loadJobs($request, $candidate, $filters);
-
-            if ($filters['view'] === 'calendar') {
-                return $this->sendResponse(
-                    $this->formatCalendar($jobs, $filters),
-                    'Calendar jobs retrieved.',
-                    200
-                );
-            }
-
+        if ($filters['view'] === 'calendar') {
             return $this->sendResponse(
-                $this->formatList($jobs, $filters),
-                'Jobs retrieved.',
+                $this->formatCalendar($jobs, $filters),
+                'Calendar jobs retrieved.',
                 200
             );
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
+
+        return $this->sendResponse(
+            $this->formatList($jobs, $filters),
+            'Jobs retrieved.',
+            200
+        );
     }
 
     private function resolveFilters(Request $request): array

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\ShortTermJob;
+use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -16,219 +17,190 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ShortTermJobApplicationController extends Controller
 {
-    private function resolveCandidate(Request $request): ?Candidate
-    {
-        return Candidate::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
-    }
+    use ResolvesCandidate;
 
     // GET /candidate/jobs/short-term-marketplace
     public function marketplace(Request $request): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($request->filled('search') && ! $request->has('filter.search')) {
-                $request->merge([
-                    'filter' => array_merge((array) $request->query('filter', []), [
-                        'search' => $request->query('search'),
-                    ]),
-                ]);
-            }
-
-            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
-                ->where('agency_id', $request->current_agency->id)
-                ->where('status', 'marketplace')
-                ->whereNull('candidate_id');
-
-            if ($request->has('location_id')) {
-                $baseQuery->where('location_id', $request->query('location_id'));
-            }
-
-            $query = QueryBuilder::for($baseQuery, $request)
-                ->allowedFilters(
-                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                        $search = collect(is_array($value) ? $value : [$value])
-                            ->map(fn (mixed $term): string => trim((string) $term))
-                            ->filter()
-                            ->implode(' ');
-
-                        if ($search === '') {
-                            return;
-                        }
-
-                        $query->where(function (Builder $query) use ($search): void {
-                            $query->where('home_city', 'like', "%{$search}%")
-                                ->orWhere('home_province', 'like', "%{$search}%")
-                                ->orWhere('country', 'like', "%{$search}%")
-                                ->orWhere('job_address', 'like', "%{$search}%")
-                                ->orWhere('title', 'like', "%{$search}%");
-                        });
-                    })
-                );
-
-            $jobs = $query->latest()->paginate(20);
-            $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatJobCard($job, $candidate));
-
-            return $this->sendResponse($jobs, 'Marketplace jobs retrieved.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($request->filled('search') && ! $request->has('filter.search')) {
+            $request->merge([
+                'filter' => array_merge((array) $request->query('filter', []), [
+                    'search' => $request->query('search'),
+                ]),
+            ]);
+        }
+
+        $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
+            ->where('agency_id', $request->current_agency->id)
+            ->where('status', 'marketplace')
+            ->whereNull('candidate_id');
+
+        if ($request->has('location_id')) {
+            $baseQuery->where('location_id', $request->query('location_id'));
+        }
+
+        $query = QueryBuilder::for($baseQuery, $request)
+            ->allowedFilters(
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $search = collect(is_array($value) ? $value : [$value])
+                        ->map(fn (mixed $term): string => trim((string) $term))
+                        ->filter()
+                        ->implode(' ');
+
+                    if ($search === '') {
+                        return;
+                    }
+
+                    $query->where(function (Builder $query) use ($search): void {
+                        $query->where('home_city', 'like', "%{$search}%")
+                            ->orWhere('home_province', 'like', "%{$search}%")
+                            ->orWhere('country', 'like', "%{$search}%")
+                            ->orWhere('job_address', 'like', "%{$search}%")
+                            ->orWhere('title', 'like', "%{$search}%");
+                    });
+                })
+            );
+
+        $jobs = $query->latest()->paginate(20);
+        $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatJobCard($job, $candidate));
+
+        return $this->sendResponse($jobs, 'Marketplace jobs retrieved.', 200);
     }
 
     // GET /candidate/jobs/short-term-marketplace/{shortTermJob}
     public function showMarketplace(Request $request, ShortTermJob $shortTermJob): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->status !== 'marketplace') {
-                return $this->sendError('Job not found.', [], 404);
-            }
-
-            $shortTermJob->load(['client', 'children', 'dates']);
-
-            return $this->sendResponse($this->formatJobDetails($shortTermJob, $candidate), 'Marketplace job retrieved.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->status !== 'marketplace') {
+            return $this->sendError('Job not found.', [], 404);
+        }
+
+        $shortTermJob->load(['client', 'children', 'dates']);
+
+        return $this->sendResponse($this->formatJobDetails($shortTermJob, $candidate), 'Marketplace job retrieved.', 200);
     }
 
     // GET /candidate/jobs/short-term-applications
     // Returns marketplace jobs the candidate has expressed interest in
     public function index(Request $request): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $this->mergeSearchFilter($request);
-
-            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
-                ->where('agency_id', $request->current_agency->id)
-                ->where('candidate_id', $candidate->id);
-
-            $query = QueryBuilder::for($baseQuery, $request)
-                ->allowedFilters(
-                    AllowedFilter::exact('status'),
-                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                        $search = $this->normalizeSearchValue($value);
-
-                        if ($search === '') {
-                            return;
-                        }
-
-                        $query->where(function (Builder $query) use ($search): void {
-                            $query->where('title', 'like', "%{$search}%")
-                                ->orWhere('home_city', 'like', "%{$search}%")
-                                ->orWhere('home_province', 'like', "%{$search}%")
-                                ->orWhere('country', 'like', "%{$search}%")
-                                ->orWhere('job_address', 'like', "%{$search}%")
-                                ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
-                                    $clientQuery->where('first_name', 'like', "%{$search}%")
-                                        ->orWhere('last_name', 'like', "%{$search}%");
-                                });
-                        });
-                    })
-                );
-
-            $jobs = $query->latest()->paginate($request->integer('per_page', 10));
-            $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatAppliedJobCard($job, $candidate));
-
-            return $this->sendResponse([
-                'notice' => 'Applied job records that have been closed for more than 30 days will be automatically deleted.',
-                'jobs' => $jobs,
-            ], 'Applied short-term jobs retrieved.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        $this->mergeSearchFilter($request);
+
+        $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
+            ->where('agency_id', $request->current_agency->id)
+            ->where('candidate_id', $candidate->id);
+
+        $query = QueryBuilder::for($baseQuery, $request)
+            ->allowedFilters(
+                AllowedFilter::exact('status'),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $search = $this->normalizeSearchValue($value);
+
+                    if ($search === '') {
+                        return;
+                    }
+
+                    $query->where(function (Builder $query) use ($search): void {
+                        $query->where('title', 'like', "%{$search}%")
+                            ->orWhere('home_city', 'like', "%{$search}%")
+                            ->orWhere('home_province', 'like', "%{$search}%")
+                            ->orWhere('country', 'like', "%{$search}%")
+                            ->orWhere('job_address', 'like', "%{$search}%")
+                            ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
+                                $clientQuery->where('first_name', 'like', "%{$search}%")
+                                    ->orWhere('last_name', 'like', "%{$search}%");
+                            });
+                    });
+                })
+            );
+
+        $jobs = $query->latest()->paginate($request->integer('per_page', 10));
+        $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatAppliedJobCard($job, $candidate));
+
+        return $this->sendResponse([
+            'notice' => 'Applied job records that have been closed for more than 30 days will be automatically deleted.',
+            'jobs' => $jobs,
+        ], 'Applied short-term jobs retrieved.', 200);
     }
 
     // GET /candidate/jobs/short-term-applications/{shortTermJob}
     public function show(Request $request, ShortTermJob $shortTermJob): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->candidate_id !== $candidate->id) {
-                return $this->sendError('Applied job not found.', [], 404);
-            }
-
-            $shortTermJob->load(['client', 'children', 'dates']);
-
-            return $this->sendResponse($this->formatAppliedJobDetails($shortTermJob, $candidate), 'Applied short-term job retrieved.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->candidate_id !== $candidate->id) {
+            return $this->sendError('Applied job not found.', [], 404);
+        }
+
+        $shortTermJob->load(['client', 'children', 'dates']);
+
+        return $this->sendResponse($this->formatAppliedJobDetails($shortTermJob, $candidate), 'Applied short-term job retrieved.', 200);
     }
 
     // POST /candidate/jobs/short-term/{shortTermJob}/apply
     public function store(Request $request, ShortTermJob $shortTermJob): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->status !== 'marketplace') {
-                return $this->sendError('This job is not available.', [], 422);
-            }
-
-            if ($shortTermJob->candidate_id) {
-                return $this->sendError('This job already has a hired candidate.', [], 422);
-            }
-
-            // For short-term jobs, expressing interest sets the candidate as the pending hire
-            $shortTermJob->update(['candidate_id' => $candidate->id]);
-
-            return $this->sendResponse($shortTermJob->fresh()->load(['dates', 'client']), 'Interest submitted. Awaiting client/agency confirmation.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->status !== 'marketplace') {
+            return $this->sendError('This job is not available.', [], 422);
+        }
+
+        if ($shortTermJob->candidate_id) {
+            return $this->sendError('This job already has a hired candidate.', [], 422);
+        }
+
+        // For short-term jobs, expressing interest sets the candidate as the pending hire
+        $shortTermJob->update(['candidate_id' => $candidate->id]);
+
+        return $this->sendResponse($shortTermJob->fresh()->load(['dates', 'client']), 'Interest submitted. Awaiting client/agency confirmation.', 200);
     }
 
     // DELETE /candidate/jobs/short-term/{shortTermJob}/apply
     public function destroy(Request $request, ShortTermJob $shortTermJob): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($shortTermJob->candidate_id !== $candidate->id) {
-                return $this->sendError('You are not the selected candidate for this job.', [], 404);
-            }
-
-            if (! in_array($shortTermJob->status, ['marketplace', 'pending_approval'])) {
-                return $this->sendError('Cannot withdraw from a job that is already running or completed.', [], 422);
-            }
-
-            $shortTermJob->update(['candidate_id' => null]);
-
-            return $this->sendResponse([], 'Withdrawn successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($shortTermJob->candidate_id !== $candidate->id) {
+            return $this->sendError('You are not the selected candidate for this job.', [], 404);
+        }
+
+        if (! in_array($shortTermJob->status, ['marketplace', 'pending_approval'])) {
+            return $this->sendError('Cannot withdraw from a job that is already running or completed.', [], 422);
+        }
+
+        $shortTermJob->update(['candidate_id' => null]);
+
+        return $this->sendResponse([], 'Withdrawn successfully.', 200);
     }
 
     private function formatJobCard(ShortTermJob $job, Candidate $candidate): array

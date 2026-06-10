@@ -3,32 +3,110 @@
 namespace App\Http\Controllers\Candidate;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Candidate\StoreUnavailabilityRequest;
+use App\Http\Requests\Candidate\UpdateAvailabilityRequest;
+use App\Http\Resources\Candidate\AvailabilityResource;
+use App\Http\Resources\Candidate\UnavailabilityResource;
 use App\Models\Candidate;
 use App\Models\CandidateAvailability;
 use App\Models\CandidateAvailabilityDay;
 use App\Models\CandidateUnavailability;
+use App\Traits\ResolvesCandidate;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
-use Illuminate\Validation\ValidationException;
 
 class CandidateAvailabilityController extends Controller
 {
-    private const DAY_NAMES = [
-        0 => 'Sunday',
-        1 => 'Monday',
-        2 => 'Tuesday',
-        3 => 'Wednesday',
-        4 => 'Thursday',
-        5 => 'Friday',
-        6 => 'Saturday',
-    ];
+    use ResolvesCandidate;
 
-    private function resolveCandidate(Request $request): ?Candidate
+    // GET /candidate/availability
+    public function show(Request $request): JsonResponse
     {
-        return Candidate::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
+        $candidate = $this->currentCandidateOrFail($request);
+
+        return $this->sendResponse([
+            'availability' => new AvailabilityResource($this->resolveOrCreateAvailability($candidate)),
+            'unavailabilities' => UnavailabilityResource::collection($this->unavailabilitiesFor($candidate)),
+        ], 'Availability retrieved successfully.', 200);
+    }
+
+    // PUT /candidate/availability
+    public function update(UpdateAvailabilityRequest $request): JsonResponse
+    {
+        $candidate = $this->currentCandidateOrFail($request);
+        $validated = $request->validated();
+
+        $availability = $this->resolveOrCreateAvailability($candidate);
+
+        if (isset($validated['timezone'])) {
+            $availability->update(['timezone' => $validated['timezone']]);
+        }
+
+        if (isset($validated['days'])) {
+            foreach ($validated['days'] as $dayData) {
+                CandidateAvailabilityDay::updateOrCreate(
+                    [
+                        'candidate_availability_id' => $availability->id,
+                        'day_of_week' => $dayData['day_of_week'],
+                    ],
+                    [
+                        'is_available' => $dayData['is_available'],
+                        'start_time' => $dayData['start_time'] ?? null,
+                        'end_time' => $dayData['end_time'] ?? null,
+                    ]
+                );
+            }
+        }
+
+        $availability->load('days');
+
+        return $this->sendResponse([
+            'availability' => new AvailabilityResource($availability),
+            'unavailabilities' => UnavailabilityResource::collection($this->unavailabilitiesFor($candidate)),
+        ], 'Availability updated successfully.', 200);
+    }
+
+    // GET /candidate/availability/unavailabilities
+    public function indexUnavailabilities(Request $request): JsonResponse
+    {
+        $candidate = $this->currentCandidateOrFail($request);
+
+        return $this->sendResponse(
+            UnavailabilityResource::collection($this->unavailabilitiesFor($candidate))->resolve(),
+            'Unavailabilities retrieved successfully.',
+            200
+        );
+    }
+
+    // POST /candidate/availability/unavailabilities
+    public function storeUnavailability(StoreUnavailabilityRequest $request): JsonResponse
+    {
+        $candidate = $this->currentCandidateOrFail($request);
+        $validated = $request->validated();
+
+        $unavailability = CandidateUnavailability::create([
+            'candidate_id' => $candidate->id,
+            'title' => $validated['title'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+        ]);
+
+        return $this->sendResponse(new UnavailabilityResource($unavailability), 'Unavailability created successfully.', 201);
+    }
+
+    // DELETE /candidate/availability/unavailabilities/{unavailability}
+    public function destroyUnavailability(Request $request, CandidateUnavailability $unavailability): JsonResponse
+    {
+        $candidate = $this->resolveCandidate($request);
+
+        if (! $candidate || $unavailability->candidate_id !== $candidate->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        $unavailability->delete();
+
+        return $this->sendResponse([], 'Unavailability deleted successfully.', 200);
     }
 
     private function resolveOrCreateAvailability(Candidate $candidate): CandidateAvailability
@@ -59,195 +137,13 @@ class CandidateAvailabilityController extends Controller
         return $availability;
     }
 
-    // GET /candidate/availability
-    public function show(Request $request): JsonResponse
+    /**
+     * @return Collection<int, CandidateUnavailability>
+     */
+    private function unavailabilitiesFor(Candidate $candidate): Collection
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
-
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $availability = $this->resolveOrCreateAvailability($candidate);
-            $unavailabilities = CandidateUnavailability::where('candidate_id', $candidate->id)
-                ->orderBy('start_date')
-                ->get();
-
-            return $this->sendResponse([
-                'availability' => $this->formatAvailability($availability),
-                'unavailabilities' => $this->formatUnavailabilities($unavailabilities),
-            ], 'Availability retrieved successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    // PUT /candidate/availability
-    public function update(Request $request): JsonResponse
-    {
-        try {
-            $candidate = $this->resolveCandidate($request);
-
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $validated = $request->validate([
-                'timezone' => 'sometimes|required|string|max:100',
-                'days' => 'sometimes|required|array',
-                'days.*.day_of_week' => 'required|integer|between:0,6',
-                'days.*.is_available' => 'required|boolean',
-                'days.*.start_time' => 'nullable|date_format:H:i',
-                'days.*.end_time' => 'nullable|date_format:H:i',
-            ]);
-
-            $availability = $this->resolveOrCreateAvailability($candidate);
-
-            if (isset($validated['timezone'])) {
-                $availability->update(['timezone' => $validated['timezone']]);
-            }
-
-            if (isset($validated['days'])) {
-                foreach ($validated['days'] as $dayData) {
-                    CandidateAvailabilityDay::updateOrCreate(
-                        [
-                            'candidate_availability_id' => $availability->id,
-                            'day_of_week' => $dayData['day_of_week'],
-                        ],
-                        [
-                            'is_available' => $dayData['is_available'],
-                            'start_time' => $dayData['start_time'] ?? null,
-                            'end_time' => $dayData['end_time'] ?? null,
-                        ]
-                    );
-                }
-            }
-
-            $availability->load('days');
-            $unavailabilities = CandidateUnavailability::where('candidate_id', $candidate->id)
-                ->orderBy('start_date')
-                ->get();
-
-            return $this->sendResponse([
-                'availability' => $this->formatAvailability($availability),
-                'unavailabilities' => $this->formatUnavailabilities($unavailabilities),
-            ], 'Availability updated successfully.', 200);
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    // GET /candidate/availability/unavailabilities
-    public function indexUnavailabilities(Request $request): JsonResponse
-    {
-        try {
-            $candidate = $this->resolveCandidate($request);
-
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $unavailabilities = CandidateUnavailability::where('candidate_id', $candidate->id)
-                ->orderBy('start_date')
-                ->get();
-
-            return $this->sendResponse($this->formatUnavailabilities($unavailabilities), 'Unavailabilities retrieved successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    // POST /candidate/availability/unavailabilities
-    public function storeUnavailability(Request $request): JsonResponse
-    {
-        try {
-            $candidate = $this->resolveCandidate($request);
-
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            $validated = $request->validate([
-                'title' => 'required|string|max:255',
-                'start_date' => 'required|date',
-                'end_date' => 'required|date|after_or_equal:start_date',
-            ]);
-
-            $unavailability = CandidateUnavailability::create([
-                'candidate_id' => $candidate->id,
-                'title' => $validated['title'],
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
-            ]);
-
-            return $this->sendResponse($this->formatUnavailability($unavailability), 'Unavailability created successfully.', 201);
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    // DELETE /candidate/availability/unavailabilities/{unavailability}
-    public function destroyUnavailability(Request $request, CandidateUnavailability $unavailability): JsonResponse
-    {
-        try {
-            $candidate = $this->resolveCandidate($request);
-
-            if (! $candidate || $unavailability->candidate_id !== $candidate->id) {
-                return $this->sendError('Not found.', [], 404);
-            }
-
-            $unavailability->delete();
-
-            return $this->sendResponse([], 'Unavailability deleted successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
-    }
-
-    private function formatAvailability(CandidateAvailability $availability): array
-    {
-        return [
-            'id' => $availability->id,
-            'timezone' => $availability->timezone,
-            'days' => $availability->days
-                ->sortBy('day_of_week')
-                ->values()
-                ->map(fn (CandidateAvailabilityDay $day): array => $this->formatAvailabilityDay($day))
-                ->all(),
-        ];
-    }
-
-    private function formatAvailabilityDay(CandidateAvailabilityDay $day): array
-    {
-        return [
-            'id' => $day->id,
-            'day_of_week' => $day->day_of_week,
-            'day_name' => self::DAY_NAMES[$day->day_of_week] ?? null,
-            'is_available' => $day->is_available,
-            'start_time' => $day->start_time,
-            'end_time' => $day->end_time,
-        ];
-    }
-
-    private function formatUnavailabilities(Collection $unavailabilities): array
-    {
-        return $unavailabilities
-            ->map(fn (CandidateUnavailability $unavailability): array => $this->formatUnavailability($unavailability))
-            ->all();
-    }
-
-    private function formatUnavailability(CandidateUnavailability $unavailability): array
-    {
-        return [
-            'id' => $unavailability->id,
-            'title' => $unavailability->title,
-            'start_date' => $unavailability->start_date?->toDateString(),
-            'end_date' => $unavailability->end_date?->toDateString(),
-        ];
+        return CandidateUnavailability::where('candidate_id', $candidate->id)
+            ->orderBy('start_date')
+            ->get();
     }
 }

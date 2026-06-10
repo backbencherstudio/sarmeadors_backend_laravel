@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\LongTermJobInterview;
+use App\Traits\ResolvesCandidate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -15,143 +16,130 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateInterviewController extends Controller
 {
-    private function resolveCandidate(Request $request): ?Candidate
-    {
-        return Candidate::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
-    }
+    use ResolvesCandidate;
 
     // GET /candidate/interviews
     // view=list | view=calendar
     public function index(Request $request): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
+        }
 
-            $requestFilter = $request->query('filter', []);
-            $queryBuilderFilters = is_array($requestFilter) ? $requestFilter : [];
-            $filter = $request->query('period', is_string($requestFilter) ? $requestFilter : ($queryBuilderFilters['period'] ?? 'all'));
-            $view = $request->query('view', 'list');
+        $requestFilter = $request->query('filter', []);
+        $queryBuilderFilters = is_array($requestFilter) ? $requestFilter : [];
+        $filter = $request->query('period', is_string($requestFilter) ? $requestFilter : ($queryBuilderFilters['period'] ?? 'all'));
+        $view = $request->query('view', 'list');
 
-            unset($queryBuilderFilters['period']);
+        unset($queryBuilderFilters['period']);
 
-            if ($request->filled('search') && ! isset($queryBuilderFilters['search'])) {
-                $queryBuilderFilters['search'] = $request->query('search');
-            }
+        if ($request->filled('search') && ! isset($queryBuilderFilters['search'])) {
+            $queryBuilderFilters['search'] = $request->query('search');
+        }
 
-            $request->merge(['filter' => $queryBuilderFilters]);
+        $request->merge(['filter' => $queryBuilderFilters]);
 
-            $query = QueryBuilder::for(
-                LongTermJobInterview::with(['job', 'job.client', 'application'])
-                    ->where('candidate_id', $candidate->id)
-                    ->where('agency_id', $request->current_agency->id),
-                $request
-            )
-                ->allowedFilters(
-                    AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                        $search = collect(is_array($value) ? $value : [$value])
-                            ->map(fn (mixed $term): string => trim((string) $term))
-                            ->filter()
-                            ->implode(' ');
-
-                        if ($search === '') {
-                            return;
-                        }
-
-                        $query->whereHas('job', function (Builder $jobQuery) use ($search): void {
-                            $jobQuery->where('title', 'like', "%{$search}%")
-                                ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
-                                    $clientQuery->where('first_name', 'like', "%{$search}%")
-                                        ->orWhere('last_name', 'like', "%{$search}%")
-                                        ->orWhere('email', 'like', "%{$search}%");
-                                });
-                        });
-                    })
-                )
-                ->orderBy('scheduled_date')
-                ->orderBy('available_from');
-
-            if ($filter === 'upcoming') {
-                $query->where('scheduled_date', '>=', now()->toDateString())
-                    ->where('status', 'scheduled');
-            } elseif ($filter === 'previous') {
-                $query->where(function ($q) {
-                    $q->where('scheduled_date', '<', now()->toDateString())
-                        ->orWhere('status', 'completed');
-                });
-            } elseif ($filter === 'cancelled') {
-                $query->where('status', 'cancelled');
-            }
-
-            if ($view === 'calendar') {
-                $month = $request->query('month', now()->month);
-                $year = $request->query('year', now()->year);
-
-                $interviews = $query->whereMonth('scheduled_date', $month)
-                    ->whereYear('scheduled_date', $year)
-                    ->get();
-
-                $grouped = $interviews
-                    ->map(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview))
-                    ->groupBy('date');
-
-                return $this->sendResponse([
-                    'view' => 'calendar',
-                    'month' => (int) $month,
-                    'year' => (int) $year,
-                    'interviews' => $grouped,
-                ], 'Interviews retrieved successfully.', 200);
-            }
-
-            $interviews = $query->paginate(20);
-            $interviews->getCollection()->transform(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview));
-
-            $next = LongTermJobInterview::with(['job', 'job.client'])
+        $query = QueryBuilder::for(
+            LongTermJobInterview::with(['job', 'job.client', 'application'])
                 ->where('candidate_id', $candidate->id)
-                ->where('agency_id', $request->current_agency->id)
-                ->where('scheduled_date', '>=', now()->toDateString())
-                ->where('status', 'scheduled')
-                ->orderBy('scheduled_date')
-                ->orderBy('available_from')
-                ->first();
+                ->where('agency_id', $request->current_agency->id),
+            $request
+        )
+            ->allowedFilters(
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $search = collect(is_array($value) ? $value : [$value])
+                        ->map(fn (mixed $term): string => trim((string) $term))
+                        ->filter()
+                        ->implode(' ');
+
+                    if ($search === '') {
+                        return;
+                    }
+
+                    $query->whereHas('job', function (Builder $jobQuery) use ($search): void {
+                        $jobQuery->where('title', 'like', "%{$search}%")
+                            ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
+                                $clientQuery->where('first_name', 'like', "%{$search}%")
+                                    ->orWhere('last_name', 'like', "%{$search}%")
+                                    ->orWhere('email', 'like', "%{$search}%");
+                            });
+                    });
+                })
+            )
+            ->orderBy('scheduled_date')
+            ->orderBy('available_from');
+
+        if ($filter === 'upcoming') {
+            $query->where('scheduled_date', '>=', now()->toDateString())
+                ->where('status', 'scheduled');
+        } elseif ($filter === 'previous') {
+            $query->where(function ($q) {
+                $q->where('scheduled_date', '<', now()->toDateString())
+                    ->orWhere('status', 'completed');
+            });
+        } elseif ($filter === 'cancelled') {
+            $query->where('status', 'cancelled');
+        }
+
+        if ($view === 'calendar') {
+            $month = $request->query('month', now()->month);
+            $year = $request->query('year', now()->year);
+
+            $interviews = $query->whereMonth('scheduled_date', $month)
+                ->whereYear('scheduled_date', $year)
+                ->get();
+
+            $grouped = $interviews
+                ->map(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview))
+                ->groupBy('date');
 
             return $this->sendResponse([
-                'view' => 'list',
-                'next_interview' => $next ? $this->formatInterview($next) : null,
-                'interviews' => $interviews,
+                'view' => 'calendar',
+                'month' => (int) $month,
+                'year' => (int) $year,
+                'interviews' => $grouped,
             ], 'Interviews retrieved successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
+
+        $interviews = $query->paginate(20);
+        $interviews->getCollection()->transform(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview));
+
+        $next = LongTermJobInterview::with(['job', 'job.client'])
+            ->where('candidate_id', $candidate->id)
+            ->where('agency_id', $request->current_agency->id)
+            ->where('scheduled_date', '>=', now()->toDateString())
+            ->where('status', 'scheduled')
+            ->orderBy('scheduled_date')
+            ->orderBy('available_from')
+            ->first();
+
+        return $this->sendResponse([
+            'view' => 'list',
+            'next_interview' => $next ? $this->formatInterview($next) : null,
+            'interviews' => $interviews,
+        ], 'Interviews retrieved successfully.', 200);
     }
 
     // GET /candidate/interviews/{interview}
     public function show(Request $request, LongTermJobInterview $interview): JsonResponse
     {
-        try {
-            $candidate = $this->resolveCandidate($request);
+        $candidate = $this->resolveCandidate($request);
 
-            if (! $candidate) {
-                return $this->sendError('Candidate profile not found.', [], 404);
-            }
-
-            if ($interview->candidate_id !== $candidate->id || $interview->agency_id !== $request->current_agency->id) {
-                return $this->sendError('Not found.', [], 404);
-            }
-
-            return $this->sendResponse(
-                $this->formatInterview($interview->load(['job', 'job.client', 'application'])),
-                'Interview retrieved successfully.',
-                200
-            );
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
         }
+
+        if ($interview->candidate_id !== $candidate->id || $interview->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        return $this->sendResponse(
+            $this->formatInterview($interview->load(['job', 'job.client', 'application'])),
+            'Interview retrieved successfully.',
+            200
+        );
     }
 
     private function formatInterview(LongTermJobInterview $interview): array
