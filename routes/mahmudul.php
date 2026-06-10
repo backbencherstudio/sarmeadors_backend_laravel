@@ -17,6 +17,7 @@ use App\Http\Controllers\Candidate\CandidateClientsController;
 use App\Http\Controllers\Candidate\CandidateDashboardController;
 use App\Http\Controllers\Candidate\CandidateDocumentController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
+use App\Http\Controllers\Candidate\CandidateMyJobController;
 use App\Http\Controllers\Candidate\CandidateNotificationController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
 use App\Http\Controllers\Candidate\CandidateRequestedJobController;
@@ -319,6 +320,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/requested/{candidateJobRequest}', [CandidateRequestedJobController::class, 'show']);
     Route::put('jobs/requested/{candidateJobRequest}/approve', [CandidateRequestedJobController::class, 'approve']);
     Route::put('jobs/requested/{candidateJobRequest}/reject', [CandidateRequestedJobController::class, 'reject']);
+
+    // My jobs unified calendar/list view
+    Route::get('jobs', [CandidateMyJobController::class, 'index']);
 
     // Candidate short-term jobs (assigned jobs)
     Route::get('jobs/short-term', [CandidateShortTermJobController::class, 'index']);
