@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Models\CandidateJobRequest;
 use App\Models\Client;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
@@ -144,6 +145,22 @@ class LongTermJobApplicationController extends Controller
 
             // Hiring notifies agency — agency then assigns nanny and starts the job
             $application->update(['status' => 'hired']);
+
+            CandidateJobRequest::updateOrCreate(
+                [
+                    'agency_id' => $longTermJob->agency_id,
+                    'client_id' => $client->id,
+                    'candidate_id' => $application->candidate_id,
+                    'long_term_job_id' => $longTermJob->id,
+                    'long_term_job_application_id' => $application->id,
+                    'job_type' => 'long_term',
+                ],
+                [
+                    'status' => 'pending',
+                    'message' => $request->input('message'),
+                    'responded_at' => null,
+                ]
+            );
 
             // Reject all other pending applications
             LongTermJobApplication::where('long_term_job_id', $longTermJob->id)

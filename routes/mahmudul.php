@@ -19,6 +19,7 @@ use App\Http\Controllers\Candidate\CandidateDocumentController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
 use App\Http\Controllers\Candidate\CandidateNotificationController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
+use App\Http\Controllers\Candidate\CandidateRequestedJobController;
 use App\Http\Controllers\Candidate\JobMessageController as CandidateJobMessageController;
 use App\Http\Controllers\Candidate\LongTermJobApplicationController as CandidateLongTermJobApplicationController;
 use App\Http\Controllers\Candidate\LongTermJobAttendanceController as CandidateLongTermJobAttendanceController;
@@ -312,6 +313,12 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     // Interviews
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
     Route::get('interviews/{interview}', [CandidateInterviewController::class, 'show']);
+
+    // Requested jobs from clients
+    Route::get('jobs/requested', [CandidateRequestedJobController::class, 'index']);
+    Route::get('jobs/requested/{candidateJobRequest}', [CandidateRequestedJobController::class, 'show']);
+    Route::put('jobs/requested/{candidateJobRequest}/approve', [CandidateRequestedJobController::class, 'approve']);
+    Route::put('jobs/requested/{candidateJobRequest}/reject', [CandidateRequestedJobController::class, 'reject']);
 
     // Candidate short-term jobs (assigned jobs)
     Route::get('jobs/short-term', [CandidateShortTermJobController::class, 'index']);

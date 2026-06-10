@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
+use App\Models\CandidateJobRequest;
 use App\Models\Client;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobReview;
@@ -115,6 +116,21 @@ class ShortTermJobApplicationController extends Controller
             }
 
             $shortTermJob->update(['candidate_id' => $candidate->id]);
+
+            CandidateJobRequest::updateOrCreate(
+                [
+                    'agency_id' => $request->current_agency->id,
+                    'client_id' => $client->id,
+                    'candidate_id' => $candidate->id,
+                    'short_term_job_id' => $shortTermJob->id,
+                    'job_type' => 'short_term',
+                ],
+                [
+                    'status' => 'pending',
+                    'message' => $request->input('message'),
+                    'responded_at' => null,
+                ]
+            );
 
             return $this->sendResponse([], 'Hire request forwarded to agency for confirmation.', 200);
         } catch (\Exception $e) {
