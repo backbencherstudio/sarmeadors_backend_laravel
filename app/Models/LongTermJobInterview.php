@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,6 +17,7 @@ class LongTermJobInterview extends Model
         'available_from',
         'available_to',
         'special_note',
+        'reschedule_reason',
         'interview_type',
         'interview_link',
         'description',
@@ -39,5 +41,17 @@ class LongTermJobInterview extends Model
     public function candidate(): BelongsTo
     {
         return $this->belongsTo(Candidate::class);
+    }
+
+    /**
+     * The exact date-time the interview starts (scheduled date + available_from).
+     */
+    public function startsAt(): ?Carbon
+    {
+        if (! $this->scheduled_date || ! $this->available_from) {
+            return null;
+        }
+
+        return Carbon::parse($this->scheduled_date->toDateString().' '.$this->available_from);
     }
 }
