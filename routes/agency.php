@@ -10,7 +10,9 @@ use App\Http\Controllers\Agency\AgencyNoteController;
 use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
+use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
 use App\Http\Controllers\Agency\ClientController;
+use App\Http\Controllers\Agency\ClientGlobalSettingsController;
 use App\Http\Controllers\Agency\DocumentTemplateController;
 use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Agency\FormFieldController;
@@ -149,6 +151,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     // agency global info management route
     Route::get('/agency-info', [AgencyController::class, 'info']);
     Route::post('info-update/{id}', [AgencyController::class, 'infoUpdate']);
+
+    // client global settings
+    Route::get('settings/client', [ClientGlobalSettingsController::class, 'getClientGlobalSettings']);
+    Route::post('settings/client', [ClientGlobalSettingsController::class, 'updateClientGlobalSettings']);
+
+    // candidate global settings
+    Route::get('settings/candidate', [CandidateGlobalSettingsController::class, 'getCandidateGlobalSettings']);
+    Route::post('settings/candidate', [CandidateGlobalSettingsController::class, 'updateCandidateGlobalSettings']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
