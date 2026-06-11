@@ -137,6 +137,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::post('/business-hour-update', [SettingsController::class, 'updateBusinessHours']);
     Route::patch('/business-hours/{id}/status', [SettingsController::class, 'toggleBusinessHourStatus']);
 
+    // agency communication settings management route for global settings
+    Route::get('settings/communication', [SettingsController::class, 'getCommunicationSettings']);
+    Route::post('settings/communication', [SettingsController::class, 'updateCommunicationSettings']);
+
     Route::get('/agency-info', [AgencyController::class, 'info']);
     Route::post('info-update/{id}', [AgencyController::class, 'infoUpdate']);
 });
