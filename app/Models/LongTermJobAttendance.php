@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 class LongTermJobAttendance extends Model
@@ -19,18 +20,18 @@ class LongTermJobAttendance extends Model
     ];
 
     protected $casts = [
-        'date'      => 'date',
+        'date' => 'date',
         'is_absent' => 'boolean',
     ];
 
     public function getDurationMinutesAttribute(): int
     {
-        if (!$this->check_in || !$this->check_out) {
+        if (! $this->check_in || ! $this->check_out) {
             return 0;
         }
 
-        $in  = \Carbon\Carbon::parse($this->check_in);
-        $out = \Carbon\Carbon::parse($this->check_out);
+        $in = Carbon::parse($this->check_in);
+        $out = Carbon::parse($this->check_out);
 
         return max(0, $in->diffInMinutes($out));
     }

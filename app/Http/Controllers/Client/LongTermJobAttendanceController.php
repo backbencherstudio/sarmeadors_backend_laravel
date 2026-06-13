@@ -26,15 +26,15 @@ class LongTermJobAttendanceController extends Controller
         try {
             $client = $this->resolveClient($request);
 
-            if (!$client || $longTermJob->client_id !== $client->id) {
+            if (! $client || $longTermJob->client_id !== $client->id) {
                 return $this->sendError('Not found', [], 404);
             }
 
             $month = $request->query('month', Carbon::now()->format('Y-m'));
 
             try {
-                $start = Carbon::parse($month . '-01')->startOfMonth();
-                $end   = $start->copy()->endOfMonth();
+                $start = Carbon::parse($month.'-01')->startOfMonth();
+                $end = $start->copy()->endOfMonth();
             } catch (\Exception) {
                 return $this->sendError('Invalid month format. Use Y-m (e.g. 2026-01).', [], 422);
             }
@@ -48,10 +48,10 @@ class LongTermJobAttendanceController extends Controller
             $summary = $this->buildSummary($longTermJob);
 
             return $this->sendResponse([
-                'job'        => $longTermJob->load(['candidate', 'schedules']),
-                'month'      => $month,
+                'job' => $longTermJob->load(['candidate', 'schedules']),
+                'month' => $month,
                 'attendance' => $attendance,
-                'summary'    => $summary,
+                'summary' => $summary,
             ], 'Attendance calendar retrieved successfully', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -66,7 +66,7 @@ class LongTermJobAttendanceController extends Controller
             ->get();
 
         $totalMinutes = $attendance->sum(fn ($a) => $a->duration_minutes);
-        $totalHours   = round($totalMinutes / 60, 2);
+        $totalHours = round($totalMinutes / 60, 2);
 
         $totalPayable = 0;
         if ($job->compensation_type === 'per_hour') {
@@ -74,16 +74,16 @@ class LongTermJobAttendanceController extends Controller
         }
 
         $totalPaid = (float) LongTermJobNannyPayment::where('long_term_job_id', $job->id)->sum('amount');
-        $due       = max(0, round($totalPayable - $totalPaid, 2));
+        $due = max(0, round($totalPayable - $totalPaid, 2));
 
         return [
-            'compensation_amount'   => (float) $job->compensation_amount,
-            'compensation_type'     => $job->compensation_type,
+            'compensation_amount' => (float) $job->compensation_amount,
+            'compensation_type' => $job->compensation_type,
             'compensation_currency' => $job->compensation_currency,
-            'total_hours_worked'    => $totalHours,
-            'total_payable'         => $totalPayable,
-            'total_paid'            => $totalPaid,
-            'due_payment'           => $due,
+            'total_hours_worked' => $totalHours,
+            'total_payable' => $totalPayable,
+            'total_paid' => $totalPaid,
+            'due_payment' => $due,
         ];
     }
 }

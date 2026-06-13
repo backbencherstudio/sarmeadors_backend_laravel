@@ -18,20 +18,18 @@ abstract class Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'data'    => $response['data'],
-                'meta'    => $response['meta'] ?? null,
-                'links'   => $response['links'] ?? null,
+                'data' => $response['data'],
+                'meta' => $response['meta'] ?? null,
+                'links' => $response['links'] ?? null,
             ], $code);
         }
 
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data'    => $data,
+            'data' => $data,
         ], $code);
     }
-
-
 
     protected function sendError($message = 'Error', $errors = [], $code = 404): JsonResponse
     {
@@ -40,7 +38,7 @@ abstract class Controller
             'message' => $message,
         ];
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             $response['data'] = $errors;
         }
 

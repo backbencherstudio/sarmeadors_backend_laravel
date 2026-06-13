@@ -21,37 +21,37 @@ class StatusTemplateController extends Controller
 
         if ($flow->isEmpty()) {
             return response()->json([
-                'status'  => 'info',
+                'status' => 'info',
                 'message' => 'No process flow found.',
-                'data'    => []
+                'data' => [],
             ], 200);
         }
 
         $formattedFlow = $flow->map(function ($status) {
             return [
-                'status_id'        => $status->id,
-                'status_name'      => $status->name,
-                'status_color'     => $status->color,
-                'serial'           => $status->serial,
-                'status_type'      => $status->type,
-                'templates'        => $status->statusTemplates->groupBy('template_type')->map(function ($items) {
+                'status_id' => $status->id,
+                'status_name' => $status->name,
+                'status_color' => $status->color,
+                'serial' => $status->serial,
+                'status_type' => $status->type,
+                'templates' => $status->statusTemplates->groupBy('template_type')->map(function ($items) {
                     return $items->map(function ($item) {
                         return [
-                            'status_template_id'  => $item->id,
-                            'template_id'         => $item->template->id,
-                            'template_title'      => $item->template->title,
-                            'template_content'    => $item->template->content,
-                            'template_type'       => $item->template->type,
+                            'status_template_id' => $item->id,
+                            'template_id' => $item->template->id,
+                            'template_title' => $item->template->title,
+                            'template_content' => $item->template->content,
+                            'template_type' => $item->template->type,
                         ];
                     });
-                })
+                }),
             ];
         });
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Process flow retrieved successfully.',
-            'data'    => $formattedFlow
+            'data' => $formattedFlow,
         ], 200);
     }
 
@@ -63,33 +63,33 @@ class StatusTemplateController extends Controller
             ->with(['status', 'template'])
             ->find($id);
 
-        if (!$data) {
+        if (! $data) {
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Status template not found or Unauthorized access'
+                'status' => 'error',
+                'message' => 'Status template not found or Unauthorized access',
             ], 404);
         }
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Data retrieved successfully',
-            'data'    => [
+            'data' => [
                 'status_template_id' => $data->id,
-                'status_id'          => $data->status_id,
-                'status_name'        => $data->status->name,
-                'template_id'        => $data->template_id,
-                'template_title'     => $data->template->title,
-                'template_type'      => $data->template_type,
-                'template_content'   => $data->template->content,
-            ]
+                'status_id' => $data->status_id,
+                'status_name' => $data->status->name,
+                'template_id' => $data->template_id,
+                'template_title' => $data->template->title,
+                'template_type' => $data->template_type,
+                'template_content' => $data->template->content,
+            ],
         ], 200);
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'status_id'     => 'required|integer',
-            'template_id'   => 'required|integer',
+            'status_id' => 'required|integer',
+            'template_id' => 'required|integer',
             'template_type' => 'required|string',
         ]);
 
@@ -97,14 +97,13 @@ class StatusTemplateController extends Controller
             ->where('agency_id', auth()->user()->agency_id)
             ->first();
 
-        if (!$status) {
+        if (! $status) {
             return response()->json(['message' => 'Unauthorized Status ID'], 403);
         }
 
-
         $statusTemplate = StatusTemplate::create([
-            'status_id'     => $request->status_id,
-            'template_id'   => $request->template_id,
+            'status_id' => $request->status_id,
+            'template_id' => $request->template_id,
             'template_type' => $request->template_type,
         ]);
 
@@ -114,8 +113,8 @@ class StatusTemplateController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'status_id'     => 'required|integer',
-            'template_id'   => 'required|integer',
+            'status_id' => 'required|integer',
+            'template_id' => 'required|integer',
             'template_type' => 'required|string',
         ]);
 
@@ -123,7 +122,7 @@ class StatusTemplateController extends Controller
             $q->where('agency_id', auth()->user()->agency_id);
         })->find($id);
 
-        if (!$statusTemplate) {
+        if (! $statusTemplate) {
             return response()->json(['message' => 'Status Template not found or Unauthorized'], 404);
         }
 
@@ -131,20 +130,20 @@ class StatusTemplateController extends Controller
             ->where('agency_id', auth()->user()->agency_id)
             ->exists();
 
-        if (!$validStatus) {
+        if (! $validStatus) {
             return response()->json(['message' => 'The selected Status is unauthorized'], 403);
         }
 
         $statusTemplate->update([
-            'status_id'     => $request->status_id,
-            'template_id'   => $request->template_id,
+            'status_id' => $request->status_id,
+            'template_id' => $request->template_id,
             'template_type' => $request->template_type,
         ]);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Status template updated successfully',
-            'data'    => $statusTemplate->load('template')
+            'data' => $statusTemplate->load('template'),
         ], 200);
     }
 
@@ -154,24 +153,25 @@ class StatusTemplateController extends Controller
             $q->where('agency_id', auth()->user()->agency_id);
         })->find($id);
 
-        if (!$statusTemplate) {
+        if (! $statusTemplate) {
             return response()->json(['message' => 'Status template not found or Unauthorized access'], 404);
         }
 
         $statusTemplate->delete();
+
         return response()->json(['status' => 'success', 'message' => 'Deleted']);
     }
 
-    //Create new status
+    // Create new status
     public function storeAfter(Request $request)
     {
         $authUser = auth('api')->user();
 
         $request->validate([
             'after_status_id' => 'required|exists:statuses,id',
-            'type'            => 'required|in:client,candidate|max:50',
-            'name'            => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,' . $authUser->agency_id,
-            'color'           => 'required|string|max:50',
+            'type' => 'required|in:client,candidate|max:50',
+            'name' => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,'.$authUser->agency_id,
+            'color' => 'required|string|max:50',
         ]);
 
         $referenceStatus = Status::where('id', $request->after_status_id)
@@ -188,16 +188,16 @@ class StatusTemplateController extends Controller
 
             $status = Status::create([
                 'agency_id' => $authUser->agency_id,
-                'name'      => $request->name,
-                'color'     => $request->color,
-                'serial'    => $newSerial,
-                'type'      => $request->type,
+                'name' => $request->name,
+                'color' => $request->color,
+                'serial' => $newSerial,
+                'type' => $request->type,
             ]);
 
             return response()->json([
-                'status'  => true,
-                'message' => 'New status inserted successfully at position ' . $newSerial,
-                'data'    => $status,
+                'status' => true,
+                'message' => 'New status inserted successfully at position '.$newSerial,
+                'data' => $status,
             ]);
         });
     }

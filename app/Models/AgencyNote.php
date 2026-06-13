@@ -11,7 +11,7 @@ class AgencyNote extends Model
         'user_id',
         'note',
         'pin_note',
-        'is_read'
+        'is_read',
     ];
 
     protected $casts = [

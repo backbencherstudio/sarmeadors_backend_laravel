@@ -3,15 +3,13 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Client;
-use App\Models\FormSubmission;
-use App\Models\FormFieldValue;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFieldValue;
+use App\Models\FormSubmission;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-
 
 class ClientController extends Controller
 {
@@ -39,12 +37,12 @@ class ClientController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $form = Form::where('id',$request->form_id)
-            ->where('agency_id',$agencyId)
+        $form = Form::where('id', $request->form_id)
+            ->where('agency_id', $agencyId)
             ->firstOrFail();
 
-        $formFields = FormField::where('form_id',$form->id)
-            ->where('status',1)
+        $formFields = FormField::where('form_id', $form->id)
+            ->where('status', 1)
             ->get();
 
         $rules = [
@@ -66,7 +64,6 @@ class ClientController extends Controller
             }
         }
 
-
         $request->validate($rules);
 
         DB::beginTransaction();
@@ -83,12 +80,12 @@ class ClientController extends Controller
                 'location_id' => $request->location_id,
                 'checklist_id' => $request->checklist_id,
                 'tag_id' => $request->tag_id,
-                'status_id' => $request->status_id
+                'status_id' => $request->status_id,
             ]);
 
             $submission = FormSubmission::create([
                 'form_id' => $form->id,
-                'entity_id' => $client->id
+                'entity_id' => $client->id,
             ]);
 
             $allowedFields = $formFields->pluck('id')->toArray();
@@ -97,7 +94,7 @@ class ClientController extends Controller
 
             foreach ($request->fields ?? [] as $fieldId => $value) {
 
-                if (!in_array($fieldId,$allowedFields)) {
+                if (! in_array($fieldId, $allowedFields)) {
                     continue;
                 }
 
@@ -106,11 +103,11 @@ class ClientController extends Controller
                     'form_field_id' => $fieldId,
                     'value' => $value,
                     'created_at' => now(),
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ];
             }
 
-            if (!empty($insertData)) {
+            if (! empty($insertData)) {
 
                 FormFieldValue::insert($insertData);
             }
@@ -120,7 +117,7 @@ class ClientController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Client created successfully',
-                'data' => $client
+                'data' => $client,
             ]);
 
         } catch (\Throwable $e) {
@@ -130,18 +127,17 @@ class ClientController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Something went wrong',
-                'error' => $e->getMessage()
-            ],500);
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 
     public function show($id)
     {
         $client = Client::with([
-            'submissions.values.field'
+            'submissions.values.field',
         ])->findOrFail($id);
 
         return response()->json($client);
     }
-
 }

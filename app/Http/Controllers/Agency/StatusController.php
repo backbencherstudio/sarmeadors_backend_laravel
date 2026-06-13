@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class StatusController extends Controller
@@ -21,7 +20,7 @@ class StatusController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Client statuses retrieved successfully.',
-            'data'   => $query->get(),
+            'data' => $query->get(),
         ]);
     }
 
@@ -30,29 +29,29 @@ class StatusController extends Controller
         $authUser = auth('api')->user();
 
         $request->validate([
-            'type'  => 'required|in:client,candidate|max:50',
-            'name'  => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,' . $authUser->agency_id,
+            'type' => 'required|in:client,candidate|max:50',
+            'name' => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,'.$authUser->agency_id,
             'color' => 'required|string|max:50',
 
         ]);
 
         $lastSerial = Status::where('agency_id', $authUser->agency_id)
-                        ->max('serial');
+            ->max('serial');
 
         $nextSerial = $lastSerial ? $lastSerial + 1 : 1;
 
         $status = Status::create([
             'agency_id' => $authUser->agency_id,
-            'name'      => $request->name,
-            'color'     => $request->color,
-            'serial'    => $nextSerial,
-            'type'      => $request->type,
+            'name' => $request->name,
+            'color' => $request->color,
+            'serial' => $nextSerial,
+            'type' => $request->type,
         ]);
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Client status created successfully.',
-            'data'    => $status,
+            'data' => $status,
         ]);
     }
 
@@ -69,7 +68,7 @@ class StatusController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Client status retrieved successfully.',
-            'data'   => $status,
+            'data' => $status,
         ]);
     }
 
@@ -84,16 +83,16 @@ class StatusController extends Controller
         }
 
         $request->validate([
-            'name'   => 'required|string|max:255|unique:statuses,name,' . $status->id . ',id,agency_id,' . $authUser->agency_id,
-            'color'  => 'required|string|max:50',
+            'name' => 'required|string|max:255|unique:statuses,name,'.$status->id.',id,agency_id,'.$authUser->agency_id,
+            'color' => 'required|string|max:50',
         ]);
 
         $status->update($request->only('name', 'color'));
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Client status updated successfully.',
-            'data'    => $status,
+            'data' => $status,
         ]);
     }
 
@@ -127,8 +126,8 @@ class StatusController extends Controller
         }
 
         $otherStatus = Status::where('agency_id', $authUser->agency_id)
-                            ->where('serial', $newSerial)
-                            ->first();
+            ->where('serial', $newSerial)
+            ->first();
 
         if ($otherStatus) {
             $otherStatus->update(['serial' => $status->serial]);
@@ -137,9 +136,9 @@ class StatusController extends Controller
         $status->update(['serial' => $newSerial]);
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Client status serial updated successfully.',
-            'serial'  => $status->serial,
+            'serial' => $status->serial,
         ]);
     }
 
@@ -156,7 +155,7 @@ class StatusController extends Controller
         $status->delete();
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Client status deleted successfully.',
         ]);
     }
@@ -181,7 +180,7 @@ class StatusController extends Controller
                     ->where('agency_id', $agencyId)
                     ->update([
                         'any_reason' => 1,
-                        'reason' => $statusData['reason']
+                        'reason' => $statusData['reason'],
                     ]);
             }
 
@@ -189,7 +188,7 @@ class StatusController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => 'Reasons stored successfully'
+                'message' => 'Reasons stored successfully',
             ]);
 
         } catch (\Throwable $e) {
@@ -199,9 +198,8 @@ class StatusController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Something went wrong',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
-
 }

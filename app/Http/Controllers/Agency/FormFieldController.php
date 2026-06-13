@@ -45,7 +45,7 @@ class FormFieldController extends Controller
             'form_id' => 'required|exists:forms,id',
             'label' => 'required|string|max:255',
             'type' => 'required|string',
-            'options' => 'nullable|array'
+            'options' => 'nullable|array',
         ]);
 
         $form = Form::where('id', $request->form_id)
@@ -65,13 +65,13 @@ class FormFieldController extends Controller
             'serial' => $request->serial ?? $serial,
             'validation_rules' => $request->validation_rules,
             'width' => $request->width ?? 12,
-            'status' => true
+            'status' => true,
         ]);
 
         return response()->json([
             'status' => true,
             'message' => 'Field created',
-            'data' => $field
+            'data' => $field,
         ]);
     }
 
@@ -95,7 +95,7 @@ class FormFieldController extends Controller
     public function reorder(Request $request)
     {
         $request->validate([
-            'fields' => 'required|array'
+            'fields' => 'required|array',
         ]);
 
         DB::beginTransaction();
@@ -106,7 +106,7 @@ class FormFieldController extends Controller
 
                 FormField::where('id', $field['id'])
                     ->update([
-                        'serial' => $field['serial']
+                        'serial' => $field['serial'],
                     ]);
             }
 
@@ -114,7 +114,7 @@ class FormFieldController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => 'Fields reordered'
+                'message' => 'Fields reordered',
             ]);
 
         } catch (\Exception $e) {
@@ -123,9 +123,8 @@ class FormFieldController extends Controller
 
             return response()->json([
                 'status' => false,
-                'message' => $e->getMessage()
-            ],500);
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
-
 }

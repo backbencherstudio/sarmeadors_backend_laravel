@@ -25,11 +25,11 @@ class FormBuilderController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'form_type'        => 'required|in:section,application',
+            'form_type' => 'required|in:section,application',
             'application_type' => 'required_if:form_type,application|nullable|in:registration,job_posting',
-            'user_type'        => 'nullable|in:client,candidate',
-            'job_type'         => 'nullable|in:shift_job,long_term_job',
-            'select_type'      => 'nullable|in:add_user,long_term_job,schedule_interview_form,review_user',
+            'user_type' => 'nullable|in:client,candidate',
+            'job_type' => 'nullable|in:shift_job,long_term_job',
+            'select_type' => 'nullable|in:add_user,long_term_job,schedule_interview_form,review_user',
         ]);
 
         DB::beginTransaction();
@@ -38,26 +38,26 @@ class FormBuilderController extends Controller
             $slug = $this->uniqueSlug($request->form_type, $request->application_type, $request->user_type);
 
             $form = FormBuilder::create([
-                'agency_id'        => $this->agencyId(),
-                'slug'             => $slug,
-                'form_type'        => $request->form_type,
+                'agency_id' => $this->agencyId(),
+                'slug' => $slug,
+                'form_type' => $request->form_type,
                 'application_type' => $request->application_type,
-                'user_type'        => $request->user_type,
-                'job_type'         => $request->job_type,
-                'select_type'      => $request->select_type,
+                'user_type' => $request->user_type,
+                'job_type' => $request->job_type,
+                'select_type' => $request->select_type,
             ]);
 
             $introBlock = FormBuilderBlock::create([
                 'form_builder_id' => $form->id,
-                'title'           => 'Introduction',
-                'description'     => 'Set your logo & form title here',
-                'serial'          => 0,
+                'title' => 'Introduction',
+                'description' => 'Set your logo & form title here',
+                'serial' => 0,
             ]);
 
             FormBuilderSection::create([
                 'form_builder_block_id' => $introBlock->id,
-                'name'                  => 'Intro Section',
-                'serial'                => 0,
+                'name' => 'Intro Section',
+                'serial' => 0,
             ]);
 
             $this->seedPredefinedBlocks($form);
@@ -65,13 +65,14 @@ class FormBuilderController extends Controller
             DB::commit();
 
             return response()->json([
-                'status'  => true,
+                'status' => true,
                 'message' => 'Form builder created',
-                'data'    => $this->formWithStructure($form->id),
+                'data' => $this->formWithStructure($form->id),
             ], 201);
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }
@@ -82,7 +83,7 @@ class FormBuilderController extends Controller
 
         return response()->json([
             'status' => true,
-            'data'   => $this->formWithStructure($id),
+            'data' => $this->formWithStructure($id),
         ]);
     }
 
@@ -91,11 +92,11 @@ class FormBuilderController extends Controller
         $form = $this->ownerForm($id);
 
         $request->validate([
-            'title'        => 'nullable|string|max:255',
-            'description'  => 'nullable|string',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
             'button_label' => 'nullable|string|max:255',
-            'button_link'  => 'nullable|string|max:500',
-            'status'       => 'nullable|boolean',
+            'button_link' => 'nullable|string|max:500',
+            'status' => 'nullable|boolean',
         ]);
 
         $data = $request->only(['title', 'description', 'button_label', 'button_link', 'status']);
@@ -116,7 +117,7 @@ class FormBuilderController extends Controller
     public function publish($id)
     {
         $form = $this->ownerForm($id);
-        $form->update(['is_published' => !$form->is_published]);
+        $form->update(['is_published' => ! $form->is_published]);
 
         $msg = $form->is_published ? 'Form published' : 'Form unpublished';
 
@@ -145,10 +146,9 @@ class FormBuilderController extends Controller
 
         return response()->json([
             'status' => true,
-            'data'   => $this->formWithStructure($form->id),
+            'data' => $this->formWithStructure($form->id),
         ]);
     }
-
 
     private function agencyId()
     {
@@ -177,7 +177,7 @@ class FormBuilderController extends Controller
         $i = 1;
 
         while (FormBuilder::where('slug', $slug)->exists()) {
-            $slug = $original . '-' . $i++;
+            $slug = $original.'-'.$i++;
         }
 
         return $slug;
@@ -186,9 +186,9 @@ class FormBuilderController extends Controller
     private function error(\Throwable $e)
     {
         return response()->json([
-            'status'  => false,
+            'status' => false,
             'message' => 'Something went wrong',
-            'error'   => $e->getMessage(),
+            'error' => $e->getMessage(),
         ], 500);
     }
 
@@ -209,7 +209,7 @@ class FormBuilderController extends Controller
                 $blocks = [
                     ['title' => 'Contact & Address',      'description' => 'Add contact and address information'],
                     ['title' => 'Work Experience',        'description' => 'Past work history'],
-                    ['title' => 'Skills & Qualifications','description' => 'Relevant skills'],
+                    ['title' => 'Skills & Qualifications', 'description' => 'Relevant skills'],
                     ['title' => 'Additional Information', 'description' => 'Extra details'],
                 ];
             }
@@ -227,15 +227,15 @@ class FormBuilderController extends Controller
         foreach ($blocks as $i => $block) {
             $b = FormBuilderBlock::create([
                 'form_builder_id' => $form->id,
-                'title'           => $block['title'],
-                'description'     => $block['description'],
-                'serial'          => $i + 1,
+                'title' => $block['title'],
+                'description' => $block['description'],
+                'serial' => $i + 1,
             ]);
 
             FormBuilderSection::create([
                 'form_builder_block_id' => $b->id,
-                'name'                  => 'Untitled Section',
-                'serial'                => 0,
+                'name' => 'Untitled Section',
+                'serial' => 0,
             ]);
         }
     }

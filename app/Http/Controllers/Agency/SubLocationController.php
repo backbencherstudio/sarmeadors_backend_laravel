@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Agency;
 use App\Http\Controllers\Controller;
 use App\Models\SubLocation;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class SubLocationController extends Controller
 {
@@ -16,7 +16,7 @@ class SubLocationController extends Controller
 
         $subLocations = SubLocation::with(['location:id,location'])
             ->where('agency_id', $agency_id)
-            ->when($request->location_id, fn($q) => $q->where('location_id', $request->location_id))
+            ->when($request->location_id, fn ($q) => $q->where('location_id', $request->location_id))
             ->get();
 
         return response()->json([
@@ -43,20 +43,20 @@ class SubLocationController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $subLocation = SubLocation::create([
-            'agency_id'    => $agency_id,
-            'location_id'  => $request->location_id,
+            'agency_id' => $agency_id,
+            'location_id' => $request->location_id,
             'sub_location' => $request->sub_location,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Sub Location created successfully',
-            'data'    => $subLocation
+            'data' => $subLocation,
         ], 201);
     }
 
@@ -68,7 +68,7 @@ class SubLocationController extends Controller
             ->where('agency_id', $agency_id)
             ->find($id);
 
-        if (!$subLocation) {
+        if (! $subLocation) {
             return response()->json(['message' => 'Sub Location not found'], 404);
         }
 
@@ -81,10 +81,10 @@ class SubLocationController extends Controller
 
         $subLocation = SubLocation::where('agency_id', $agency_id)->find($id);
 
-        if (!$subLocation) {
+        if (! $subLocation) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sub Location not found or unauthorized.'
+                'message' => 'Sub Location not found or unauthorized.',
             ], 404);
         }
 
@@ -108,7 +108,7 @@ class SubLocationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Sub Location updated successfully',
-            'data'    => $subLocation
+            'data' => $subLocation,
         ]);
     }
 
@@ -118,11 +118,12 @@ class SubLocationController extends Controller
 
         $subLocation = SubLocation::where('agency_id', $agency_id)->find($id);
 
-        if (!$subLocation) {
+        if (! $subLocation) {
             return response()->json(['message' => 'Sub Location not found or unauthorized'], 404);
         }
 
         $subLocation->delete();
+
         return response()->json(['success' => true, 'message' => 'Sub Location deleted successfully']);
     }
 }

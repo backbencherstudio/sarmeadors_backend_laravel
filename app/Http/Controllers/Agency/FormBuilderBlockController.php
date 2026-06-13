@@ -21,7 +21,7 @@ class FormBuilderBlockController extends Controller
         $form = $this->ownerForm($formBuilderId);
 
         $request->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
@@ -32,28 +32,29 @@ class FormBuilderBlockController extends Controller
 
             $block = FormBuilderBlock::create([
                 'form_builder_id' => $form->id,
-                'title'           => $request->title,
-                'description'     => $request->description,
-                'serial'          => $serial,
+                'title' => $request->title,
+                'description' => $request->description,
+                'serial' => $serial,
             ]);
 
             // Auto-create default section so the block is usable immediately
             $section = FormBuilderSection::create([
                 'form_builder_block_id' => $block->id,
-                'name'                  => 'Untitled Section',
-                'serial'                => 0,
+                'name' => 'Untitled Section',
+                'serial' => 0,
             ]);
 
             DB::commit();
 
             return response()->json([
-                'status'  => true,
+                'status' => true,
                 'message' => 'Block added',
-                'data'    => $block->load('sections'),
+                'data' => $block->load('sections'),
             ], 201);
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }
@@ -67,9 +68,9 @@ class FormBuilderBlockController extends Controller
         $block = $this->ownerBlock($id);
 
         $request->validate([
-            'title'       => 'sometimes|required|string|max:255',
+            'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
-            'status'      => 'nullable|boolean',
+            'status' => 'nullable|boolean',
         ]);
 
         $block->update($request->only(['title', 'description', 'status']));
@@ -104,7 +105,7 @@ class FormBuilderBlockController extends Controller
             $agencyId = auth('api')->user()->agency_id;
 
             foreach ($request->blocks as $item) {
-                FormBuilderBlock::whereHas('formBuilder', fn($q) => $q->where('agency_id', $agencyId))
+                FormBuilderBlock::whereHas('formBuilder', fn ($q) => $q->where('agency_id', $agencyId))
                     ->where('id', $item['id'])
                     ->update(['serial' => $item['serial']]);
             }
@@ -115,6 +116,7 @@ class FormBuilderBlockController extends Controller
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }

@@ -19,7 +19,7 @@ class Event extends Model
         'interview_link',
         'note',
         'is_email_notify',
-        'assign_user_id'
+        'assign_user_id',
     ];
 
     public function eventType()

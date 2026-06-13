@@ -11,6 +11,6 @@ class Permission extends Model
         'permission_name',
         'permission_type',
         'group_name',
-        'guard_name'
+        'guard_name',
     ];
 }

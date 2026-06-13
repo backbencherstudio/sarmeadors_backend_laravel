@@ -9,16 +9,12 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
 
 class AgencyController extends Controller
 {
-
     public function data()
     {
         $agencies = Agency::all();
@@ -26,7 +22,7 @@ class AgencyController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agencies retrieved successfully',
-            'data' => $agencies
+            'data' => $agencies,
         ], 200);
     }
 
@@ -42,7 +38,7 @@ class AgencyController extends Controller
             'max_clients' => 'required|integer|min:1',
             'max_candidates' => 'required|integer|min:1',
             'status' => 'nullable|in:active,inactive,suspended',
-            'subdomain_prefix' => ['required', 'string','max:50','unique:agencies,subdomain_prefix','regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'subdomain_prefix' => ['required', 'string', 'max:50', 'unique:agencies,subdomain_prefix', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
         ]);
 
         if ($validator->fails()) {
@@ -50,7 +46,7 @@ class AgencyController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -60,7 +56,7 @@ class AgencyController extends Controller
 
             $data = $validator->validated();
             $prefix = strtolower($data['subdomain_prefix']);
-            $fullSubdomain = $prefix . '.staffhaus.io';
+            $fullSubdomain = $prefix.'.staffhaus.io';
 
             $agency = Agency::create([
                 'name' => $data['name'],
@@ -81,19 +77,19 @@ class AgencyController extends Controller
                 'total_candidates' => 0,
             ]);
 
-            //create default business hours for the agency
+            // create default business hours for the agency
             $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
             foreach ($days as $day) {
                 AgencyBusinessHour::create([
-                    'agency_id'  => $agency->id,
-                    'day'        => $day,
+                    'agency_id' => $agency->id,
+                    'day' => $day,
                     'start_time' => '09:00:00',
-                    'end_time'   => '17:00:00',
-                    'is_open'    => in_array($day, ['Saturday', 'Sunday']) ? false : true,
+                    'end_time' => '17:00:00',
+                    'is_open' => in_array($day, ['Saturday', 'Sunday']) ? false : true,
                 ]);
             }
-            //end of business hour creation
+            // end of business hour creation
 
             $user = User::create([
                 'first_name' => $data['name'],
@@ -123,8 +119,8 @@ class AgencyController extends Controller
                         'id' => $user->id,
                         'name' => $user->first_name,
                         'email' => $user->email,
-                    ]
-                ]
+                    ],
+                ],
 
             ], 201);
 
@@ -144,7 +140,7 @@ class AgencyController extends Controller
     {
         $agency = Agency::find($id);
 
-        if (!$agency) {
+        if (! $agency) {
             return response()->json([
                 'status' => false,
                 'message' => 'Agency not found',
@@ -168,7 +164,7 @@ class AgencyController extends Controller
                 'total_users' => $agency->total_users,
                 'total_clients' => $agency->total_clients,
                 'total_candidates' => $agency->total_candidates,
-            ]
+            ],
         ]);
     }
 
@@ -176,7 +172,7 @@ class AgencyController extends Controller
     {
         $agency = Agency::find($id);
 
-        if (!$agency) {
+        if (! $agency) {
 
             return response()->json([
                 'status' => false,
@@ -186,14 +182,14 @@ class AgencyController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
-            'email' => ['required','email', 'max:100', Rule::unique('agencies', 'email')->ignore($agency->id),],
+            'email' => ['required', 'email', 'max:100', Rule::unique('agencies', 'email')->ignore($agency->id)],
             'mobile' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'max_users' => 'required|integer|min:1',
             'max_clients' => 'required|integer|min:1',
             'max_candidates' => 'required|integer|min:1',
             'status' => 'nullable|in:active,inactive,suspended',
-            'subdomain_prefix' => [ 'required','string','max:50', Rule::unique('agencies', 'subdomain_prefix')->ignore($agency->id), 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'subdomain_prefix' => ['required', 'string', 'max:50', Rule::unique('agencies', 'subdomain_prefix')->ignore($agency->id), 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
         ]);
 
         if ($validator->fails()) {
@@ -201,7 +197,7 @@ class AgencyController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -212,7 +208,7 @@ class AgencyController extends Controller
             $data = $validator->validated();
 
             $prefix = strtolower($data['subdomain_prefix']);
-            $fullSubdomain = $prefix . '.staffhaus.io';
+            $fullSubdomain = $prefix.'.staffhaus.io';
             $agency->update([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -240,7 +236,7 @@ class AgencyController extends Controller
 
                 if ($request->filled('password')) {
                     $admin->update([
-                        'password' => Hash::make($request->password)
+                        'password' => Hash::make($request->password),
                     ]);
                 }
             }
@@ -262,8 +258,8 @@ class AgencyController extends Controller
                         'id' => $admin->id,
                         'name' => $admin->first_name,
                         'email' => $admin->email,
-                    ] : null
-                ]
+                    ] : null,
+                ],
 
             ]);
 
@@ -283,7 +279,7 @@ class AgencyController extends Controller
     {
         $agency = Agency::find($id);
 
-        if (!$agency) {
+        if (! $agency) {
 
             return response()->json([
                 'status' => false,
@@ -352,7 +348,7 @@ class AgencyController extends Controller
 
         $agency = Agency::find($id);
 
-        if (!$agency) {
+        if (! $agency) {
 
             return response()->json([
                 'status' => false,
@@ -455,7 +451,7 @@ class AgencyController extends Controller
 
         $agency = Agency::find($authUser->agency_id);
 
-        if (!$agency) {
+        if (! $agency) {
 
             return response()->json([
                 'status' => false,
@@ -478,20 +474,19 @@ class AgencyController extends Controller
                 'language' => $agency->language,
 
                 'stripe_publishable_key' => $agency->stripe_publishable_key
-                    ? substr($agency->stripe_publishable_key, 0, 10) . '...'
+                    ? substr($agency->stripe_publishable_key, 0, 10).'...'
                     : null,
 
                 'stripe_secret_key' => $agency->stripe_secret_key
-                    ? substr($agency->stripe_secret_key, 0, 10) . '...'
+                    ? substr($agency->stripe_secret_key, 0, 10).'...'
                     : null,
 
                 'stripe_webhook_secret' => $agency->stripe_webhook_secret
-                    ? substr($agency->stripe_webhook_secret, 0, 10) . '...'
+                    ? substr($agency->stripe_webhook_secret, 0, 10).'...'
                     : null,
 
                 'subdomain' => $agency->subdomain,
-            ]
+            ],
         ]);
     }
-
 }

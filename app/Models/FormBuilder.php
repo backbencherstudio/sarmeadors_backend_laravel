@@ -24,7 +24,7 @@ class FormBuilder extends Model
     ];
 
     protected $casts = [
-        'status'       => 'boolean',
+        'status' => 'boolean',
         'is_published' => 'boolean',
     ];
 
@@ -45,6 +45,6 @@ class FormBuilder extends Model
 
     public function getLogoAttribute($value)
     {
-        return $value ? asset('storage/' . $value) : null;
+        return $value ? asset('storage/'.$value) : null;
     }
 }

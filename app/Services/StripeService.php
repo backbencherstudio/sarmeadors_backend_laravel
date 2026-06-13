@@ -7,6 +7,9 @@ namespace App\Services;
 use App\Models\Agency;
 use App\Models\Client;
 use App\Models\ShortTermJob;
+use Stripe\Checkout\Session;
+use Stripe\Exception\AuthenticationException;
+use Stripe\PaymentIntent;
 use Stripe\StripeClient;
 
 class StripeService
@@ -17,7 +20,7 @@ class StripeService
      */
     private function getClient(Agency $agency): StripeClient
     {
-        if (!$agency->hasStripeKeys()) {
+        if (! $agency->hasStripeKeys()) {
             throw new \Exception('Agency has not configured Stripe keys.');
         }
 
@@ -36,18 +39,18 @@ class StripeService
             $account = $stripe->accounts->retrieve('self');
 
             return [
-                'valid'      => true,
+                'valid' => true,
                 'account_id' => $account->id,
-                'email'      => $account->email ?? null,
+                'email' => $account->email ?? null,
             ];
-        } catch (\Stripe\Exception\AuthenticationException $e) {
+        } catch (AuthenticationException $e) {
             return [
-                'valid'   => false,
+                'valid' => false,
                 'message' => 'Invalid Stripe secret key.',
             ];
         } catch (\Exception $e) {
             return [
-                'valid'   => false,
+                'valid' => false,
                 'message' => $e->getMessage(),
             ];
         }
@@ -61,7 +64,7 @@ class StripeService
         $stripe = $this->getClient($agency);
 
         $customer = $stripe->customers->create([
-            'name'  => $client->full_name,
+            'name' => $client->full_name,
             'email' => $client->email,
             'phone' => $client->phone,
             'metadata' => [
@@ -84,21 +87,21 @@ class StripeService
     public function createCheckoutSession(
         Client $client,
         Agency $agency,
-        float  $amount,
+        float $amount,
         string $currency = 'usd'
-    ): \Stripe\Checkout\Session {
+    ): Session {
 
         $stripe = $this->getClient($agency);
 
         return $stripe->checkout->sessions->create([
-            'mode'       => 'payment',
-            'customer'   => $client->stripe_customer_id,
+            'mode' => 'payment',
+            'customer' => $client->stripe_customer_id,
             'line_items' => [[
                 'price_data' => [
-                    'currency'     => $currency,
-                    'unit_amount'  => (int)($amount * 100),
+                    'currency' => $currency,
+                    'unit_amount' => (int) ($amount * 100),
                     'product_data' => [
-                        'name' => "Registration Fee",
+                        'name' => 'Registration Fee',
                     ],
                 ],
                 'quantity' => 1,
@@ -110,9 +113,9 @@ class StripeService
                 ],
             ],
             'success_url' => config('app.frontend_url')
-                . "/registration/success?session_id={CHECKOUT_SESSION_ID}",
-            'cancel_url'  => config('app.frontend_url')
-                . "/registration/cancel",
+                .'/registration/success?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => config('app.frontend_url')
+                .'/registration/cancel',
             'metadata' => [
                 'client_id' => $client->id,
                 'agency_id' => $agency->id,
@@ -124,24 +127,24 @@ class StripeService
      * Create a PaymentIntent for job posting fee — returns client_secret for custom form
      */
     public function createJobPaymentIntent(
-        Client        $client,
-        Agency        $agency,
+        Client $client,
+        Agency $agency,
         ?ShortTermJob $job,
-        float         $amount,
-        string        $currency = 'usd'
-    ): \Stripe\PaymentIntent {
+        float $amount,
+        string $currency = 'usd'
+    ): PaymentIntent {
 
         $stripe = $this->getClient($agency);
 
         return $stripe->paymentIntents->create([
-            'amount'      => (int) ($amount * 100),
-            'currency'    => strtolower($currency),
-            'description' => 'Job Posting Fee' . ($job ? ' – ' . $job->title : ''),
-            'metadata'    => [
-                'job_id'    => $job?->id,
+            'amount' => (int) ($amount * 100),
+            'currency' => strtolower($currency),
+            'description' => 'Job Posting Fee'.($job ? ' – '.$job->title : ''),
+            'metadata' => [
+                'job_id' => $job?->id,
                 'client_id' => $client->id,
                 'agency_id' => $agency->id,
-                'job_type'  => 'short_term',
+                'job_type' => 'short_term',
             ],
         ]);
     }
@@ -153,7 +156,7 @@ class StripeService
         Agency $agency,
         string $paymentIntentId,
         string $paymentMethodId
-    ): \Stripe\PaymentIntent {
+    ): PaymentIntent {
         $stripe = $this->getClient($agency);
 
         return $stripe->paymentIntents->confirm($paymentIntentId, [
@@ -164,7 +167,7 @@ class StripeService
     /**
      * Retrieve a PaymentIntent using AGENCY's keys
      */
-    public function retrievePaymentIntent(Agency $agency, string $paymentIntentId): \Stripe\PaymentIntent
+    public function retrievePaymentIntent(Agency $agency, string $paymentIntentId): PaymentIntent
     {
         $stripe = $this->getClient($agency);
 
@@ -174,7 +177,7 @@ class StripeService
     /**
      * Retrieve checkout session using AGENCY's keys
      */
-    public function retrieveCheckoutSession(Agency $agency, string $sessionId): \Stripe\Checkout\Session
+    public function retrieveCheckoutSession(Agency $agency, string $sessionId): Session
     {
         $stripe = $this->getClient($agency);
 

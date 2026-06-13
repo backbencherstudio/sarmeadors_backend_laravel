@@ -20,9 +20,9 @@ class Payment extends Model
     ];
 
     protected $casts = [
-        'amount'       => 'decimal:2',
+        'amount' => 'decimal:2',
         'platform_fee' => 'decimal:2',
-        'metadata'     => 'array',
+        'metadata' => 'array',
     ];
 
     public function agency()

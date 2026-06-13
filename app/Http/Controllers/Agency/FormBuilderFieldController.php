@@ -47,18 +47,18 @@ class FormBuilderFieldController extends Controller
         $allTypes = collect(FormBuilderField::FIELD_TYPES)->flatten()->toArray();
 
         $request->validate([
-            'field_type'   => 'required|in:' . implode(',', $allTypes),
-            'field_label'  => 'required|string|max:255',
-            'profile_label'=> 'nullable|string|max:255',
-            'placeholder'  => 'nullable|string|max:255',
+            'field_type' => 'required|in:'.implode(',', $allTypes),
+            'field_label' => 'required|string|max:255',
+            'profile_label' => 'nullable|string|max:255',
+            'placeholder' => 'nullable|string|max:255',
             'is_mandatory' => 'nullable|boolean',
-            'settings'     => 'nullable|array',
-            'items'        => 'nullable|array',
+            'settings' => 'nullable|array',
+            'items' => 'nullable|array',
             'items.*.item_type' => 'nullable|string',
-            'items.*.label'     => 'required_with:items|string',
-            'items.*.value'     => 'nullable|string',
-            'items.*.meta'      => 'nullable|array',
-            'items.*.serial'    => 'nullable|integer',
+            'items.*.label' => 'required_with:items|string',
+            'items.*.value' => 'nullable|string',
+            'items.*.meta' => 'nullable|array',
+            'items.*.serial' => 'nullable|integer',
         ]);
 
         DB::beginTransaction();
@@ -68,13 +68,13 @@ class FormBuilderFieldController extends Controller
 
             $field = FormBuilderField::create([
                 'form_builder_section_id' => $section->id,
-                'field_type'   => $request->field_type,
-                'field_label'  => $request->field_label,
-                'profile_label'=> $request->profile_label,
-                'placeholder'  => $request->placeholder,
+                'field_type' => $request->field_type,
+                'field_label' => $request->field_label,
+                'profile_label' => $request->profile_label,
+                'placeholder' => $request->placeholder,
                 'is_mandatory' => $request->boolean('is_mandatory'),
-                'serial'       => $serial,
-                'settings'     => $request->settings,
+                'serial' => $serial,
+                'settings' => $request->settings,
             ]);
 
             $this->syncItems($field, $request->items ?? []);
@@ -82,13 +82,14 @@ class FormBuilderFieldController extends Controller
             DB::commit();
 
             return response()->json([
-                'status'  => true,
+                'status' => true,
                 'message' => 'Field added',
-                'data'    => $field->load('items'),
+                'data' => $field->load('items'),
             ], 201);
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }
@@ -104,13 +105,13 @@ class FormBuilderFieldController extends Controller
         $allTypes = collect(FormBuilderField::FIELD_TYPES)->flatten()->toArray();
 
         $request->validate([
-            'field_type'   => 'sometimes|required|in:' . implode(',', $allTypes),
-            'field_label'  => 'sometimes|required|string|max:255',
-            'profile_label'=> 'nullable|string|max:255',
-            'placeholder'  => 'nullable|string|max:255',
+            'field_type' => 'sometimes|required|in:'.implode(',', $allTypes),
+            'field_label' => 'sometimes|required|string|max:255',
+            'profile_label' => 'nullable|string|max:255',
+            'placeholder' => 'nullable|string|max:255',
             'is_mandatory' => 'nullable|boolean',
-            'settings'     => 'nullable|array',
-            'items'        => 'nullable|array',
+            'settings' => 'nullable|array',
+            'items' => 'nullable|array',
         ]);
 
         DB::beginTransaction();
@@ -131,6 +132,7 @@ class FormBuilderFieldController extends Controller
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }
@@ -155,8 +157,8 @@ class FormBuilderFieldController extends Controller
     public function reorder(Request $request)
     {
         $request->validate([
-            'fields'          => 'required|array',
-            'fields.*.id'     => 'required|integer',
+            'fields' => 'required|array',
+            'fields.*.id' => 'required|integer',
             'fields.*.serial' => 'required|integer',
         ]);
 
@@ -166,7 +168,7 @@ class FormBuilderFieldController extends Controller
             $agencyId = auth('api')->user()->agency_id;
 
             foreach ($request->fields as $item) {
-                FormBuilderField::whereHas('section.block.formBuilder', fn($q) => $q->where('agency_id', $agencyId))
+                FormBuilderField::whereHas('section.block.formBuilder', fn ($q) => $q->where('agency_id', $agencyId))
                     ->where('id', $item['id'])
                     ->update(['serial' => $item['serial']]);
             }
@@ -177,6 +179,7 @@ class FormBuilderFieldController extends Controller
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return $this->error($e);
         }
     }
@@ -191,11 +194,11 @@ class FormBuilderFieldController extends Controller
         foreach ($items as $i => $item) {
             FormBuilderFieldItem::create([
                 'form_builder_field_id' => $field->id,
-                'item_type'             => $item['item_type'] ?? 'option',
-                'label'                 => $item['label'],
-                'value'                 => $item['value'] ?? null,
-                'meta'                  => $item['meta'] ?? null,
-                'serial'                => $item['serial'] ?? $i,
+                'item_type' => $item['item_type'] ?? 'option',
+                'label' => $item['label'],
+                'value' => $item['value'] ?? null,
+                'meta' => $item['meta'] ?? null,
+                'serial' => $item['serial'] ?? $i,
             ]);
         }
     }

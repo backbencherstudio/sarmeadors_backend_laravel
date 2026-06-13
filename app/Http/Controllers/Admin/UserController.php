@@ -4,22 +4,18 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
-use Illuminate\Http\Request;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-
     public function roleList()
     {
         $user = auth('api')->user();
@@ -43,7 +39,7 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Roles fetched successfully.',
-            'data'    => $roles
+            'data' => $roles,
         ]);
     }
 
@@ -72,7 +68,7 @@ class UserController extends Controller
         if (empty($allowedRoles)) {
             return response()->json([
                 'status' => false,
-                'message' => 'You are not authorized to create users.'
+                'message' => 'You are not authorized to create users.',
             ], 403);
         }
 
@@ -85,26 +81,26 @@ class UserController extends Controller
             if ($agency && $agency->total_users >= $agency->max_users) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'User limit exceeded for this agency.'
+                    'message' => 'User limit exceeded for this agency.',
                 ], 403);
             }
         }
 
         $validator = Validator::make($request->all(), [
             'first_name' => ['required', 'string', 'max:100'],
-            'last_name'  => ['nullable', 'string', 'max:100'],
-            'mobile'     => ['nullable', 'string', 'max:20'],
-            'email'      => ['required', 'email', 'max:255', 'unique:users,email'],
-            'image'      => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'role_id'    => ['required', 'integer', 'exists:roles,id'],
-            'password'   => ['required', 'confirmed', Password::defaults()],
+            'last_name' => ['nullable', 'string', 'max:100'],
+            'mobile' => ['nullable', 'string', 'max:20'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => false,
                 'message' => 'Validation errors',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -112,10 +108,10 @@ class UserController extends Controller
 
         $role = Role::find($validated['role_id']);
 
-        if (!in_array($role->name, $allowedRoles)) {
+        if (! in_array($role->name, $allowedRoles)) {
             return response()->json([
                 'status' => false,
-                'message' => 'You are not allowed to assign this role.'
+                'message' => 'You are not allowed to assign this role.',
             ], 403);
         }
 
@@ -132,12 +128,12 @@ class UserController extends Controller
 
             $user = User::create([
                 'first_name' => $validated['first_name'],
-                'last_name'  => $validated['last_name'] ?? null,
-                'email'      => $validated['email'],
-                'mobile'     => $validated['mobile'] ?? null,
-                'image'      => $imagePath,
-                'agency_id'  => $authUser->agency_id,
-                'password'   => Hash::make($validated['password']),
+                'last_name' => $validated['last_name'] ?? null,
+                'email' => $validated['email'],
+                'mobile' => $validated['mobile'] ?? null,
+                'image' => $imagePath,
+                'agency_id' => $authUser->agency_id,
+                'password' => Hash::make($validated['password']),
             ]);
 
             $user->assignRole($role->name);
@@ -159,7 +155,7 @@ class UserController extends Controller
                     'email' => $user->email,
                     'image' => $user->image,
                     'role' => $role->name,
-                ]
+                ],
             ], 201);
 
         } catch (\Throwable $e) {
@@ -169,7 +165,7 @@ class UserController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'User creation failed.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -183,21 +179,21 @@ class UserController extends Controller
         if ($authUser->hasRole('agency_admin') && $authUser->agency_id !== $user->agency_id) {
             return response()->json([
                 'status' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
         return response()->json([
             'status' => true,
             'data' => [
-                'id'         => $user->id,
+                'id' => $user->id,
                 'first_name' => $user->first_name,
-                'last_name'  => $user->last_name,
-                'mobile'     => $user->mobile,
-                'email'      => $user->email,
-                'image'      => $user->image ?? null,
-                'role'       => $user->getRoleNames()->first(),
-            ]
+                'last_name' => $user->last_name,
+                'mobile' => $user->mobile,
+                'email' => $user->email,
+                'image' => $user->image ?? null,
+                'role' => $user->getRoleNames()->first(),
+            ],
         ]);
     }
 
@@ -223,10 +219,10 @@ class UserController extends Controller
             default => null,
         };
 
-        if (!$allowedRoles) {
+        if (! $allowedRoles) {
             return response()->json([
                 'status' => false,
-                'message' => 'You are not authorized to update users.'
+                'message' => 'You are not authorized to update users.',
             ], 403);
         }
 
@@ -234,19 +230,19 @@ class UserController extends Controller
 
         $validator = Validator::make($request->all(), [
             'first_name' => ['required', 'string', 'max:100'],
-            'last_name'  => ['nullable', 'string', 'max:100'],
-            'mobile'     => ['nullable', 'string', 'max:20'],
-            'email'      => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'image'      => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'role_id'    => ['required', 'integer', 'exists:roles,id'],
-            'password'   => ['nullable', 'confirmed', Password::defaults()],
+            'last_name' => ['nullable', 'string', 'max:100'],
+            'mobile' => ['nullable', 'string', 'max:20'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'password' => ['nullable', 'confirmed', Password::defaults()],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => false,
                 'message' => 'Validation errors',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -254,10 +250,10 @@ class UserController extends Controller
 
         $role = Role::findOrFail($validated['role_id']);
 
-        if (!in_array($role->name, $allowedRoles)) {
+        if (! in_array($role->name, $allowedRoles)) {
             return response()->json([
                 'status' => false,
-                'message' => 'You are not allowed to assign this role.'
+                'message' => 'You are not allowed to assign this role.',
             ], 403);
         }
 
@@ -281,11 +277,11 @@ class UserController extends Controller
 
             $user->update([
                 'first_name' => $validated['first_name'],
-                'last_name'  => $validated['last_name'] ?? null,
-                'email'      => $validated['email'],
-                'mobile'     => $validated['mobile'] ?? null,
-                'image'      => $imagePath,
-                'password'   => !empty($validated['password'])
+                'last_name' => $validated['last_name'] ?? null,
+                'email' => $validated['email'],
+                'mobile' => $validated['mobile'] ?? null,
+                'image' => $imagePath,
+                'password' => ! empty($validated['password'])
                     ? Hash::make($validated['password'])
                     : $user->password,
             ]);
@@ -305,7 +301,7 @@ class UserController extends Controller
                     'email' => $user->email,
                     'image' => $user->image,
                     'role' => $role->name,
-                ]
+                ],
             ], 200);
 
         } catch (\Throwable $e) {
@@ -315,7 +311,7 @@ class UserController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'User update failed.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -326,9 +322,9 @@ class UserController extends Controller
         $perPage = $request->get('per_page', 10);
         $query = User::whereHas('roles')
             ->with(['roles:id,name'])
-            ->select('id','first_name','last_name','email','mobile','image','agency_id');
+            ->select('id', 'first_name', 'last_name', 'email', 'mobile', 'image', 'agency_id');
 
-        if (!$authUser->hasRole('super_admin')) {
+        if (! $authUser->hasRole('super_admin')) {
             $query->where('agency_id', $authUser->agency_id);
         }
 
@@ -338,27 +334,28 @@ class UserController extends Controller
 
         $users->getCollection()->transform(function ($user) {
             return [
-                'id'         => $user->id,
+                'id' => $user->id,
                 'first_name' => $user->first_name,
-                'last_name'  => $user->last_name,
-                'email'      => $user->email,
-                'mobile'     => $user->mobile,
-                'image'      => $user->image,
-                'agency_id'  => $user->agency_id,
-                'role'       => $user->getRoleNames()->first(),
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'mobile' => $user->mobile,
+                'image' => $user->image,
+                'agency_id' => $user->agency_id,
+                'role' => $user->getRoleNames()->first(),
             ];
         });
+
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Users fetched successfully.',
-            'data'    => $users->items(),
+            'data' => $users->items(),
 
             'pagination' => [
                 'current_page' => $users->currentPage(),
-                'per_page'    => $users->perPage(),
-                'total'       => $users->total(),
-                'last_page'   => $users->lastPage(),
-            ]
+                'per_page' => $users->perPage(),
+                'total' => $users->total(),
+                'last_page' => $users->lastPage(),
+            ],
         ]);
     }
 
@@ -371,7 +368,7 @@ class UserController extends Controller
         if ($user->is_owner == 1) {
             return response()->json([
                 'status' => false,
-                'message' => 'Owner user cannot be deleted.'
+                'message' => 'Owner user cannot be deleted.',
             ], 403);
         }
 
@@ -381,7 +378,7 @@ class UserController extends Controller
         ) {
             return response()->json([
                 'status' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -411,8 +408,8 @@ class UserController extends Controller
             DB::commit();
 
             return response()->json([
-                'status'  => true,
-                'message' => 'User deleted successfully.'
+                'status' => true,
+                'message' => 'User deleted successfully.',
             ], 200);
 
         } catch (\Throwable $e) {
@@ -420,9 +417,9 @@ class UserController extends Controller
             DB::rollBack();
 
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'User deletion failed.',
-                'error'   => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -433,20 +430,20 @@ class UserController extends Controller
 
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|string',
-            'new_password'     => 'required|string|min:6|confirmed',
+            'new_password' => 'required|string|min:6|confirmed',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation errors',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        if (!Hash::check($request->current_password, $user->password)) {
+        if (! Hash::check($request->current_password, $user->password)) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Current password is incorrect.',
             ], 422);
         }
@@ -455,7 +452,7 @@ class UserController extends Controller
         $user->save();
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Password updated successfully.',
         ], 200);
     }
@@ -466,18 +463,18 @@ class UserController extends Controller
 
         $validator = Validator::make($request->all(), [
             'first_name' => 'required|string|max:100',
-            'last_name'  => 'nullable|string|max:100',
-            'mobile'     => 'nullable|string|max:20',
-            'email'      => ['required','email','max:255',Rule::unique('users', 'email')->ignore($user->id)],
-            'image'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'password'   => 'nullable|string|min:6|confirmed',
+            'last_name' => 'nullable|string|max:100',
+            'mobile' => 'nullable|string|max:20',
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'password' => 'nullable|string|min:6|confirmed',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'Validation errors',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -485,12 +482,12 @@ class UserController extends Controller
 
         $updateData = [
             'first_name' => $validated['first_name'],
-            'last_name'  => $validated['last_name'] ?? null,
-            'mobile'     => $validated['mobile'] ?? null,
-            'email'      => $validated['email'],
+            'last_name' => $validated['last_name'] ?? null,
+            'mobile' => $validated['mobile'] ?? null,
+            'email' => $validated['email'],
         ];
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $updateData['password'] = Hash::make($validated['password']);
         }
 
@@ -509,18 +506,17 @@ class UserController extends Controller
         $user->refresh();
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => 'Profile updated successfully.',
-            'data'    => [
-                'id'         => $user->id,
+            'data' => [
+                'id' => $user->id,
                 'first_name' => $user->first_name,
-                'last_name'  => $user->last_name,
-                'mobile'     => $user->mobile,
-                'email'      => $user->email,
-                'image'      => $user->image,
+                'last_name' => $user->last_name,
+                'mobile' => $user->mobile,
+                'email' => $user->email,
+                'image' => $user->image,
                 // 'role'       => $user->getRoleNames()->first(),
-            ]
+            ],
         ], 200);
     }
-
 }

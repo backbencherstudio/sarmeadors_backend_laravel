@@ -23,7 +23,7 @@ class MessageTemplate extends Model
         'body',
 
         'attachments',
-        'agency_id'
+        'agency_id',
     ];
 
     protected $casts = [

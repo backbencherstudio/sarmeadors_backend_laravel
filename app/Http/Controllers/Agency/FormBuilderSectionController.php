@@ -24,8 +24,8 @@ class FormBuilderSectionController extends Controller
 
         $section = FormBuilderSection::create([
             'form_builder_block_id' => $block->id,
-            'name'                  => $request->name ?? 'Untitled Section',
-            'serial'                => $serial,
+            'name' => $request->name ?? 'Untitled Section',
+            'serial' => $serial,
         ]);
 
         return response()->json(['status' => true, 'message' => 'Section added', 'data' => $section], 201);

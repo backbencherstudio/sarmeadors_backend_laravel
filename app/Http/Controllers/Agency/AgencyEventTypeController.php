@@ -17,9 +17,9 @@ class AgencyEventTypeController extends Controller
         $search = $request->query('search');
         $type = $request->query('type');
 
-        if (!is_null($type)) {
+        if (! is_null($type)) {
             $type = is_string($type) ? strtolower(trim($type)) : $type;
-            if (!in_array($type, ['candidate', 'client'], true)) {
+            if (! in_array($type, ['candidate', 'client'], true)) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Invalid type. Allowed: candidate, client.',
@@ -29,7 +29,7 @@ class AgencyEventTypeController extends Controller
 
         $agencyEventTypes = EventType::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
-                return $query->where('name', 'like', '%' . $search . '%');
+                return $query->where('name', 'like', '%'.$search.'%');
             })
             ->when($type, function ($query, $type) {
                 return $query->where('type', $type);
@@ -50,7 +50,7 @@ class AgencyEventTypeController extends Controller
                 'total' => $agencyEventTypes->total(),
                 'next_page_url' => $agencyEventTypes->nextPageUrl(),
                 'prev_page_url' => $agencyEventTypes->previousPageUrl(),
-            ]
+            ],
         ], 200);
     }
 
@@ -62,16 +62,16 @@ class AgencyEventTypeController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyEventType) {
+        if (! $agencyEventType) {
             return response()->json([
                 'status' => false,
-                'message' => 'Agency event type not found or unauthorized'
+                'message' => 'Agency event type not found or unauthorized',
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $agencyEventType
+            'data' => $agencyEventType,
         ], 200);
     }
 
@@ -94,8 +94,8 @@ class AgencyEventTypeController extends Controller
 
         $names = $request->filled('names') ? $request->input('names') : [$request->input('name')];
         $names = collect($names)
-            ->filter(fn($value) => !is_null($value) && $value !== '')
-            ->map(fn($value) => trim($value))
+            ->filter(fn ($value) => ! is_null($value) && $value !== '')
+            ->map(fn ($value) => trim($value))
             ->filter()
             ->unique()
             ->values();
@@ -103,7 +103,7 @@ class AgencyEventTypeController extends Controller
         if ($names->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one name using "name" or "names".'
+                'message' => 'Please provide at least one name using "name" or "names".',
             ], 422);
         }
 
@@ -112,18 +112,18 @@ class AgencyEventTypeController extends Controller
             ->pluck('name')
             ->toArray();
 
-        if (!empty($existingNames)) {
+        if (! empty($existingNames)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some names already exist.',
-                'duplicates' => $existingNames
+                'duplicates' => $existingNames,
             ], 422);
         }
 
         $type = $request->input('type');
         $status = $request->status ?? 1;
         $now = now();
-        $rows = $names->map(fn($name) => [
+        $rows = $names->map(fn ($name) => [
             'agency_id' => $agencyId,
             'name' => $name,
             'type' => $type,
@@ -159,7 +159,7 @@ class AgencyEventTypeController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyEventType) {
+        if (! $agencyEventType) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -168,7 +168,7 @@ class AgencyEventTypeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('event_types')->ignore($agencyEventType->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('event_types')->ignore($agencyEventType->id)->where(fn ($query) => $query->where('agency_id', $agencyId)),
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -178,7 +178,7 @@ class AgencyEventTypeController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency event type updated successfully',
-            'data' => $agencyEventType
+            'data' => $agencyEventType,
         ], 200);
     }
 
@@ -194,13 +194,13 @@ class AgencyEventTypeController extends Controller
         ]);
 
         $updates = collect($request->input('updates'))
-            ->map(fn($item) => [...$item, 'name' => trim($item['name'])])
+            ->map(fn ($item) => [...$item, 'name' => trim($item['name'])])
             ->values();
 
-        if ($updates->contains(fn($item) => $item['name'] === '')) {
+        if ($updates->contains(fn ($item) => $item['name'] === '')) {
             return response()->json([
                 'status' => false,
-                'message' => 'Name cannot be empty.'
+                'message' => 'Name cannot be empty.',
             ], 422);
         }
 
@@ -218,7 +218,7 @@ class AgencyEventTypeController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Some agency event types were not found or unauthorized.',
-                'missing_ids' => $missingIds
+                'missing_ids' => $missingIds,
             ], 404);
         }
 
@@ -228,11 +228,11 @@ class AgencyEventTypeController extends Controller
             ->pluck('name')
             ->toArray();
 
-        if (!empty($nameConflicts)) {
+        if (! empty($nameConflicts)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some names already exist.',
-                'duplicates' => $nameConflicts
+                'duplicates' => $nameConflicts,
             ], 422);
         }
 
@@ -257,7 +257,7 @@ class AgencyEventTypeController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency event types updated successfully',
-            'data' => $updated
+            'data' => $updated,
         ], 200);
     }
 
@@ -267,7 +267,7 @@ class AgencyEventTypeController extends Controller
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$agencyEventType) {
+        if (! $agencyEventType) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 

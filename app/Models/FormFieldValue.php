@@ -9,7 +9,7 @@ class FormFieldValue extends Model
     protected $fillable = [
         'submission_id',
         'form_field_id',
-        'value'
+        'value',
     ];
 
     public function field()

@@ -19,16 +19,16 @@ class FormBuilderField extends Model
 
     protected $casts = [
         'is_mandatory' => 'boolean',
-        'settings'     => 'array',
+        'settings' => 'array',
     ];
 
     // All field types grouped by category
     public const FIELD_TYPES = [
-        'basic'   => [
+        'basic' => [
             'text_box', 'text_area', 'rating', 'rating_group',
             'password', 'rich_text_editor', 'language_input',
         ],
-        'choice'  => [
+        'choice' => [
             'dropdown', 'radio', 'radio_table',
             'single_checkbox', 'multi_select_checkbox', 'checkbox_table',
         ],
@@ -37,12 +37,12 @@ class FormBuilderField extends Model
             'date_time_picker', 'multi_date_picker', 'time_availability',
             'booking_section',
         ],
-        'media'   => [
+        'media' => [
             'file_upload', 'list_files', 'video_recorder',
             'file_with_additional_info',
         ],
         'signing' => ['signature', 'signature_field'],
-        'layout'  => [
+        'layout' => [
             'label', 'separator', 'html',
             'section', 'preset_section', 'preset_fields',
             'html_selection', 'display_value_by_expression',

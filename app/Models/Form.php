@@ -11,7 +11,7 @@ class Form extends Model
         'name',
         'slug',
         'entity',
-        'status'
+        'status',
     ];
 
     public function fields()

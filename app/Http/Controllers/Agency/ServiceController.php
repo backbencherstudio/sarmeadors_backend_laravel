@@ -17,15 +17,15 @@ class ServiceController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Services retrieved successfully',
-            'data' => $services
+            'data' => $services,
         ]);
     }
 
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'service_name'  => 'required|string|max:255',
-            'status'        => 'nullable|boolean',
+            'service_name' => 'required|string|max:255',
+            'status' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -33,9 +33,9 @@ class ServiceController extends Controller
         }
 
         $service = Service::create([
-            'agency_id'     => auth('api')->user()->agency_id,
-            'service_name'  => $request->service_name,
-            'status'        => $request->has('status') ? $request->status : true,
+            'agency_id' => auth('api')->user()->agency_id,
+            'service_name' => $request->service_name,
+            'status' => $request->has('status') ? $request->status : true,
         ]);
 
         return response()->json(['message' => 'Service Created', 'data' => $service], 201);
@@ -46,7 +46,7 @@ class ServiceController extends Controller
         $agency_id = auth('api')->user()->agency_id;
         $service = Service::where('id', $id)->where('agency_id', $agency_id)->first();
 
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found'], 404);
         }
 
@@ -58,18 +58,18 @@ class ServiceController extends Controller
         $agency_id = auth('api')->user()->agency_id;
         $service = Service::where('id', $id)->where('agency_id', $agency_id)->first();
 
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found'], 404);
         }
 
         $request->validate([
-            'service_name'  => 'required|string',
-            'status'        => 'nullable|boolean',
+            'service_name' => 'required|string',
+            'status' => 'nullable|boolean',
         ]);
 
         $service->update([
-            'service_name'  => $request->service_name,
-            'status'        => $request->has('status') ? $request->status : $service->status,
+            'service_name' => $request->service_name,
+            'status' => $request->has('status') ? $request->status : $service->status,
         ]);
 
         return response()->json(['message' => 'Service updated', 'data' => $service]);
@@ -80,7 +80,7 @@ class ServiceController extends Controller
         $agency_id = auth('api')->user()->agency_id;
         $service = Service::where('id', $id)->where('agency_id', $agency_id)->first();
 
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found'], 404);
         }
 
@@ -89,13 +89,13 @@ class ServiceController extends Controller
         ]);
 
         $service->update([
-            'status' => $request->status
+            'status' => $request->status,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Status updated successfully',
-            'current_status' => $service->status
+            'current_status' => $service->status,
         ]);
     }
 
@@ -104,11 +104,12 @@ class ServiceController extends Controller
         $agency_id = auth('api')->user()->agency_id;
         $service = Service::where('id', $id)->where('agency_id', $agency_id)->first();
 
-        if (!$service) {
+        if (! $service) {
             return response()->json(['message' => 'Service not found'], 404);
         }
 
         $service->delete();
+
         return response()->json(['message' => 'Service deleted successfully']);
     }
 }

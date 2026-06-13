@@ -10,7 +10,7 @@ class AgencyHoliday extends Model
 
     protected $casts = [
         'location_ids' => 'array',
-        'is_common' => 'boolean'
+        'is_common' => 'boolean',
     ];
 
     protected $hidden = ['location_ids', 'created_at', 'updated_at'];

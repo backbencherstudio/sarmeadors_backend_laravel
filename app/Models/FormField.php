@@ -17,14 +17,14 @@ class FormField extends Model
         'serial',
         'width',
         'validation_rules',
-        'status'
+        'status',
     ];
 
     protected $casts = [
         'options' => 'array',
         'validation_rules' => 'array',
         'is_required' => 'boolean',
-        'status' => 'boolean'
+        'status' => 'boolean',
     ];
 
     public function form()

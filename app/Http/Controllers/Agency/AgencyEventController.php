@@ -18,7 +18,7 @@ class AgencyEventController extends Controller
         $events = Event::with(['eventType', 'assignedUser'])
             ->where('agency_id', $agencyId)
             ->when($search, function ($query, $search) {
-                return $query->where('event_title', 'like', '%' . $search . '%');
+                return $query->where('event_title', 'like', '%'.$search.'%');
             })
             ->latest()
             ->paginate($perPage);
@@ -32,7 +32,7 @@ class AgencyEventController extends Controller
                 'last_page' => $events->lastPage(),
                 'per_page' => $events->perPage(),
                 'total' => $events->total(),
-            ]
+            ],
         ], 200);
     }
 
@@ -41,26 +41,26 @@ class AgencyEventController extends Controller
         $agencyId = auth('api')->user()->agency_id;
 
         $request->validate([
-            'event_title'    => 'required|string|max:255',
-            'event_type_id'  => 'required|exists:event_types,id',
-            'event_date'     => 'required|date',
-            'event_time'     => 'required',
+            'event_title' => 'required|string|max:255',
+            'event_type_id' => 'required|exists:event_types,id',
+            'event_date' => 'required|date',
+            'event_time' => 'required',
             'event_time_zone' => 'required|string',
             // 'client_id'      => 'nullable|exists:clients,id',
             // 'candidate_id'   => 'nullable|exists:candidates,id',
 
-            'client_id'      => 'nullable|integer',
-            'candidate_id'   => 'nullable|integer',
+            'client_id' => 'nullable|integer',
+            'candidate_id' => 'nullable|integer',
 
-            'location'       => 'nullable|string|max:255',
+            'location' => 'nullable|string|max:255',
             'interview_link' => 'nullable|string',
-            'note'           => 'nullable|string',
+            'note' => 'nullable|string',
             'is_email_notify' => 'boolean',
             'assign_user_id' => 'nullable|exists:users,id',
         ]);
 
         // Validation: At least one must be present
-        if (!$request->client_id && !$request->candidate_id) {
+        if (! $request->client_id && ! $request->candidate_id) {
             return response()->json(['status' => false, 'message' => 'Client or Candidate must be selected.'], 422);
         }
 
@@ -74,29 +74,29 @@ class AgencyEventController extends Controller
             }
         }
 
-        $formattedTime = date("H:i:s", strtotime($request->event_time));
+        $formattedTime = date('H:i:s', strtotime($request->event_time));
 
         $event = Event::create([
-            'agency_id'       => $agencyId,
-            'event_type_id'   => $request->event_type_id,
-            'event_title'     => $request->event_title,
-            'event_date'      => $request->event_date,
-            'event_time'      => $formattedTime,
+            'agency_id' => $agencyId,
+            'event_type_id' => $request->event_type_id,
+            'event_title' => $request->event_title,
+            'event_date' => $request->event_date,
+            'event_time' => $formattedTime,
             'event_time_zone' => $request->event_time_zone,
-            'client_id'       => $request->client_id,
-            'candidate_id'    => $request->candidate_id,
-            'location'        => $location,
-            'interview_link'  => $request->interview_link,
-            'note'            => $request->note,
+            'client_id' => $request->client_id,
+            'candidate_id' => $request->candidate_id,
+            'location' => $location,
+            'interview_link' => $request->interview_link,
+            'note' => $request->note,
             'is_email_notify' => $request->is_email_notify ?? 0,
-            'assign_user_id'  => $request->assign_user_id,
+            'assign_user_id' => $request->assign_user_id,
         ]);
 
         return response()->json([
             'status' => true,
             'message' => 'Event created successfully',
             // 'data' => $event->load(['eventType', 'client', 'candidate', 'assignedUser'])
-            'data' => $event->load(['eventType', 'assignedUser'])
+            'data' => $event->load(['eventType', 'assignedUser']),
         ], 201);
     }
 
@@ -110,7 +110,7 @@ class AgencyEventController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$event) {
+        if (! $event) {
             return response()->json(['status' => false, 'message' => 'Event not found'], 404);
         }
 
@@ -123,25 +123,25 @@ class AgencyEventController extends Controller
 
         $event = Event::where('id', $id)->where('agency_id', $agencyId)->first();
 
-        if (!$event) {
+        if (! $event) {
             return response()->json(['status' => false, 'message' => 'Event not found'], 404);
         }
 
         $request->validate([
-            'event_title'    => 'required|string|max:255',
-            'event_type_id'  => 'required|exists:event_types,id',
-            'event_date'     => 'required|date',
-            'event_time'     => 'required',
+            'event_title' => 'required|string|max:255',
+            'event_type_id' => 'required|exists:event_types,id',
+            'event_date' => 'required|date',
+            'event_time' => 'required',
             'event_time_zone' => 'required|string',
             // 'client_id'      => 'nullable|exists:clients,id',
             // 'candidate_id'   => 'nullable|exists:candidates,id',
 
-            'client_id'      => 'nullable|integer',
-            'candidate_id'   => 'nullable|integer',
+            'client_id' => 'nullable|integer',
+            'candidate_id' => 'nullable|integer',
 
-            'location'       => 'nullable|string|max:255',
+            'location' => 'nullable|string|max:255',
             'interview_link' => 'nullable|string',
-            'note'           => 'nullable|string',
+            'note' => 'nullable|string',
             'is_email_notify' => 'boolean',
             'assign_user_id' => 'nullable|exists:users,id',
         ]);
@@ -149,18 +149,18 @@ class AgencyEventController extends Controller
         $data = $request->all();
 
         if ($request->filled('event_time')) {
-            $data['event_time'] = date("H:i:s", strtotime($request->event_time));
+            $data['event_time'] = date('H:i:s', strtotime($request->event_time));
         }
 
         if ($request->has('location') && empty($request->location)) {
-        /*
-            $clientId = $request->client_id ?? $event->client_id;
-            $candidateId = $request->candidate_id ?? $event->candidate_id;
+            /*
+                $clientId = $request->client_id ?? $event->client_id;
+                $candidateId = $request->candidate_id ?? $event->candidate_id;
 
-            if ($clientId) {
-                // $data['location'] = Client::find($clientId)?->address;
-            }
-        */
+                if ($clientId) {
+                    // $data['location'] = Client::find($clientId)?->address;
+                }
+            */
         }
 
         $event->update($data);
@@ -169,7 +169,7 @@ class AgencyEventController extends Controller
             'status' => true,
             'message' => 'Event updated successfully',
             // 'data' => $event->fresh(['eventType', 'client', 'candidate', 'assignedUser'])
-            'data' => $event->fresh(['eventType', 'assignedUser'])
+            'data' => $event->fresh(['eventType', 'assignedUser']),
         ], 200);
     }
 
@@ -179,7 +179,7 @@ class AgencyEventController extends Controller
 
         $event = Event::where('id', $id)->where('agency_id', $agencyId)->first();
 
-        if (!$event) {
+        if (! $event) {
             return response()->json(['status' => false, 'message' => 'Event not found'], 404);
         }
 
@@ -187,7 +187,7 @@ class AgencyEventController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Event deleted successfully'
+            'message' => 'Event deleted successfully',
         ], 200);
     }
 }

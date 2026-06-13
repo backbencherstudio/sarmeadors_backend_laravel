@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use Closure;
 use App\Models\Agency;
 use App\Models\User;
+use Closure;
 use Illuminate\Http\Request;
 
 class CheckSubdomain
@@ -17,7 +17,7 @@ class CheckSubdomain
             return $next($request);
         }
 
-        if (!$user) {
+        if (! $user) {
             $email = $request->input('email');
             if ($email) {
                 $loginUser = User::where('email', $email)->first();
@@ -29,19 +29,19 @@ class CheckSubdomain
 
         $subdomain = $request->header('X-Subdomain');
 
-        if (!$subdomain) {
+        if (! $subdomain) {
             return response()->json([
                 'status' => false,
-                'message' => 'Subdomain is required.'
+                'message' => 'Subdomain is required.',
             ], 400);
         }
 
         $agency = Agency::where('subdomain_prefix', $subdomain)->first();
 
-        if (!$agency) {
+        if (! $agency) {
             return response()->json([
                 'status' => false,
-                'message' => 'Agency not found for this subdomain.'
+                'message' => 'Agency not found for this subdomain.',
             ], 404);
         }
 

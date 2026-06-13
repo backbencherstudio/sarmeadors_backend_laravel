@@ -3,19 +3,15 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string|min:6',
         ]);
 
@@ -23,7 +19,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -86,7 +82,6 @@ class AuthController extends Controller
         ]);
     }
 
-
     protected function respondWithToken($token, $user)
     {
         return response()->json([
@@ -97,5 +92,4 @@ class AuthController extends Controller
             'expires_in' => auth('api')->factory()->getTTL() * 60,
         ]);
     }
-
 }

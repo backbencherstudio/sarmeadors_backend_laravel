@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
         //     'agency_id' => 0,
         //     'password' => bcrypt('111111'),
         // ]);
-        $adminApi=User::factory()->create([
+        $adminApi = User::factory()->create([
             'first_name' => 'Super',
             'last_name' => 'Admin',
             'email' => 'admin@gmail.com',
@@ -41,6 +41,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // $admin->assignRole('admin');
-        $adminApi->assignRole(Role::where('name','super_admin')->where('guard_name','api')->first());
+        $adminApi->assignRole(Role::where('name', 'super_admin')->where('guard_name', 'api')->first());
     }
 }

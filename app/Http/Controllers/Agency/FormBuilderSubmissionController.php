@@ -11,7 +11,6 @@ use App\Models\FormBuilderField;
 use App\Models\FormBuilderSubmission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class FormBuilderSubmissionController extends Controller
@@ -27,14 +26,14 @@ class FormBuilderSubmissionController extends Controller
 
         if ($form->application_type === 'registration') {
             $baseRules = [
-                'first_name'    => 'required|string|max:255',
-                'last_name'     => 'nullable|string|max:255',
-                'email'         => 'required|email|max:255',
-                'mobile'        => 'nullable|string|max:30',
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'email' => 'required|email|max:255',
+                'mobile' => 'nullable|string|max:30',
                 'hear_about_us' => 'nullable|string',
-                'type_id'       => 'nullable|array',
-                'location_id'   => 'nullable|array',
-                'image'         => 'nullable|image|max:10240',
+                'type_id' => 'nullable|array',
+                'location_id' => 'nullable|array',
+                'image' => 'nullable|image|max:10240',
             ];
 
             $emailTable = $form->user_type === 'client' ? 'clients' : 'candidates';
@@ -60,7 +59,7 @@ class FormBuilderSubmissionController extends Controller
 
         try {
             $entityType = null;
-            $entityId   = null;
+            $entityId = null;
 
             if ($form->application_type === 'registration') {
 
@@ -72,15 +71,15 @@ class FormBuilderSubmissionController extends Controller
                 if ($form->user_type === 'client') {
 
                     $entity = Client::create([
-                        'agency_id'     => $form->agency_id,
-                        'first_name'    => $request->first_name,
-                        'last_name'     => $request->last_name,
-                        'email'         => $request->email,
-                        'mobile'        => $request->mobile,
+                        'agency_id' => $form->agency_id,
+                        'first_name' => $request->first_name,
+                        'last_name' => $request->last_name,
+                        'email' => $request->email,
+                        'mobile' => $request->mobile,
                         'hear_about_us' => $request->hear_about_us,
-                        'image'         => $imagePath,
-                        'type_id'       => $request->type_id,
-                        'location_id'   => $request->location_id,
+                        'image' => $imagePath,
+                        'type_id' => $request->type_id,
+                        'location_id' => $request->location_id,
                     ]);
 
                     $entityType = Client::class;
@@ -88,15 +87,15 @@ class FormBuilderSubmissionController extends Controller
                 } elseif ($form->user_type === 'candidate') {
 
                     $entity = Candidate::create([
-                        'agency_id'     => $form->agency_id,
-                        'first_name'    => $request->first_name,
-                        'last_name'     => $request->last_name,
-                        'email'         => $request->email,
-                        'mobile'        => $request->mobile,
+                        'agency_id' => $form->agency_id,
+                        'first_name' => $request->first_name,
+                        'last_name' => $request->last_name,
+                        'email' => $request->email,
+                        'mobile' => $request->mobile,
                         'hear_about_us' => $request->hear_about_us,
-                        'image'         => $imagePath,
-                        'type_id'       => $request->type_id,
-                        'location_id'   => $request->location_id,
+                        'image' => $imagePath,
+                        'type_id' => $request->type_id,
+                        'location_id' => $request->location_id,
                     ]);
 
                     $entityType = Candidate::class;
@@ -107,18 +106,18 @@ class FormBuilderSubmissionController extends Controller
 
             $submission = FormBuilderSubmission::create([
                 'form_builder_id' => $form->id,
-                'entity_type'     => $entityType,
-                'entity_id'       => $entityId,
-                'ip_address'      => $request->ip(),
-                'user_agent'      => $request->userAgent(),
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
             ]);
 
             $allowedFieldIds = $customFields->pluck('id')->flip();
-            $answers         = $request->input('answers', []);
-            $insertData      = [];
+            $answers = $request->input('answers', []);
+            $insertData = [];
 
             foreach ($answers as $fieldId => $value) {
-                if (!isset($allowedFieldIds[$fieldId])) {
+                if (! isset($allowedFieldIds[$fieldId])) {
                     continue;
                 }
 
@@ -140,27 +139,28 @@ class FormBuilderSubmissionController extends Controller
 
                 $insertData[] = [
                     'form_builder_submission_id' => $submission->id,
-                    'form_builder_field_id'      => (int) $fieldId,
-                    'value'                      => json_encode($value),
-                    'created_at'                 => now(),
-                    'updated_at'                 => now(),
+                    'form_builder_field_id' => (int) $fieldId,
+                    'value' => json_encode($value),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
             }
 
-            if (!empty($insertData)) {
+            if (! empty($insertData)) {
                 FormBuilderAnswer::insert($insertData);
             }
 
             DB::commit();
 
             return response()->json([
-                'status'        => true,
-                'message'       => 'Submitted successfully',
+                'status' => true,
+                'message' => 'Submitted successfully',
                 'submission_id' => $submission->id,
             ], 201);
 
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
         }
     }
@@ -182,7 +182,7 @@ class FormBuilderSubmissionController extends Controller
         $agencyId = auth('api')->user()->agency_id;
 
         $submission = FormBuilderSubmission::with(['answers.field', 'entity'])
-            ->whereHas('formBuilder', fn($q) => $q->where('agency_id', $agencyId))
+            ->whereHas('formBuilder', fn ($q) => $q->where('agency_id', $agencyId))
             ->findOrFail($id);
 
         return response()->json(['status' => true, 'data' => $submission]);

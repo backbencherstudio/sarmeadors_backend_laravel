@@ -14,7 +14,7 @@ class SubLocation extends Model
         'location_id',
         'sub_location',
     ];
-    
+
     protected $hidden = [
         'created_at',
         'updated_at',
@@ -29,6 +29,4 @@ class SubLocation extends Model
     {
         return $this->belongsTo(Location::class);
     }
-
-
 }
