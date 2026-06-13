@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Agency\AgencySettingsController;
+use App\Http\Controllers\Client\CandidateMessageController as ClientCandidateMessageController;
 use App\Http\Controllers\Client\ClientCandidateController;
 use App\Http\Controllers\Client\ClientDashboardController;
 use App\Http\Controllers\Client\ClientDocumentController;
 use App\Http\Controllers\Client\ClientInterviewController;
 use App\Http\Controllers\Client\ClientLocationController;
+use App\Http\Controllers\Client\ClientMessageInboxController;
 use App\Http\Controllers\Client\ClientNotificationController;
 use App\Http\Controllers\Client\ClientPaymentController;
 use App\Http\Controllers\Client\ClientProfileController;
@@ -36,6 +38,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
 
     // Locations (dropdown source for profile / job address)
     Route::get('locations', [ClientLocationController::class, 'index']);
+
+    // Messages inbox (dashboard chat: admin & candidate tabs)
+    Route::get('messages', [ClientMessageInboxController::class, 'index']);
 
     // Notifications
     Route::get('notifications', [ClientNotificationController::class, 'index']);
@@ -151,4 +156,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::get('jobs/long-term/{longTermJob}/messages', [ClientJobMessageController::class, 'index']);
     Route::post('jobs/long-term/{longTermJob}/messages', [ClientJobMessageController::class, 'store']);
     Route::get('jobs/long-term/{longTermJob}/messages/unread-counts', [ClientJobMessageController::class, 'unreadCounts']);
+
+    // Client <-> assigned candidate direct messages
+    Route::get('jobs/long-term/{longTermJob}/candidate-messages', [ClientCandidateMessageController::class, 'index']);
+    Route::post('jobs/long-term/{longTermJob}/candidate-messages', [ClientCandidateMessageController::class, 'store']);
+    Route::get('jobs/long-term/{longTermJob}/candidate-messages/unread-counts', [ClientCandidateMessageController::class, 'unreadCounts']);
 });

@@ -5,24 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CandidateDocument extends Model
+class ClientDocument extends Model
 {
     protected $fillable = [
         'agency_id',
-        'candidate_id',
+        'client_id',
         'document_template_id',
-        'required_key',
-        'category',
         'title',
         'description',
-        'file_path',
-        'original_file_name',
-        'mime_type',
-        'size',
         'status',
         'signature',
         'signed_content',
         'signed_content_type',
+        'file_path',
+        'signed_ip',
         'signed_at',
         'metadata',
     ];
@@ -42,9 +38,9 @@ class CandidateDocument extends Model
         return $this->belongsTo(Agency::class);
     }
 
-    public function candidate(): BelongsTo
+    public function client(): BelongsTo
     {
-        return $this->belongsTo(Candidate::class);
+        return $this->belongsTo(Client::class);
     }
 
     public function documentTemplate(): BelongsTo

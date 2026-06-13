@@ -6,10 +6,12 @@ use App\Http\Controllers\Candidate\CandidateClientsController;
 use App\Http\Controllers\Candidate\CandidateDashboardController;
 use App\Http\Controllers\Candidate\CandidateDocumentController;
 use App\Http\Controllers\Candidate\CandidateInterviewController;
+use App\Http\Controllers\Candidate\CandidateMessageInboxController;
 use App\Http\Controllers\Candidate\CandidateMyJobController;
 use App\Http\Controllers\Candidate\CandidateNotificationController;
 use App\Http\Controllers\Candidate\CandidateProfileController;
 use App\Http\Controllers\Candidate\CandidateRequestedJobController;
+use App\Http\Controllers\Candidate\ClientMessageController as CandidateClientMessageController;
 use App\Http\Controllers\Candidate\JobMessageController as CandidateJobMessageController;
 use App\Http\Controllers\Candidate\LongTermJobApplicationController as CandidateLongTermJobApplicationController;
 use App\Http\Controllers\Candidate\LongTermJobAttendanceController as CandidateLongTermJobAttendanceController;
@@ -31,6 +33,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::put('profile', [CandidateProfileController::class, 'update']);
     Route::put('profile/password', [CandidateProfileController::class, 'updatePassword']);
     Route::delete('profile', [CandidateProfileController::class, 'destroy']);
+
+    // Messages inbox (dashboard chat: admin & client tabs)
+    Route::get('messages', [CandidateMessageInboxController::class, 'index']);
 
     // Notifications
     Route::get('notifications', [CandidateNotificationController::class, 'index']);
@@ -131,4 +136,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::get('jobs/long-term/{longTermJob}/messages', [CandidateJobMessageController::class, 'index']);
     Route::post('jobs/long-term/{longTermJob}/messages', [CandidateJobMessageController::class, 'store']);
     Route::get('jobs/long-term/{longTermJob}/messages/unread-counts', [CandidateJobMessageController::class, 'unreadCounts']);
+
+    // Candidate <-> client direct messages (assigned jobs)
+    Route::get('jobs/long-term/{longTermJob}/client-messages', [CandidateClientMessageController::class, 'index']);
+    Route::post('jobs/long-term/{longTermJob}/client-messages', [CandidateClientMessageController::class, 'store']);
+    Route::get('jobs/long-term/{longTermJob}/client-messages/unread-counts', [CandidateClientMessageController::class, 'unreadCounts']);
 });

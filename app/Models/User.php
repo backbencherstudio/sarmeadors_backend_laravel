@@ -11,8 +11,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
-
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, HasRoles, Notifiable;
 
     protected $fillable = [
         'first_name',
@@ -37,7 +36,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function getImageAttribute()
     {
-        return $this->attributes['image'] ? asset('storage/' . $this->attributes['image']) : null;
+        return ($this->attributes['image'] ?? null) ? asset('storage/'.$this->attributes['image']) : null;
     }
 
     public function getJWTIdentifier()
@@ -49,7 +48,6 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
-
 
     public function agency()
     {

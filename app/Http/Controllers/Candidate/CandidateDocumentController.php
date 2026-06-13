@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\CandidateDocument;
 use App\Models\DocumentTemplate;
+use App\Notifications\AgreementSignedNotification;
 use App\Traits\ResolvesCandidate;
+use App\Traits\SendsNotifications;
+use App\Traits\SnapshotsAgreementFiles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +16,8 @@ use Illuminate\Support\Facades\Storage;
 class CandidateDocumentController extends Controller
 {
     use ResolvesCandidate;
+    use SendsNotifications;
+    use SnapshotsAgreementFiles;
 
     private const REQUIRED_DOCUMENTS = [
         'headshot' => [
@@ -87,12 +92,18 @@ class CandidateDocumentController extends Controller
             ->where('category', 'agreement')
             ->first();
 
+        $isSigned = $candidateDocument?->status === 'signed';
+
         return $this->sendResponse([
             'agreement' => $this->formatAgreement($documentTemplate->load(['fields', 'signers']), collect([$candidateDocument])->filter()),
-            'content_html' => $documentTemplate->content,
+            'content_html' => $isSigned && $candidateDocument->signed_content !== null
+                ? $candidateDocument->signed_content
+                : $documentTemplate->content,
             'fields' => $documentTemplate->fields,
             'signers' => $documentTemplate->signers,
-            'file_url' => $documentTemplate->file_path ? asset($documentTemplate->file_path) : null,
+            'file_url' => $isSigned && $candidateDocument->file_path
+                ? $candidateDocument->file_url
+                : ($documentTemplate->file_path ? asset($documentTemplate->file_path) : null),
         ], 'Agreement retrieved successfully.', 200);
     }
 
@@ -102,6 +113,15 @@ class CandidateDocumentController extends Controller
 
         if (! $candidate || ! $this->canUseTemplate($request, $documentTemplate)) {
             return $this->sendError('Document not found.', [], 404);
+        }
+
+        $existingAgreement = CandidateDocument::where('candidate_id', $candidate->id)
+            ->where('document_template_id', $documentTemplate->id)
+            ->where('category', 'agreement')
+            ->first();
+
+        if ($existingAgreement?->status === 'signed') {
+            return $this->sendError('You have already signed this agreement.', [], 422);
         }
 
         $validated = $request->validate([
@@ -121,8 +141,31 @@ class CandidateDocumentController extends Controller
                 'description' => "You've already signed this agreement.",
                 'status' => 'signed',
                 'signature' => $validated['signature'],
+                'signed_content' => $documentTemplate->content_type === 'text' ? $documentTemplate->content : null,
+                'signed_content_type' => $documentTemplate->content_type,
+                'file_path' => $this->snapshotAgreementFile($documentTemplate, 'candidate-documents'),
                 'signed_at' => now(),
             ]
+        );
+
+        $signerName = trim($candidate->first_name.' '.$candidate->last_name);
+
+        $this->notifyAgencyAdmins(
+            $request->current_agency->id,
+            'agreement_signed',
+            'Agreement Signed',
+            sprintf('%s signed "%s".', $signerName, $documentTemplate->name),
+            null,
+            [
+                'document_template_id' => $documentTemplate->id,
+                'candidate_document_id' => $document->id,
+                'signer_type' => 'candidate',
+            ]
+        );
+
+        $this->notifyEmailRecipients(
+            $documentTemplate->notification_emails,
+            new AgreementSignedNotification($documentTemplate->name, $signerName, 'candidate')
         );
 
         return $this->sendResponse($this->formatUploadedDocument($document), 'Agreement signed successfully.', 200);

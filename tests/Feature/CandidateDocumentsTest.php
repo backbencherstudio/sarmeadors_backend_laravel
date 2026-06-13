@@ -98,6 +98,47 @@ class CandidateDocumentsTest extends TestCase
             ->assertJsonPath('data.status', 'uploaded');
     }
 
+    public function test_signed_agreement_is_frozen_and_cannot_be_resigned(): void
+    {
+        [$agency, $user] = $this->createCandidateScenario();
+
+        $agreement = DocumentTemplate::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Agency Agreement Midwest Nannies',
+            'user_type' => 'candidate',
+            'content_type' => 'text',
+            'content' => '<p>Original agreement content</p>',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/documents/agreements/{$agreement->id}/sign", [
+                'signature' => 'Alex Morrison',
+                'agree' => true,
+            ])
+            ->assertOk();
+
+        $agreement->update(['content' => '<p>New terms the candidate never saw</p>']);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/candidate/documents/agreements/{$agreement->id}")
+            ->assertOk()
+            ->assertJsonPath('data.content_html', '<p>Original agreement content</p>');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/documents/agreements/{$agreement->id}/sign", [
+                'signature' => 'Alex Morrison',
+                'agree' => true,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'You have already signed this agreement.');
+    }
+
     private function createCandidateScenario(): array
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();

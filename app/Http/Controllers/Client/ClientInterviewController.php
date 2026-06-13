@@ -10,6 +10,7 @@ use App\Models\LongTermJobInterview;
 use App\Traits\FormatsTime;
 use App\Traits\PresentsCandidate;
 use App\Traits\ResolvesClient;
+use App\Traits\SendsNotifications;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class ClientInterviewController extends Controller
     use FormatsTime;
     use PresentsCandidate;
     use ResolvesClient;
+    use SendsNotifications;
 
     /**
      * Cancelling or rescheduling must inform the admin at least this many
@@ -177,8 +179,26 @@ class ClientInterviewController extends Controller
             'reschedule_reason' => $validated['reason'],
         ]);
 
+        $interview = $interview->fresh()->load(['job', 'candidate']);
+
+        $body = sprintf(
+            '%s rescheduled the interview for "%s" to %s (%s).',
+            trim($client->first_name.' '.$client->last_name),
+            $interview->job?->title,
+            $interview->scheduled_date?->format('M d, Y'),
+            $this->formatTime($interview->available_from).' - '.$this->formatTime($interview->available_to)
+        );
+        $meta = [
+            'interview_id' => $interview->id,
+            'job_id' => $interview->long_term_job_id,
+            'reason' => $validated['reason'],
+        ];
+
+        $this->notifyAgencyAdmins($request->current_agency->id, 'interview_rescheduled', 'Interview Rescheduled', $body, null, $meta);
+        $this->notifyPortalUser($request->current_agency->id, $interview->candidate?->email, 'interview_rescheduled', 'Interview Rescheduled', $body, null, $meta);
+
         return $this->sendResponse(
-            $this->formatInterview($interview->fresh()->load(['job', 'candidate'])),
+            $this->formatInterview($interview),
             'Interview rescheduled successfully.',
             200
         );
@@ -206,6 +226,23 @@ class ClientInterviewController extends Controller
         }
 
         $interview->update(['status' => 'cancelled']);
+
+        $interview->loadMissing(['job', 'candidate']);
+
+        $body = sprintf(
+            '%s cancelled the interview for "%s" scheduled on %s (%s).',
+            trim($client->first_name.' '.$client->last_name),
+            $interview->job?->title,
+            $interview->scheduled_date?->format('M d, Y'),
+            $this->formatTime($interview->available_from).' - '.$this->formatTime($interview->available_to)
+        );
+        $meta = [
+            'interview_id' => $interview->id,
+            'job_id' => $interview->long_term_job_id,
+        ];
+
+        $this->notifyAgencyAdmins($request->current_agency->id, 'interview_cancelled', 'Interview Cancelled', $body, null, $meta);
+        $this->notifyPortalUser($request->current_agency->id, $interview->candidate?->email, 'interview_cancelled', 'Interview Cancelled', $body, null, $meta);
 
         return $this->sendResponse([], 'Interview cancelled successfully.', 200);
     }

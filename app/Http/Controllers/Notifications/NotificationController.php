@@ -105,7 +105,31 @@ abstract class NotificationController extends Controller
             'meta' => $data['meta'] ?? [],
             'read_at' => $notification->read_at?->toDateTimeString(),
             'created_at' => $notification->created_at?->toDateTimeString(),
+            'time_ago' => $notification->created_at?->shortRelativeToNowDiffForHumans(),
+            'group' => $this->resolveGroup($notification),
             'is_read' => filled($notification->read_at),
         ];
+    }
+
+    /**
+     * Date bucket label used by the notification panel (Today / Yesterday / date).
+     */
+    private function resolveGroup(DatabaseNotification $notification): ?string
+    {
+        $createdAt = $notification->created_at;
+
+        if (! $createdAt) {
+            return null;
+        }
+
+        if ($createdAt->isToday()) {
+            return 'Today';
+        }
+
+        if ($createdAt->isYesterday()) {
+            return 'Yesterday';
+        }
+
+        return $createdAt->format('M d, Y');
     }
 }

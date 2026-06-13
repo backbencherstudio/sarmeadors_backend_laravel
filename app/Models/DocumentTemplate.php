@@ -9,7 +9,8 @@ class DocumentTemplate extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'notification_emails' => 'array'
+        'notification_emails' => 'array',
+        'admin_view_ids' => 'array',
     ];
 
     public function fields()

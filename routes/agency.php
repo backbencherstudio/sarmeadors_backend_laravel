@@ -6,6 +6,7 @@ use App\Http\Controllers\Agency\AgencyEventController;
 use App\Http\Controllers\Agency\AgencyEventTypeController;
 use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyNoteController;
+use App\Http\Controllers\Agency\AgencyNotificationController;
 use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
@@ -199,12 +200,20 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     // status template create new status after
     Route::post('statuses/store-after', [StatusTemplateController::class, 'storeAfter']);
 
+    // Notifications
+    Route::get('notifications', [AgencyNotificationController::class, 'index']);
+    Route::put('notifications/mark-all-read', [AgencyNotificationController::class, 'markAllRead']);
+    Route::put('notifications/{id}/read', [AgencyNotificationController::class, 'markRead']);
+    Route::delete('notifications/{id}', [AgencyNotificationController::class, 'destroy']);
+
     // document template management route
     Route::get('document-templates', [DocumentTemplateController::class, 'index']);
     Route::post('document-templates/store', [DocumentTemplateController::class, 'store']);
     Route::get('document-templates/show/{id}', [DocumentTemplateController::class, 'show']);
     Route::post('document-templates/update/{id}', [DocumentTemplateController::class, 'update']);
     Route::delete('document-templates/delete/{id}', [DocumentTemplateController::class, 'destroy']);
+    Route::post('document-templates/duplicate/{id}', [DocumentTemplateController::class, 'duplicate']);
+    Route::get('document-templates/download/{id}', [DocumentTemplateController::class, 'download']);
 
     // Client Status
     Route::get('/statuses', [StatusController::class, 'index']);

@@ -3,153 +3,88 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
+use App\Http\Requests\Client\DeleteProfileRequest;
+use App\Http\Requests\Client\UpdatePasswordRequest;
+use App\Http\Requests\Client\UpdateProfileRequest;
+use App\Http\Resources\Client\ClientProfileResource;
+use App\Traits\ResolvesClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 
 class ClientProfileController extends Controller
 {
-    private function resolveClient(Request $request): ?Client
-    {
-        return Client::where('email', $request->user()->email)
-            ->where('agency_id', $request->current_agency->id)
-            ->first();
-    }
+    use ResolvesClient;
 
     // GET /client/profile
     public function show(Request $request): JsonResponse
     {
-        try {
-            $user = $request->user();
-            $client = $this->resolveClient($request);
+        $client = $this->currentClientOrFail($request);
 
-            if (! $client) {
-                return $this->sendError('Client profile not found.', [], 404);
-            }
-
-            return $this->sendResponse([
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                    'mobile' => $user->mobile,
-                    'image' => $user->image ? asset('storage/'.$user->image) : null,
-                ],
-                'client' => $client->append('image_url'),
-            ], 'Profile retrieved successfully.', 200);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
-        }
+        return $this->sendResponse(
+            new ClientProfileResource($client, $request->user()),
+            'Profile retrieved successfully.',
+            200
+        );
     }
 
     // PUT /client/profile
-    public function update(Request $request): JsonResponse
+    public function update(UpdateProfileRequest $request): JsonResponse
     {
-        try {
-            $user = $request->user();
-            $client = $this->resolveClient($request);
+        $user = $request->user();
+        $client = $this->currentClientOrFail($request);
 
-            if (! $client) {
-                return $this->sendError('Client profile not found.', [], 404);
+        $validated = $request->validated();
+
+        if ($request->hasFile('image')) {
+            if ($user->getRawOriginal('image')) {
+                Storage::disk('public')->delete($user->getRawOriginal('image'));
             }
 
-            $validated = $request->validate([
-                'first_name' => 'sometimes|required|string|max:255',
-                'last_name' => 'nullable|string|max:255',
-                'mobile' => 'nullable|string|max:20',
-                'image' => 'nullable|image|max:5120',
-                'location_id' => 'nullable|array',
-                'location_id.*' => 'integer|exists:locations,id',
-            ]);
-
-            if ($request->hasFile('image')) {
-                if ($user->image) {
-                    Storage::disk('public')->delete($user->image);
-                }
-                $imagePath = $request->file('image')->store('profiles', 'public');
-                $user->update(['image' => $imagePath]);
-                $client->update(['image' => $imagePath]);
-            }
-
-            $user->update(collect($validated)->only(['first_name', 'last_name', 'mobile'])->toArray());
-
-            $client->update(collect($validated)->only(['first_name', 'last_name', 'mobile', 'location_id'])->toArray());
-
-            return $this->sendResponse([
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                    'mobile' => $user->mobile,
-                    'image' => $user->image ? asset('storage/'.$user->image) : null,
-                ],
-                'client' => $client->fresh()->append('image_url'),
-            ], 'Profile updated successfully.', 200);
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+            $imagePath = $request->file('image')->store('profiles', 'public');
+            $user->update(['image' => $imagePath]);
+            $client->update(['image' => $imagePath]);
         }
+
+        $user->update(collect($validated)->only(['first_name', 'last_name', 'mobile'])->toArray());
+        $client->update(collect($validated)->only(['first_name', 'last_name', 'mobile', 'location_id'])->toArray());
+
+        return $this->sendResponse(
+            new ClientProfileResource($client->fresh(), $user->fresh()),
+            'Profile updated successfully.',
+            200
+        );
     }
 
     // PUT /client/profile/password
-    public function updatePassword(Request $request): JsonResponse
+    public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
-        try {
-            $user = $request->user();
+        $user = $request->user();
+        $validated = $request->validated();
 
-            $validated = $request->validate([
-                'current_password' => 'required|string',
-                'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/',
-            ]);
-
-            if (! Hash::check($validated['current_password'], $user->password)) {
-                return $this->sendError('Current password is incorrect.', [], 422);
-            }
-
-            $user->update(['password' => Hash::make($validated['password'])]);
-
-            return $this->sendResponse([], 'Password updated successfully.', 200);
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return $this->sendError('Current password is incorrect.', [], 422);
         }
+
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        return $this->sendResponse([], 'Password updated successfully.', 200);
     }
 
     // DELETE /client/profile
-    public function destroy(Request $request): JsonResponse
+    public function destroy(DeleteProfileRequest $request): JsonResponse
     {
-        try {
-            $user = $request->user();
-            $client = $this->resolveClient($request);
+        $user = $request->user();
+        $client = $this->currentClientOrFail($request);
 
-            if (! $client) {
-                return $this->sendError('Client profile not found.', [], 404);
-            }
-
-            $validated = $request->validate([
-                'password' => 'required|string',
-            ]);
-
-            if (! Hash::check($validated['password'], $user->password)) {
-                return $this->sendError('Password is incorrect.', [], 422);
-            }
-
-            $client->delete();
-            $user->tokens()->delete();
-            $user->delete();
-
-            return $this->sendResponse([], 'Account deleted successfully.', 200);
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('Something went wrong', $e->getMessage(), 500);
+        if (! Hash::check($request->validated()['password'], $user->password)) {
+            return $this->sendError('Password is incorrect.', [], 422);
         }
+
+        $client->delete();
+        $user->delete();
+
+        return $this->sendResponse([], 'Account deleted successfully.', 200);
     }
 }
