@@ -26,21 +26,6 @@
             <div class="progress-track" aria-hidden="true">
                 <span></span>
             </div>
-
-            <div class="status-grid" aria-label="Development progress">
-                <div>
-                    <strong>Design</strong>
-                    <span>Polishing the public experience.</span>
-                </div>
-                <div>
-                    <strong>Platform</strong>
-                    <span>Preparing secure core services.</span>
-                </div>
-                <div>
-                    <strong>Launch</strong>
-                    <span>Getting everything ready for visitors.</span>
-                </div>
-            </div>
         </section>
     </main>
 </body>
