@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('agencies', function (Blueprint $table) {
@@ -32,6 +29,10 @@ return new class extends Migration
             $table->text('stripe_publishable_key')->nullable();
             $table->text('stripe_secret_key')->nullable();
             $table->text('stripe_webhook_secret')->nullable();
+            $table->boolean('short_term_payment_required')->default(false);
+            $table->decimal('short_term_job_fee', 10, 2)->default(0);
+            $table->string('short_term_job_fee_currency', 3)->default('usd');
+            $table->boolean('short_term_auto_approve')->default(true);
             $table->integer('max_users')->default(20);
             $table->integer('max_clients')->default(100);
             $table->integer('max_candidates')->default(1000);
@@ -44,9 +45,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('agencies');

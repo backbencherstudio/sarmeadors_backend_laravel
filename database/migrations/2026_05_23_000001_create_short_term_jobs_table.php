@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('agency_id')->constrained('agencies')->cascadeOnDelete();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
+            $table->foreignId('candidate_id')->nullable()->constrained('candidates')->nullOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
 
             $table->string('title');
@@ -31,6 +32,10 @@ return new class extends Migration
             $table->enum('status', ['draft', 'pending_payment', 'pending_approval', 'marketplace', 'running', 'completed', 'cancelled', 'rejected'])->default('draft');
             $table->string('stripe_payment_intent_id')->nullable();
             $table->text('rejection_reason')->nullable();
+            $table->text('cancellation_reason')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->boolean('broadcast_requested')->default(false);
+            $table->timestamp('broadcast_requested_at')->nullable();
 
             $table->timestamps();
         });

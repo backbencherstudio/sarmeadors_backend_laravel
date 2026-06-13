@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('agency_id')->constrained('agencies')->cascadeOnDelete();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
+            $table->foreignId('candidate_id')->nullable()->constrained('candidates')->nullOnDelete();
 
             // Basic info
             $table->string('title');
@@ -25,6 +26,18 @@ return new class extends Migration
             $table->string('home_province');
             $table->string('home_postal_code');
             $table->string('country');
+
+            // Primary contact (First Parent)
+            $table->string('primary_first_name')->nullable();
+            $table->string('primary_last_name')->nullable();
+            $table->string('primary_email')->nullable();
+            $table->string('primary_phone')->nullable();
+
+            // Secondary contact (Second Parent)
+            $table->string('secondary_first_name')->nullable();
+            $table->string('secondary_last_name')->nullable();
+            $table->string('secondary_email')->nullable();
+            $table->string('secondary_phone')->nullable();
 
             // Schedule window
             $table->date('start_date');
@@ -41,11 +54,15 @@ return new class extends Migration
             $table->boolean('school_activity')->default(false);
             $table->boolean('has_housekeeper')->default(false);
             $table->boolean('live_in_required')->default(false);
-            $table->boolean('paid_vacation')->default(false);
+            $table->enum('paid_vacation', ['vacation', 'holidays', 'vacation_and_holidays', 'none'])->nullable();
             $table->enum('accommodation_quality', ['excellent', 'not_bad', 'somewhat_comfortable', 'none'])->default('none');
             $table->enum('tips_policy', ['yes', 'no', 'sometimes', 'none'])->default('none');
             $table->boolean('room_with_wifi')->default(false);
             $table->enum('negotiable_salary', ['yes', 'no', 'open'])->default('open');
+            $table->boolean('prepare_meals')->default(false);
+            $table->boolean('travel_with_family')->default(false);
+            $table->enum('spouse_work_from_home', ['yes_i_do', 'yes_spouse', 'yes_both', 'no'])->default('no');
+            $table->enum('nanny_own_car', ['yes', 'no', 'other'])->default('no');
 
             // Additional information
             $table->text('family_schedule')->nullable();
@@ -60,17 +77,17 @@ return new class extends Migration
             $table->text('consent_description')->nullable();
             $table->text('child_attachment')->nullable();
 
-            // Status — always starts at pending_approval (no auto-post, no payment)
+            // Status
             $table->enum('status', [
-                'pending_approval',
-                'marketplace',
-                'running',
-                'completed',
-                'cancelled',
-                'rejected',
+                'pending_approval', 'marketplace', 'running',
+                'completed', 'cancelled', 'rejected',
             ])->default('pending_approval');
 
             $table->text('rejection_reason')->nullable();
+            $table->text('cancellation_reason')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->boolean('broadcast_requested')->default(false);
+            $table->timestamp('broadcast_requested_at')->nullable();
             $table->timestamps();
         });
     }

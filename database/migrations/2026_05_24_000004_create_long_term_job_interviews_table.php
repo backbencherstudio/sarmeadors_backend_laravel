@@ -18,6 +18,10 @@ return new class extends Migration
             $table->time('available_from');
             $table->time('available_to');
             $table->text('special_note')->nullable();
+            $table->text('reschedule_reason')->nullable();
+            $table->enum('interview_type', ['in_person', 'zoom', 'google_meet'])->default('in_person');
+            $table->string('interview_link')->nullable();
+            $table->text('description')->nullable();
             $table->enum('status', ['scheduled', 'completed', 'cancelled'])->default('scheduled');
             $table->timestamps();
         });

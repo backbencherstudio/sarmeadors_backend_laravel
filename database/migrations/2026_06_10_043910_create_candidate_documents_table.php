@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('candidate_documents', function (Blueprint $table) {
@@ -26,6 +23,8 @@ return new class extends Migration
             $table->unsignedInteger('size')->nullable();
             $table->enum('status', ['pending', 'uploaded', 'signed'])->default('pending');
             $table->string('signature')->nullable();
+            $table->longText('signed_content')->nullable();
+            $table->string('signed_content_type')->nullable();
             $table->timestamp('signed_at')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
@@ -36,9 +35,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('candidate_documents');

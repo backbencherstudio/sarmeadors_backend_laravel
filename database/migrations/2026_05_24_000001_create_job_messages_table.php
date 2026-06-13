@@ -10,12 +10,10 @@ return new class extends Migration
     {
         Schema::create('job_messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('long_term_job_id')->constrained('long_term_jobs')->cascadeOnDelete();
+            $table->foreignId('long_term_job_id')->nullable()->constrained('long_term_jobs')->cascadeOnDelete();
+            $table->foreignId('short_term_job_id')->nullable()->constrained('short_term_jobs')->cascadeOnDelete();
             $table->foreignId('sender_id')->constrained('users')->cascadeOnDelete();
-            // thread: which conversation thread this message belongs to
-            // 'client'    = agency <-> client
-            // 'candidate' = agency <-> candidate
-            $table->enum('thread', ['client', 'candidate']);
+            $table->enum('thread', ['client', 'candidate', 'client_candidate']);
             $table->text('message')->nullable();
             $table->string('file_path')->nullable();
             $table->string('file_name')->nullable();
@@ -23,6 +21,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['long_term_job_id', 'thread']);
+            $table->index(['short_term_job_id', 'thread'], 'job_messages_short_term_job_id_thread_index');
         });
     }
 
