@@ -84,6 +84,9 @@ class AuthController extends Controller
 
     protected function respondWithToken($token, $user)
     {
+        $user->setAttribute('role', $user->getRoleNames()->first());
+        $user->unsetRelation('roles');
+
         return response()->json([
             'success' => true,
             'user' => $user,
