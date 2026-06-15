@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RolePermissionSeeder::class);
         $this->call(AgencySeeder::class);
         $this->call(ClientSeeder::class);
+        $this->call(ClientDashboardSeeder::class);
 
         // $admin=User::factory()->create([
         //     'first_name' => 'Admin',
