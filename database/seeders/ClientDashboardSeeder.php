@@ -227,7 +227,18 @@ class ClientDashboardSeeder extends Seeder
             ],
         ];
 
-        $clients = [];
+        $existingClient = Client::where('agency_id', $agency->id)->where('email', 'client@gmail.com')->first();
+        if ($existingClient) {
+            $existingClient->update([
+                'type_id' => json_encode([$types[0]->id]),
+                'location_id' => json_encode([$locations[0]->id]),
+                'tag_id' => json_encode([$tags[2]->id]),
+                'status_id' => json_encode([$statuses[0]->id]),
+                'checklist_id' => json_encode([$checklists[0]->id, $checklists[1]->id, $checklists[2]->id]),
+            ]);
+        }
+
+        $clients = $existingClient ? [$existingClient] : [];
         foreach ($clientsData as $index => $data) {
             $data['agency_id'] = $agency->id;
             $data['type_id'] = json_encode([$types[$index % count($types)]->id]);
@@ -267,13 +278,14 @@ class ClientDashboardSeeder extends Seeder
         $stJobConfigs = [
             ['title' => 'Weekend Babysitting', 'status' => 'completed', 'clientIdx' => 0, 'candidateIdx' => 0],
             ['title' => 'Date Night Childcare', 'status' => 'completed', 'clientIdx' => 0, 'candidateIdx' => 1],
+            ['title' => 'Morning Babysitting', 'status' => 'running', 'clientIdx' => 0, 'candidateIdx' => 2],
             ['title' => 'After School Care', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 2],
-            ['title' => 'Weekend Morning Care', 'status' => 'running', 'clientIdx' => 0, 'candidateIdx' => 1],
+            ['title' => 'Weekend Morning Care', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 1],
             ['title' => 'School Pickup & Care', 'status' => 'running', 'clientIdx' => 2, 'candidateIdx' => 0],
-            ['title' => 'Emergency Babysitting', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 2],
-            ['title' => 'Evening Babysitter', 'status' => 'marketplace', 'clientIdx' => 1, 'candidateIdx' => null],
-            ['title' => 'Full Day Childcare', 'status' => 'pending_payment', 'clientIdx' => 2, 'candidateIdx' => null],
-            ['title' => 'Holiday Coverage', 'status' => 'completed', 'clientIdx' => 2, 'candidateIdx' => 0],
+            ['title' => 'Emergency Babysitting', 'status' => 'running', 'clientIdx' => 2, 'candidateIdx' => 2],
+            ['title' => 'Evening Babysitter', 'status' => 'marketplace', 'clientIdx' => 2, 'candidateIdx' => null],
+            ['title' => 'Full Day Childcare', 'status' => 'pending_payment', 'clientIdx' => 3, 'candidateIdx' => null],
+            ['title' => 'Holiday Coverage', 'status' => 'completed', 'clientIdx' => 3, 'candidateIdx' => 0],
         ];
 
         foreach ($stJobConfigs as $config) {
@@ -318,27 +330,33 @@ class ClientDashboardSeeder extends Seeder
                 'start' => '-30 days', 'end' => '+335 days',
             ],
             [
+                'title' => 'Full-Time Live-Out Nanny',
+                'status' => 'running',
+                'clientIdx' => 1, 'candidateIdx' => 0,
+                'start' => '-30 days', 'end' => '+335 days',
+            ],
+            [
                 'title' => 'Summer Nanny',
                 'status' => 'running',
-                'clientIdx' => 1, 'candidateIdx' => 1,
+                'clientIdx' => 2, 'candidateIdx' => 1,
                 'start' => '-14 days', 'end' => '+76 days',
             ],
             [
                 'title' => 'After-School Nanny',
                 'status' => 'running',
-                'clientIdx' => 2, 'candidateIdx' => 0,
+                'clientIdx' => 3, 'candidateIdx' => 0,
                 'start' => '-7 days', 'end' => '+180 days',
             ],
             [
                 'title' => 'Part-Time Afternoon Nanny',
                 'status' => 'marketplace',
-                'clientIdx' => 1, 'candidateIdx' => null,
+                'clientIdx' => 2, 'candidateIdx' => null,
                 'start' => '+14 days', 'end' => '+379 days',
             ],
             [
                 'title' => 'Live-In Nanny for Newborn',
                 'status' => 'pending_approval',
-                'clientIdx' => 2, 'candidateIdx' => null,
+                'clientIdx' => 3, 'candidateIdx' => null,
                 'start' => '+30 days', 'end' => '+395 days',
             ],
         ];
