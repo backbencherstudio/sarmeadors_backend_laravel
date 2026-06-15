@@ -47,23 +47,20 @@ class ClientDashboardController extends Controller
             'interviews' => LongTermJobInterview::whereIn('long_term_job_id', $longTermJobIds)->count(),
         ];
 
-        $latestLongTermJob = LongTermJob::with(['candidate', 'applications.candidate'])
+        $longTermJobs = LongTermJob::with(['candidate', 'children', 'applications.candidate'])
             ->withCount('applications')
             ->where('client_id', $client->id)
             ->whereNotIn('status', ['cancelled', 'completed'])
-            ->latest()
-            ->first();
+            ->get();
 
-        $latestShortTermJob = ShortTermJob::with(['candidate', 'dates'])
+        $shortTermJobs = ShortTermJob::with(['candidate', 'children', 'dates'])
             ->where('client_id', $client->id)
             ->whereNotIn('status', ['cancelled', 'completed'])
-            ->latest()
-            ->first();
+            ->get();
 
-        $currentJob = collect([$latestLongTermJob, $latestShortTermJob])
-            ->filter()
+        $currentJobs = $longTermJobs->concat($shortTermJobs)
             ->sortByDesc('created_at')
-            ->first();
+            ->values();
 
         $recommendedCandidates = Candidate::with('reviews')
             ->where('agency_id', $agencyId)
@@ -80,7 +77,9 @@ class ClientDashboardController extends Controller
                 'image_url' => $client->image_url,
             ],
             'stats' => $stats,
-            'current_job' => $currentJob ? $this->formatCurrentJob($currentJob) : null,
+            'current_jobs' => $currentJobs
+                ->map(fn (ShortTermJob|LongTermJob $job): array => $this->formatCurrentJob($job))
+                ->values(),
             'recommended_candidates' => $recommendedCandidates
                 ->map(fn (Candidate $candidate): array => $this->formatRecommendedCandidate($candidate))
                 ->values(),
