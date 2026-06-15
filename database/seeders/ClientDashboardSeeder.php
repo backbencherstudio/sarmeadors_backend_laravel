@@ -9,6 +9,9 @@ use App\Models\CandidateJobRequest;
 use App\Models\CheckList;
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\DocumentTemplate;
+use App\Models\DocumentTemplateField;
+use App\Models\DocumentTemplateSigner;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\JobMessage;
@@ -286,6 +289,7 @@ class ClientDashboardSeeder extends Seeder
             ['title' => 'Evening Babysitter', 'status' => 'marketplace', 'clientIdx' => 2, 'candidateIdx' => null],
             ['title' => 'Full Day Childcare', 'status' => 'pending_payment', 'clientIdx' => 3, 'candidateIdx' => null],
             ['title' => 'Holiday Coverage', 'status' => 'completed', 'clientIdx' => 3, 'candidateIdx' => 0],
+            ['title' => 'Toddler Playdate Care', 'status' => 'marketplace', 'clientIdx' => 0, 'candidateIdx' => null],
         ];
 
         foreach ($stJobConfigs as $config) {
@@ -408,6 +412,76 @@ class ClientDashboardSeeder extends Seeder
                     'secondary_phone' => '+1 305 200 0099',
                     'status' => $config['status'],
                     'broadcast_requested' => in_array($config['status'], ['marketplace', 'pending_approval']),
+                ]
+            );
+
+            $longTermJobs[] = $job;
+        }
+
+        $extraLTJobs = [
+            [
+                'title' => 'Weekend Nanny',
+                'status' => 'marketplace',
+                'clientIdx' => 1, 'candidateIdx' => null,
+                'start' => '+7 days', 'end' => '+91 days',
+            ],
+            [
+                'title' => 'Twin Newborn Care',
+                'status' => 'pending_approval',
+                'clientIdx' => 0, 'candidateIdx' => null,
+                'start' => '+21 days', 'end' => '+385 days',
+            ],
+        ];
+
+        foreach ($extraLTJobs as $config) {
+            $client = $clients[$config['clientIdx']];
+            $job = LongTermJob::firstOrCreate(
+                [
+                    'agency_id' => $agency->id,
+                    'client_id' => $client->id,
+                    'title' => $config['title'],
+                ],
+                [
+                    'candidate_id' => $config['candidateIdx'] !== null ? $candidates[$config['candidateIdx']]->id : null,
+                    'location_id' => $locations[array_rand($locations)]->id,
+                    'description' => $config['title'] === 'Twin Newborn Care'
+                        ? 'Expecting twins and need an experienced nanny specialized in newborn care.'
+                        : 'Looking for a weekend nanny to help with childcare every Saturday and Sunday.',
+                    'job_address' => $config['clientIdx'] === 0 ? '789 Harbor Blvd' : '456 Family Dr',
+                    'home_city' => 'Miami',
+                    'home_province' => 'FL',
+                    'home_postal_code' => '33101',
+                    'country' => 'US',
+                    'start_date' => now()->modify($config['start'])->format('Y-m-d'),
+                    'end_date' => now()->modify($config['end'])->format('Y-m-d'),
+                    'compensation_amount' => 28.00,
+                    'compensation_currency' => 'usd',
+                    'compensation_type' => 'per_hour',
+                    'bilingual_preference' => false,
+                    'special_needs' => $config['title'] === 'Twin Newborn Care',
+                    'school_activity' => false,
+                    'has_housekeeper' => false,
+                    'live_in_required' => false,
+                    'prepare_meals' => true,
+                    'travel_with_family' => false,
+                    'spouse_work_from_home' => 'yes_i_do',
+                    'nanny_own_car' => 'yes',
+                    'paid_vacation' => 'none',
+                    'room_with_wifi' => false,
+                    'negotiable_salary' => 'open',
+                    'family_schedule' => 'Flexible schedule needed, primarily weekend coverage.',
+                    'household_tasks' => 'Child-related tasks only.',
+                    'family_philosophy' => 'Respectful, nurturing environment.',
+                    'primary_first_name' => $client->first_name,
+                    'primary_last_name' => $client->last_name,
+                    'primary_email' => $client->email,
+                    'primary_phone' => $client->mobile,
+                    'secondary_first_name' => 'Alex',
+                    'secondary_last_name' => $client->last_name,
+                    'secondary_email' => 'alex.'.strtolower($client->last_name).'@example.com',
+                    'secondary_phone' => '+1 305 200 0098',
+                    'status' => $config['status'],
+                    'broadcast_requested' => true,
                 ]
             );
 
@@ -809,24 +883,120 @@ class ClientDashboardSeeder extends Seeder
 
         /*
         |--------------------------------------------------------------------------
-        | Client Documents
+        | Document Templates (created by agency, sent to clients for signing)
         |--------------------------------------------------------------------------
         */
-        foreach ($clients as $index => $client) {
-            ClientDocument::firstOrCreate(
-                [
-                    'client_id' => $client->id,
-                    'title' => 'Service Agreement - '.$client->first_name.' '.$client->last_name,
+        $templatesData = [
+            [
+                'name' => 'Standard Service Agreement',
+                'user_type' => 'client',
+                'content_type' => 'text',
+                'content' => 'This Service Agreement is entered into between [AGENCY_NAME] and [CLIENT_NAME] for the provision of childcare services. Terms and conditions apply as per agency policy.',
+                'org_signer_name' => $agency->name.' Representative',
+                'org_name' => $agency->name,
+                'signer_labels' => ['Client', 'Agency Representative'],
+                'fields' => [
+                    ['field_type' => 'text', 'field_label' => 'Full Name', 'field_tag' => 'client_name', 'is_required' => true],
+                    ['field_type' => 'text', 'field_label' => 'Email', 'field_tag' => 'client_email', 'is_required' => true],
+                    ['field_type' => 'text', 'field_label' => 'Phone', 'field_tag' => 'client_phone', 'is_required' => true],
+                    ['field_type' => 'date', 'field_label' => 'Start Date', 'field_tag' => 'start_date', 'is_required' => true],
+                    ['field_type' => 'textarea', 'field_label' => 'Special Requirements', 'field_tag' => 'special_requirements', 'is_required' => false],
+                    ['field_type' => 'signature', 'field_label' => 'Client Signature', 'field_tag' => 'client_signature', 'is_required' => true],
+                    ['field_type' => 'signature', 'field_label' => 'Agency Signature', 'field_tag' => 'agency_signature', 'is_required' => true],
                 ],
+            ],
+            [
+                'name' => 'Liability Waiver',
+                'user_type' => 'client',
+                'content_type' => 'text',
+                'content' => 'I, [CLIENT_NAME], hereby release [AGENCY_NAME] from any and all liability arising from the childcare services provided. I understand the risks and agree to the terms outlined.',
+                'org_signer_name' => $agency->name.' Representative',
+                'org_name' => $agency->name,
+                'signer_labels' => ['Client'],
+                'fields' => [
+                    ['field_type' => 'text', 'field_label' => 'Full Name', 'field_tag' => 'client_name', 'is_required' => true],
+                    ['field_type' => 'date', 'field_label' => 'Date', 'field_tag' => 'date', 'is_required' => true],
+                    ['field_type' => 'signature', 'field_label' => 'Signature', 'field_tag' => 'client_signature', 'is_required' => true],
+                ],
+            ],
+            [
+                'name' => 'Emergency Contact Form',
+                'user_type' => 'client',
+                'content_type' => 'text',
+                'content' => 'Please provide emergency contact information for the duration of the childcare services.',
+                'org_signer_name' => null,
+                'org_name' => $agency->name,
+                'signer_labels' => ['Client'],
+                'fields' => [
+                    ['field_type' => 'text', 'field_label' => 'Full Name', 'field_tag' => 'client_name', 'is_required' => true],
+                    ['field_type' => 'text', 'field_label' => 'Emergency Contact Name', 'field_tag' => 'emergency_name', 'is_required' => true],
+                    ['field_type' => 'text', 'field_label' => 'Emergency Contact Phone', 'field_tag' => 'emergency_phone', 'is_required' => true],
+                    ['field_type' => 'text', 'field_label' => 'Emergency Contact Relation', 'field_tag' => 'emergency_relation', 'is_required' => true],
+                    ['field_type' => 'textarea', 'field_label' => 'Medical Conditions / Allergies', 'field_tag' => 'medical_conditions', 'is_required' => false],
+                    ['field_type' => 'signature', 'field_label' => 'Client Signature', 'field_tag' => 'client_signature', 'is_required' => true],
+                ],
+            ],
+        ];
+
+        $documentTemplates = [];
+        foreach ($templatesData as $tmpl) {
+            $template = DocumentTemplate::firstOrCreate(
                 [
                     'agency_id' => $agency->id,
-                    'description' => 'Standard service agreement contract',
-                    'status' => $index === 2 ? 'pending' : 'signed',
-                    'signed_at' => $index === 2 ? null : now()->subDays(rand(5, 30)),
-                    'signed_ip' => '192.168.1.'.rand(10, 200),
-                    'metadata' => json_encode(['signed_from' => 'email']),
+                    'name' => $tmpl['name'],
+                ],
+                [
+                    'user_type' => $tmpl['user_type'],
+                    'content_type' => $tmpl['content_type'],
+                    'content' => $tmpl['content'],
+                    'org_signer_name' => $tmpl['org_signer_name'],
+                    'org_name' => $tmpl['org_name'],
                 ]
             );
+
+            foreach ($tmpl['fields'] as $field) {
+                DocumentTemplateField::firstOrCreate(
+                    [
+                        'document_template_id' => $template->id,
+                        'field_tag' => $field['field_tag'],
+                    ],
+                    $field
+                );
+            }
+
+            foreach ($tmpl['signer_labels'] as $label) {
+                DocumentTemplateSigner::firstOrCreate(
+                    [
+                        'document_template_id' => $template->id,
+                        'signer_label' => $label,
+                    ]
+                );
+            }
+
+            $documentTemplates[] = $template;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Client Documents (instances sent to clients for signing)
+        |--------------------------------------------------------------------------
+        */
+        foreach ($clients as $client) {
+            foreach ($documentTemplates as $template) {
+                ClientDocument::firstOrCreate(
+                    [
+                        'client_id' => $client->id,
+                        'document_template_id' => $template->id,
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'title' => $template->name.' - '.$client->first_name.' '.$client->last_name,
+                        'description' => $template->content,
+                        'status' => 'pending',
+                        'metadata' => json_encode(['sent_via' => 'email', 'template_name' => $template->name]),
+                    ]
+                );
+            }
         }
 
         /*
