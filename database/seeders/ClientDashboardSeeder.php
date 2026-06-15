@@ -268,6 +268,9 @@ class ClientDashboardSeeder extends Seeder
             ['title' => 'Weekend Babysitting', 'status' => 'completed', 'clientIdx' => 0, 'candidateIdx' => 0],
             ['title' => 'Date Night Childcare', 'status' => 'completed', 'clientIdx' => 0, 'candidateIdx' => 1],
             ['title' => 'After School Care', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 2],
+            ['title' => 'Weekend Morning Care', 'status' => 'running', 'clientIdx' => 0, 'candidateIdx' => 1],
+            ['title' => 'School Pickup & Care', 'status' => 'running', 'clientIdx' => 2, 'candidateIdx' => 0],
+            ['title' => 'Emergency Babysitting', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 2],
             ['title' => 'Evening Babysitter', 'status' => 'marketplace', 'clientIdx' => 1, 'candidateIdx' => null],
             ['title' => 'Full Day Childcare', 'status' => 'pending_payment', 'clientIdx' => 2, 'candidateIdx' => null],
             ['title' => 'Holiday Coverage', 'status' => 'completed', 'clientIdx' => 2, 'candidateIdx' => 0],
@@ -313,6 +316,18 @@ class ClientDashboardSeeder extends Seeder
                 'status' => 'running',
                 'clientIdx' => 0, 'candidateIdx' => 0,
                 'start' => '-30 days', 'end' => '+335 days',
+            ],
+            [
+                'title' => 'Summer Nanny',
+                'status' => 'running',
+                'clientIdx' => 1, 'candidateIdx' => 1,
+                'start' => '-14 days', 'end' => '+76 days',
+            ],
+            [
+                'title' => 'After-School Nanny',
+                'status' => 'running',
+                'clientIdx' => 2, 'candidateIdx' => 0,
+                'start' => '-7 days', 'end' => '+180 days',
             ],
             [
                 'title' => 'Part-Time Afternoon Nanny',
@@ -482,19 +497,19 @@ class ClientDashboardSeeder extends Seeder
         | Long-Term Job Nanny Payments
         |--------------------------------------------------------------------------
         */
-        $runningLTJob = $longTermJobs[0] ?? null;
-        if ($runningLTJob && $runningLTJob->candidate_id) {
+        $runningLTJobs = array_filter($longTermJobs, fn ($j) => $j->status === 'running' && $j->candidate_id);
+        foreach ($runningLTJobs as $i => $job) {
             LongTermJobNannyPayment::firstOrCreate(
-                ['invoice_number' => 'INV-'.now()->format('Ymd').'-001'],
+                ['invoice_number' => 'INV-'.now()->format('Ymd').'-'.str_pad($i + 1, 3, '0', STR_PAD_LEFT)],
                 [
-                    'long_term_job_id' => $runningLTJob->id,
-                    'candidate_id' => $runningLTJob->candidate_id,
+                    'long_term_job_id' => $job->id,
+                    'candidate_id' => $job->candidate_id,
                     'agency_id' => $agency->id,
                     'amount' => 4000.00,
                     'currency' => 'usd',
                     'payment_method' => 'bank_transfer',
                     'payment_date' => now()->subDays(3)->format('Y-m-d'),
-                    'notes' => 'Monthly payment for nanny services',
+                    'notes' => 'Monthly payment for nanny services - '.$job->title,
                 ]
             );
         }
@@ -525,19 +540,19 @@ class ClientDashboardSeeder extends Seeder
             );
         }
 
-        if ($runningLTJob && $runningLTJob->candidate_id) {
+        foreach ($runningLTJobs as $job) {
             foreach (range(0, 4) as $dayOffset) {
                 $date = now()->subDays($dayOffset)->format('Y-m-d');
                 LongTermJobAttendance::firstOrCreate(
                     [
-                        'long_term_job_id' => $runningLTJob->id,
-                        'candidate_id' => $runningLTJob->candidate_id,
+                        'long_term_job_id' => $job->id,
+                        'candidate_id' => $job->candidate_id,
                         'date' => $date,
                     ],
                     [
                         'check_in' => '08:00:00',
                         'check_out' => '18:00:00',
-                        'is_absent' => false,
+                        'is_absent' => rand(0, 5) === 0,
                         'notes' => 'Regular work day.',
                     ]
                 );
@@ -566,17 +581,17 @@ class ClientDashboardSeeder extends Seeder
             );
         }
 
-        if ($runningLTJob && $runningLTJob->candidate_id && $runningLTJob->client_id) {
+        foreach ($runningLTJobs as $job) {
             LongTermJobReview::firstOrCreate(
                 [
-                    'long_term_job_id' => $runningLTJob->id,
-                    'candidate_id' => $runningLTJob->candidate_id,
-                    'client_id' => $runningLTJob->client_id,
+                    'long_term_job_id' => $job->id,
+                    'candidate_id' => $job->candidate_id,
+                    'client_id' => $job->client_id,
                 ],
                 [
                     'agency_id' => $agency->id,
-                    'rating' => 5,
-                    'review' => 'Best nanny we have ever had. Our kids love her and she is incredibly reliable.',
+                    'rating' => rand(4, 5),
+                    'review' => 'Our family is very happy with the care provided. Reliable, professional, and loving.',
                 ]
             );
         }
@@ -649,7 +664,8 @@ class ClientDashboardSeeder extends Seeder
         | Long-Term Job Applications & Interviews
         |--------------------------------------------------------------------------
         */
-        $marketplaceLTJob = $longTermJobs[1] ?? null;
+        $marketplaceLTJobs = array_filter($longTermJobs, fn ($j) => $j->status === 'marketplace');
+        $marketplaceLTJob = reset($marketplaceLTJobs) ?: null;
         if ($marketplaceLTJob) {
             $application = LongTermJobApplication::firstOrCreate(
                 [
@@ -699,48 +715,55 @@ class ClientDashboardSeeder extends Seeder
         | Candidate Job Requests
         |--------------------------------------------------------------------------
         */
-        $candidateJobRequestConfigs = [
-            ['jobIdx' => 3, 'candidateIdx' => 1, 'type' => 'short_term', 'status' => 'pending'],
-            ['jobIdx' => 3, 'candidateIdx' => 2, 'type' => 'short_term', 'status' => 'pending'],
-            ['jobIdx' => 1, 'candidateIdx' => 2, 'type' => 'long_term', 'status' => 'approved'],
-        ];
+        $stMarketplaceJobs = array_filter($shortTermJobs, fn ($j) => $j->status === 'marketplace');
+        $stMarketplaceJob = reset($stMarketplaceJobs) ?: null;
+        if ($stMarketplaceJob) {
+            CandidateJobRequest::firstOrCreate(
+                [
+                    'client_id' => $stMarketplaceJob->client_id,
+                    'candidate_id' => $candidates[1]->id,
+                    'short_term_job_id' => $stMarketplaceJob->id,
+                ],
+                [
+                    'agency_id' => $agency->id,
+                    'job_type' => 'short_term',
+                    'status' => 'pending',
+                    'message' => 'Candidate is interested in this position.',
+                ]
+            );
 
-        foreach ($candidateJobRequestConfigs as $config) {
-            if ($config['type'] === 'short_term') {
-                $job = $shortTermJobs[$config['jobIdx']];
-                CandidateJobRequest::firstOrCreate(
-                    [
-                        'client_id' => $job->client_id,
-                        'candidate_id' => $candidates[$config['candidateIdx']]->id,
-                        'short_term_job_id' => $job->id,
-                    ],
-                    [
-                        'agency_id' => $agency->id,
-                        'job_type' => 'short_term',
-                        'status' => $config['status'],
-                        'message' => $config['status'] === 'approved'
-                            ? 'Request approved! Candidate has been assigned.'
-                            : 'Candidate is interested in this position.',
-                        'responded_at' => $config['status'] === 'approved' ? now()->subDay() : null,
-                    ]
-                );
-            } else {
-                $job = $longTermJobs[$config['jobIdx']];
-                CandidateJobRequest::firstOrCreate(
-                    [
-                        'client_id' => $job->client_id,
-                        'candidate_id' => $candidates[$config['candidateIdx']]->id,
-                        'long_term_job_id' => $job->id,
-                    ],
-                    [
-                        'agency_id' => $agency->id,
-                        'job_type' => 'long_term',
-                        'status' => $config['status'],
-                        'message' => 'Candidate has been approved for the long-term position.',
-                        'responded_at' => now()->subDay(),
-                    ]
-                );
-            }
+            CandidateJobRequest::firstOrCreate(
+                [
+                    'client_id' => $stMarketplaceJob->client_id,
+                    'candidate_id' => $candidates[2]->id,
+                    'short_term_job_id' => $stMarketplaceJob->id,
+                ],
+                [
+                    'agency_id' => $agency->id,
+                    'job_type' => 'short_term',
+                    'status' => 'pending',
+                    'message' => 'Candidate is interested in this position.',
+                ]
+            );
+        }
+
+        $ltApprovedJobs = array_filter($longTermJobs, fn ($j) => $j->status === 'running' && $j->candidate_id);
+        $ltApprovedJob = reset($ltApprovedJobs) ?: null;
+        if ($ltApprovedJob) {
+            CandidateJobRequest::firstOrCreate(
+                [
+                    'client_id' => $ltApprovedJob->client_id,
+                    'candidate_id' => $ltApprovedJob->candidate_id,
+                    'long_term_job_id' => $ltApprovedJob->id,
+                ],
+                [
+                    'agency_id' => $agency->id,
+                    'job_type' => 'long_term',
+                    'status' => 'approved',
+                    'message' => 'Candidate has been approved for the long-term position.',
+                    'responded_at' => now()->subDay(),
+                ]
+            );
         }
 
         /*
