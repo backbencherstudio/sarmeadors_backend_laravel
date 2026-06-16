@@ -16,12 +16,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Roles & agency tenant
         $this->call(RolePermissionSeeder::class);
         $this->call(AgencySeeder::class);
-        $this->call(ClientSeeder::class);
-        $this->call(ClientDashboardSeeder::class);
+
+        // Client & candidate domain (single source per entity, fully relational)
+        $this->call(SupportingDataSeeder::class);
         $this->call(CandidateSeeder::class);
+        $this->call(ClientSeeder::class);
+        $this->call(JobSeeder::class);
+
+        // Supporting domain data (depend on agency/clients/candidates above)
+        $this->call(AgencySettingsSeeder::class);
+        $this->call(ServiceSeeder::class);
+        $this->call(TemplateSeeder::class);
+        $this->call(MessageTemplateSeeder::class);
+        $this->call(FormSeeder::class);
 
         // $admin=User::factory()->create([
         //     'first_name' => 'Admin',
