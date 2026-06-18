@@ -3,7 +3,6 @@
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
-use App\Http\Controllers\Client\ClientController as ClientClientController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,11 +25,6 @@ Route::middleware('subdomain')->group(function () {
     Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
     Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
     Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
-
-    // Public client registration
-    Route::prefix('client')->group(function () {
-        Route::post('/register', [ClientClientController::class, 'store']);
-    });
 });
 
 Route::middleware('auth:api')->group(function () {

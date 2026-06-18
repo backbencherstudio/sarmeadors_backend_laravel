@@ -11,10 +11,17 @@ use App\Models\CandidateUnavailability;
 use App\Models\DocumentTemplate;
 use App\Models\DocumentTemplateField;
 use App\Models\DocumentTemplateSigner;
+use App\Models\Location;
+use App\Models\Type;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 
+/**
+ * Seeds the full candidate roster for the agency. This is the single source
+ * of candidates — JobSeeder references the candidates created here so every
+ * candidate ends up tied to real jobs, applications and documents.
+ */
 class CandidateSeeder extends Seeder
 {
     public function run(): void
@@ -29,7 +36,79 @@ class CandidateSeeder extends Seeder
 
         $role = Role::where('name', 'candidate')->where('guard_name', 'api')->first();
 
+        $candidateTypes = Type::where('agency_id', $agency->id)->where('type', 'candidate')->orderBy('id')->get();
+        $locations = Location::where('agency_id', $agency->id)->orderBy('id')->get();
+
+        if ($candidateTypes->isEmpty() || $locations->isEmpty()) {
+            $this->command->error('Supporting data not found. Run SupportingDataSeeder first.');
+
+            return;
+        }
+
         $candidatesData = [
+            [
+                'first_name' => 'Maria', 'last_name' => 'Garcia',
+                'email' => 'candidate@gmail.com', 'mobile' => '+1 305 111 0001',
+                'date_of_birth' => '1995-03-15', 'nationality' => 'US',
+                'street_address' => '456 Oak Ave', 'city' => 'Miami', 'province' => 'FL',
+                'postal_code' => '33101', 'country' => 'US',
+                'years_of_experience' => '5-10', 'commitment' => 'long_term',
+                'pay_range_per_hour' => '20-25', 'hours_per_week' => '40',
+                'bilingual' => 'Spanish', 'drivers_license' => 'dl_and_car',
+                'cpr_first_aid' => 'yes', 'vaccinations' => 'yes',
+                'ok_with_pets' => 'dog', 'ok_with_travel' => 'domestic',
+                'work_legally_in_us' => true, 'comfortable_paid_legally' => true, 'has_ssn' => true,
+                'hear_about_us' => 'Friend',
+                'available_for' => ['full_time', 'live_out'],
+                'interested_in_iowa' => false,
+                'start_date' => now()->subYears(4)->format('Y-m-d'),
+                'last_position_end_reason' => 'Family relocated abroad',
+                'reference_first_name' => 'Carla', 'reference_last_name' => 'Lopez',
+                'reference_phone' => '+1 305 555 0111', 'reference_email' => 'carla.lopez@example.com',
+                'reference_relation' => 'Former Employer', 'reference_description' => 'Cared for 2 children over 4 years.',
+            ],
+            [
+                'first_name' => 'Sarah', 'last_name' => 'Johnson',
+                'email' => 'sarah.johnson@example.com', 'mobile' => '+1 305 111 0002',
+                'date_of_birth' => '1998-07-22', 'nationality' => 'US',
+                'street_address' => '789 Pine St', 'city' => 'Miami Beach', 'province' => 'FL',
+                'postal_code' => '33139', 'country' => 'US',
+                'years_of_experience' => '2-5', 'commitment' => 'short_term',
+                'pay_range_per_hour' => '18-22', 'hours_per_week' => '30',
+                'bilingual' => 'French', 'drivers_license' => 'dl_only',
+                'cpr_first_aid' => 'yes', 'vaccinations' => 'willing',
+                'ok_with_pets' => 'cat', 'ok_with_travel' => 'no_travel',
+                'work_legally_in_us' => true, 'comfortable_paid_legally' => true, 'has_ssn' => true,
+                'hear_about_us' => 'Google',
+                'available_for' => ['part_time', 'date_nights', 'weekends'],
+                'interested_in_iowa' => false,
+                'start_date' => now()->subYears(2)->format('Y-m-d'),
+                'last_position_end_reason' => 'Returned to school',
+                'reference_first_name' => 'Megan', 'reference_last_name' => 'Foster',
+                'reference_phone' => '+1 305 555 0112', 'reference_email' => 'megan.foster@example.com',
+                'reference_relation' => 'Former Employer', 'reference_description' => 'Reliable weekend sitter for 2 years.',
+            ],
+            [
+                'first_name' => 'Emily', 'last_name' => 'Davis',
+                'email' => 'emily.davis@example.com', 'mobile' => '+1 305 111 0003',
+                'date_of_birth' => '1993-11-08', 'nationality' => 'US',
+                'street_address' => '321 Elm Blvd', 'city' => 'Coral Gables', 'province' => 'FL',
+                'postal_code' => '33146', 'country' => 'US',
+                'years_of_experience' => '10+', 'commitment' => 'temporary',
+                'pay_range_per_hour' => '25-30', 'hours_per_week' => '20',
+                'bilingual' => 'None', 'drivers_license' => 'dl_and_car',
+                'cpr_first_aid' => 'yes', 'vaccinations' => 'yes',
+                'ok_with_pets' => 'neither', 'ok_with_travel' => 'international',
+                'work_legally_in_us' => true, 'comfortable_paid_legally' => true, 'has_ssn' => true,
+                'hear_about_us' => 'Referral',
+                'available_for' => ['temporary', 'short_term', 'travel'],
+                'interested_in_iowa' => true,
+                'start_date' => now()->subYears(6)->format('Y-m-d'),
+                'last_position_end_reason' => 'Prefers temporary assignments',
+                'reference_first_name' => 'Helen', 'reference_last_name' => 'Park',
+                'reference_phone' => '+1 305 555 0113', 'reference_email' => 'helen.park@example.com',
+                'reference_relation' => 'Agency Director', 'reference_description' => 'Placed with 6+ families successfully.',
+            ],
             [
                 'first_name' => 'Jennifer', 'last_name' => 'Martinez',
                 'email' => 'jennifer.martinez@example.com', 'mobile' => '+1 305 111 0004',
@@ -138,8 +217,11 @@ class CandidateSeeder extends Seeder
         ];
 
         $candidates = [];
-        foreach ($candidatesData as $data) {
+        foreach ($candidatesData as $index => $data) {
             $data['agency_id'] = $agency->id;
+            $data['type_id'] = [$candidateTypes[$index % $candidateTypes->count()]->id];
+            $data['location_id'] = [$locations[$index % $locations->count()]->id];
+
             $candidate = Candidate::firstOrCreate(
                 ['email' => $data['email']],
                 $data
@@ -150,7 +232,6 @@ class CandidateSeeder extends Seeder
                 [
                     'first_name' => $candidate->first_name,
                     'last_name' => $candidate->last_name,
-                    'email' => $candidate->email,
                     'mobile' => $candidate->mobile,
                     'agency_id' => $agency->id,
                     'is_owner' => 0,
@@ -158,59 +239,78 @@ class CandidateSeeder extends Seeder
                 ]
             );
 
-            if (! $user->hasRole($role)) {
+            if ($role && ! $user->hasRole($role)) {
                 $user->assignRole($role);
             }
 
             $candidates[] = $candidate;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Candidate Availability
-        |--------------------------------------------------------------------------
-        */
+        $this->seedAvailability($candidates);
+        $this->seedUnavailability($candidates);
+        $this->seedDocuments($agency, $candidates);
+
+        $this->command->info('Candidate seeder completed successfully!');
+        $this->command->info('Created/ensured: '.count($candidates).' candidates');
+    }
+
+    /**
+     * @param  array<int, Candidate>  $candidates
+     */
+    private function seedAvailability(array $candidates): void
+    {
         $timezones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles'];
+
         foreach ($candidates as $index => $candidate) {
             $availability = CandidateAvailability::firstOrCreate(
                 ['candidate_id' => $candidate->id],
                 ['timezone' => $timezones[$index % count($timezones)]]
             );
 
-            if (CandidateAvailabilityDay::where('candidate_availability_id', $availability->id)->count() === 0) {
-                $days = [
-                    ['day_of_week' => 1, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
-                    ['day_of_week' => 2, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
-                    ['day_of_week' => 3, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
-                    ['day_of_week' => 4, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
-                    ['day_of_week' => 5, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '16:00:00'],
-                    ['day_of_week' => 6, 'is_available' => $index % 2 === 0, 'start_time' => '10:00:00', 'end_time' => '16:00:00'],
-                    ['day_of_week' => 7, 'is_available' => false, 'start_time' => null, 'end_time' => null],
-                ];
+            if (CandidateAvailabilityDay::where('candidate_availability_id', $availability->id)->count() > 0) {
+                continue;
+            }
 
-                foreach ($days as $day) {
-                    CandidateAvailabilityDay::create(array_merge(
-                        ['candidate_availability_id' => $availability->id],
-                        $day
-                    ));
-                }
+            $days = [
+                ['day_of_week' => 1, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
+                ['day_of_week' => 2, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
+                ['day_of_week' => 3, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
+                ['day_of_week' => 4, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
+                ['day_of_week' => 5, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '16:00:00'],
+                ['day_of_week' => 6, 'is_available' => $index % 2 === 0, 'start_time' => '10:00:00', 'end_time' => '16:00:00'],
+                ['day_of_week' => 7, 'is_available' => false, 'start_time' => null, 'end_time' => null],
+            ];
+
+            foreach ($days as $day) {
+                CandidateAvailabilityDay::create(array_merge(
+                    ['candidate_availability_id' => $availability->id],
+                    $day
+                ));
             }
         }
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Candidate Unavailability
-        |--------------------------------------------------------------------------
-        */
+    /**
+     * @param  array<int, Candidate>  $candidates
+     */
+    private function seedUnavailability(array $candidates): void
+    {
         $unavailabilityData = [
             ['candidateIdx' => 0, 'title' => 'Vacation', 'start' => '+30 days', 'end' => '+37 days'],
             ['candidateIdx' => 1, 'title' => 'Doctor Appointment', 'start' => '+5 days', 'end' => '+5 days'],
             ['candidateIdx' => 2, 'title' => 'Family Event', 'start' => '+14 days', 'end' => '+16 days'],
             ['candidateIdx' => 3, 'title' => 'Moving', 'start' => '+60 days', 'end' => '+62 days'],
             ['candidateIdx' => 4, 'title' => 'Holiday', 'start' => '+20 days', 'end' => '+24 days'],
+            ['candidateIdx' => 5, 'title' => 'Conference', 'start' => '+45 days', 'end' => '+47 days'],
+            ['candidateIdx' => 6, 'title' => 'Personal Leave', 'start' => '+10 days', 'end' => '+12 days'],
+            ['candidateIdx' => 7, 'title' => 'Travel', 'start' => '+25 days', 'end' => '+30 days'],
         ];
 
         foreach ($unavailabilityData as $data) {
+            if (! isset($candidates[$data['candidateIdx']])) {
+                continue;
+            }
+
             CandidateUnavailability::firstOrCreate(
                 [
                     'candidate_id' => $candidates[$data['candidateIdx']]->id,
@@ -222,12 +322,13 @@ class CandidateSeeder extends Seeder
                 ]
             );
         }
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Candidate Document Templates (agency-created)
-        |--------------------------------------------------------------------------
-        */
+    /**
+     * @param  array<int, Candidate>  $candidates
+     */
+    private function seedDocuments(Agency $agency, array $candidates): void
+    {
         $candidateTemplate = DocumentTemplate::firstOrCreate(
             [
                 'agency_id' => $agency->id,
@@ -271,16 +372,10 @@ class CandidateSeeder extends Seeder
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Candidate Documents (pending signature)
-        |--------------------------------------------------------------------------
-        */
         $requiredKeys = ['resume', 'certification', 'background_check'];
-        $categories = ['required', 'required', 'required'];
 
         foreach ($candidates as $candidate) {
-            foreach ($requiredKeys as $i => $key) {
+            foreach ($requiredKeys as $key) {
                 CandidateDocument::firstOrCreate(
                     [
                         'candidate_id' => $candidate->id,
@@ -288,7 +383,7 @@ class CandidateSeeder extends Seeder
                     ],
                     [
                         'agency_id' => $agency->id,
-                        'category' => $categories[$i],
+                        'category' => 'required',
                         'title' => ucwords(str_replace('_', ' ', $key)),
                         'description' => 'Required '.$key.' document for candidate.',
                         'status' => 'pending',
@@ -312,8 +407,5 @@ class CandidateSeeder extends Seeder
                 ]
             );
         }
-
-        $this->command->info('Candidate seeder completed successfully!');
-        $this->command->info('Created: '.count($candidates).' candidates');
     }
 }
