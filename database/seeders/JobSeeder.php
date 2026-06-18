@@ -85,6 +85,7 @@ class JobSeeder extends Seeder
         $this->seedReviews($agency, $shortTermJobs, $longTermJobs);
         $this->seedJobMessages($shortTermJobs, $longTermJobs);
         $this->seedApplicationsAndInterviews($agency, $longTermJobs);
+        $this->seedLongTermApplications($agency, $longTermJobs);
         $this->seedCandidateJobRequests($agency, $shortTermJobs, $longTermJobs);
         $this->seedReports($agency, $shortTermJobs);
         $this->seedRefundRequests($agency, $longTermJobs);
@@ -182,6 +183,15 @@ class JobSeeder extends Seeder
             ['title' => 'Live-In Nanny for Newborn', 'status' => 'pending_approval', 'clientIdx' => 5, 'candidateIdx' => null, 'start' => '+30 days', 'end' => '+395 days'],
             ['title' => 'Weekend Nanny', 'status' => 'running', 'clientIdx' => 0, 'candidateIdx' => 6, 'start' => '-10 days', 'end' => '+90 days'],
             ['title' => 'Twin Newborn Care', 'status' => 'running', 'clientIdx' => 1, 'candidateIdx' => 7, 'start' => '-5 days', 'end' => '+360 days'],
+
+            // Completed placements so every client has "previous" candidates
+            // they have already worked with (powers the candidates "previous" tab).
+            ['title' => 'Completed Live-Out Nanny 2024', 'status' => 'completed', 'clientIdx' => 0, 'candidateIdx' => 2, 'start' => '-400 days', 'end' => '-35 days'],
+            ['title' => 'Completed Seasonal Nanny 2024', 'status' => 'completed', 'clientIdx' => 1, 'candidateIdx' => 3, 'start' => '-360 days', 'end' => '-20 days'],
+            ['title' => 'Completed Live-In Nanny 2024', 'status' => 'completed', 'clientIdx' => 2, 'candidateIdx' => 4, 'start' => '-340 days', 'end' => '-15 days'],
+            ['title' => 'Completed After-School Nanny 2024', 'status' => 'completed', 'clientIdx' => 3, 'candidateIdx' => 5, 'start' => '-320 days', 'end' => '-25 days'],
+            ['title' => 'Completed Part-Time Nanny 2024', 'status' => 'completed', 'clientIdx' => 4, 'candidateIdx' => 6, 'start' => '-300 days', 'end' => '-30 days'],
+            ['title' => 'Completed Weekend Nanny 2024', 'status' => 'completed', 'clientIdx' => 5, 'candidateIdx' => 7, 'start' => '-280 days', 'end' => '-18 days'],
         ];
 
         $jobs = [];
@@ -440,7 +450,7 @@ class JobSeeder extends Seeder
         }
 
         foreach ($longTermJobs as $job) {
-            if ($job->status !== 'running' || ! $job->candidate_id) {
+            if (! in_array($job->status, ['running', 'completed'], true) || ! $job->candidate_id) {
                 continue;
             }
 
@@ -453,7 +463,9 @@ class JobSeeder extends Seeder
                 [
                     'agency_id' => $agency->id,
                     'rating' => rand(4, 5),
-                    'review' => 'Our family is very happy with the care provided. Reliable, professional, and loving.',
+                    'review' => $job->status === 'completed'
+                        ? 'It was a pleasure having them care for our children. We would gladly work with them again.'
+                        : 'Our family is very happy with the care provided. Reliable, professional, and loving.',
                 ]
             );
         }
@@ -580,6 +592,44 @@ class JobSeeder extends Seeder
                 'status' => 'scheduled',
             ]
         );
+    }
+
+    /**
+     * Seed a few applicants on every long-term posting so each client sees
+     * "new" candidates (people who applied to their jobs) in the candidates tab.
+     *
+     * @param  array<int, LongTermJob>  $jobs
+     */
+    private function seedLongTermApplications(Agency $agency, array $jobs): void
+    {
+        $messages = [
+            'I am very interested in this position and have strong references from similar families.',
+            'I would love to meet your family. I have years of experience with children of all ages.',
+            'This role is a great fit for my skills. I am available to start at your convenience.',
+        ];
+
+        foreach ($jobs as $index => $job) {
+            foreach ([1, 2, 3] as $offset) {
+                $candidate = $this->candidate($index + $offset);
+
+                // Skip the candidate already placed on this job.
+                if ($candidate->id === $job->candidate_id) {
+                    continue;
+                }
+
+                LongTermJobApplication::firstOrCreate(
+                    [
+                        'long_term_job_id' => $job->id,
+                        'candidate_id' => $candidate->id,
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'application_message' => $messages[$offset % count($messages)],
+                        'status' => 'pending',
+                    ]
+                );
+            }
+        }
     }
 
     /**

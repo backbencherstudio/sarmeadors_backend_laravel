@@ -68,6 +68,45 @@ class ClientCandidatesTest extends TestCase
             ->assertJsonPath('data.0.actions.can_view_profile', true);
     }
 
+    public function test_previous_candidates_tab_returns_candidates_from_completed_jobs(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $worked = Candidate::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Maria',
+            'last_name' => 'Gomez',
+            'email' => 'maria@example.com',
+        ]);
+
+        $applicant = Candidate::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Nina',
+            'last_name' => 'Park',
+            'email' => 'nina@example.com',
+        ]);
+
+        // A completed placement makes "Maria" a previous candidate, while an
+        // application on an open job only makes "Nina" a new candidate.
+        $this->createLongTermJob($agency, $client, $worked, 'completed');
+
+        $openJob = $this->createLongTermJob($agency, $client);
+        LongTermJobApplication::create([
+            'long_term_job_id' => $openJob->id,
+            'candidate_id' => $applicant->id,
+            'agency_id' => $agency->id,
+            'status' => 'pending',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/client/candidates?tab=previous')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Maria Gomez');
+    }
+
     public function test_candidate_detail_returns_profile_tabs_and_reviews(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();
