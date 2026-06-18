@@ -8,6 +8,7 @@ use App\Models\CandidateClientReport;
 use App\Models\CandidateJobRequest;
 use App\Models\CheckList;
 use App\Models\Client;
+use App\Models\ClientCandidate;
 use App\Models\ClientDocument;
 use App\Models\DocumentTemplate;
 use App\Models\DocumentTemplateField;
@@ -798,6 +799,34 @@ class ClientDashboardSeeder extends Seeder
                     'interview_link' => 'https://zoom.us/j/example123',
                     'description' => 'Initial interview to meet the family',
                     'status' => 'scheduled',
+                ]
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | My Candidates links (status / notes shown on the client's cards)
+        |--------------------------------------------------------------------------
+        */
+        $candidateLinks = [
+            ['candidate' => $candidates[0] ?? null, 'status' => 'interested', 'notes' => 'Kelsey is targeting an August start date.'],
+            ['candidate' => $candidates[1] ?? null, 'status' => 'interview_scheduled', 'notes' => null],
+        ];
+        foreach ($candidateLinks as $link) {
+            if (! $link['candidate']) {
+                continue;
+            }
+
+            ClientCandidate::firstOrCreate(
+                [
+                    'client_id' => $client->id,
+                    'candidate_id' => $link['candidate']->id,
+                ],
+                [
+                    'agency_id' => $agency->id,
+                    'status' => $link['status'],
+                    'notes' => $link['notes'],
+                    'linked_at' => now()->subDays(7),
                 ]
             );
         }

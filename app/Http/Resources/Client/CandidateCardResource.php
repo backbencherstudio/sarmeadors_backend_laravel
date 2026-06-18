@@ -3,9 +3,11 @@
 namespace App\Http\Resources\Client;
 
 use App\Models\Candidate;
+use App\Models\ClientCandidate;
 use App\Traits\PresentsCandidate;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
 
 /**
  * @mixin Candidate
@@ -20,6 +22,8 @@ class CandidateCardResource extends JsonResource
     public function toArray(Request $request): array
     {
         $candidate = $this->resource;
+        $link = $candidate->relationLoaded('clientLink') ? $candidate->getRelation('clientLink') : null;
+        $status = $link instanceof ClientCandidate ? $link->status : 'interested';
 
         return [
             'id' => $candidate->id,
@@ -35,8 +39,13 @@ class CandidateCardResource extends JsonResource
                 'average' => $candidate->average_rating,
                 'count' => $candidate->reviews_count,
             ],
+            'status' => $status,
+            'status_label' => Str::headline($status),
+            'notes' => $link instanceof ClientCandidate ? $link->notes : null,
+            'linked_at' => $link instanceof ClientCandidate ? $link->linked_at?->toIso8601String() : null,
             'actions' => [
                 'can_view_profile' => true,
+                'can_extend_offer' => true,
             ],
         ];
     }

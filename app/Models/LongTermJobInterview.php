@@ -12,6 +12,7 @@ class LongTermJobInterview extends Model
         'long_term_job_id',
         'long_term_job_application_id',
         'candidate_id',
+        'client_id',
         'agency_id',
         'scheduled_date',
         'available_from',
@@ -41,6 +42,11 @@ class LongTermJobInterview extends Model
     public function candidate(): BelongsTo
     {
         return $this->belongsTo(Candidate::class);
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 
     /**

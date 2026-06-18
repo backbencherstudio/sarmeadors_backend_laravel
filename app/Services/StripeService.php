@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Agency;
 use App\Models\Client;
+use App\Models\ClientPaymentMethod;
 use App\Models\ShortTermJob;
 use Stripe\Checkout\Session;
 use Stripe\Exception\AuthenticationException;
@@ -66,7 +67,7 @@ class StripeService
         $customer = $stripe->customers->create([
             'name' => $client->full_name,
             'email' => $client->email,
-            'phone' => $client->phone,
+            'phone' => $client->mobile,
             'metadata' => [
                 'client_id' => $client->id,
                 'agency_id' => $agency->id,
@@ -76,6 +77,52 @@ class StripeService
         $client->update(['stripe_customer_id' => $customer->id]);
 
         return $customer->id;
+    }
+
+    /**
+     * Return the client's Stripe customer id, creating the customer on the
+     * agency's Stripe account the first time.
+     */
+    public function ensureCustomer(Client $client, Agency $agency): string
+    {
+        if ($client->stripe_customer_id) {
+            return $client->stripe_customer_id;
+        }
+
+        return $this->createCustomer($client, $agency);
+    }
+
+    /**
+     * Attach a payment method to the client's customer and persist the safe
+     * display details so it can be reused for future bookings. The full card
+     * number and CVC stay with Stripe — only brand/last4/expiry are stored.
+     */
+    public function storePaymentMethod(Client $client, Agency $agency, string $paymentMethodId, ?string $cardholderName = null): ClientPaymentMethod
+    {
+        $stripe = $this->getClient($agency);
+        $customerId = $this->ensureCustomer($client, $agency);
+
+        $stripe->paymentMethods->attach($paymentMethodId, ['customer' => $customerId]);
+
+        $paymentMethod = $stripe->paymentMethods->retrieve($paymentMethodId);
+        $card = $paymentMethod->card ?? null;
+        $isFirst = ClientPaymentMethod::where('client_id', $client->id)->doesntExist();
+
+        return ClientPaymentMethod::updateOrCreate(
+            [
+                'client_id' => $client->id,
+                'stripe_payment_method_id' => $paymentMethodId,
+            ],
+            [
+                'agency_id' => $agency->id,
+                'cardholder_name' => $cardholderName ?? ($paymentMethod->billing_details->name ?? null),
+                'brand' => $card->brand ?? null,
+                'last4' => $card->last4 ?? null,
+                'exp_month' => $card->exp_month ?? null,
+                'exp_year' => $card->exp_year ?? null,
+                'is_default' => $isFirst,
+            ]
+        );
     }
 
     /**
@@ -131,12 +178,14 @@ class StripeService
         Agency $agency,
         ?ShortTermJob $job,
         float $amount,
-        string $currency = 'usd'
+        string $currency = 'usd',
+        ?string $customerId = null,
+        bool $savePaymentMethod = false
     ): PaymentIntent {
 
         $stripe = $this->getClient($agency);
 
-        return $stripe->paymentIntents->create([
+        $params = [
             'amount' => (int) ($amount * 100),
             'currency' => strtolower($currency),
             'description' => 'Job Posting Fee'.($job ? ' – '.$job->title : ''),
@@ -146,7 +195,17 @@ class StripeService
                 'agency_id' => $agency->id,
                 'job_type' => 'short_term',
             ],
-        ]);
+        ];
+
+        if ($customerId) {
+            $params['customer'] = $customerId;
+        }
+
+        if ($savePaymentMethod) {
+            $params['setup_future_usage'] = 'off_session';
+        }
+
+        return $stripe->paymentIntents->create($params);
     }
 
     /**

@@ -44,6 +44,15 @@ class StoreHireRequestRequest extends FormRequest
             'dates.*.booking_date' => ['required', 'date'],
             'dates.*.start_time' => ['required', 'date_format:H:i'],
             'dates.*.end_time' => ['required', 'date_format:H:i', 'after:dates.*.start_time'],
+
+            // Agency-fee payment (short-term only; required only when the agency
+            // charges a fee — enforced in the controller). Raw card data is never
+            // sent here, only a Stripe payment_method token.
+            'payment_method_id' => ['nullable', 'string'],
+            'cardholder_name' => ['nullable', 'string', 'max:255'],
+            'billing_country' => ['nullable', 'string', 'max:100'],
+            'billing_postal_code' => ['nullable', 'string', 'max:20'],
+            'save_payment_method' => ['nullable', 'boolean'],
         ];
     }
 }

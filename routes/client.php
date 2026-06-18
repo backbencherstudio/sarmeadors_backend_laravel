@@ -10,6 +10,7 @@ use App\Http\Controllers\Client\ClientLocationController;
 use App\Http\Controllers\Client\ClientMessageInboxController;
 use App\Http\Controllers\Client\ClientNotificationController;
 use App\Http\Controllers\Client\ClientPaymentController;
+use App\Http\Controllers\Client\ClientPaymentMethodController;
 use App\Http\Controllers\Client\ClientProfileController;
 use App\Http\Controllers\Client\JobMessageController as ClientJobMessageController;
 use App\Http\Controllers\Client\LongTermJobApplicationController as ClientLongTermJobApplicationController;
@@ -54,6 +55,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::post('documents/{document}/sign', [ClientDocumentController::class, 'sign']);
     Route::get('documents/{document}/download', [ClientDocumentController::class, 'download']);
 
+    // Saved payment methods (cards stored for future bookings)
+    Route::get('payment-methods', [ClientPaymentMethodController::class, 'index']);
+    Route::delete('payment-methods/{paymentMethod}', [ClientPaymentMethodController::class, 'destroy']);
+
     // Aggregated payments hub
     Route::get('payments', [ClientPaymentController::class, 'index']);
     Route::get('payments/invoices', [ClientPaymentController::class, 'invoices']);
@@ -73,6 +78,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     // Hire / Interview requests from candidate detail page
     Route::post('candidates/{candidate}/hire-request', [ClientCandidateController::class, 'hireRequest']);
     Route::post('candidates/{candidate}/interview-request', [ClientCandidateController::class, 'interviewRequest']);
+
+    // My Candidates link (status / notes)
+    Route::put('candidates/{candidate}/link', [ClientCandidateController::class, 'updateLink']);
 
     // Interviews management
     Route::get('interviews', [ClientInterviewController::class, 'index']);

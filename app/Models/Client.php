@@ -11,6 +11,7 @@ class Client extends Model
         'first_name',
         'last_name',
         'email',
+        'stripe_customer_id',
         'mobile',
         'image',
         'hear_about_us',
@@ -36,6 +37,16 @@ class Client extends Model
         return $this->image ? asset('storage/'.$this->image) : null;
     }
 
+    public function getFullNameAttribute(): string
+    {
+        return trim($this->first_name.' '.$this->last_name);
+    }
+
+    public function paymentMethods()
+    {
+        return $this->hasMany(ClientPaymentMethod::class);
+    }
+
     public function agency()
     {
         return $this->belongsTo(Agency::class);
@@ -44,6 +55,11 @@ class Client extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function candidateLinks()
+    {
+        return $this->hasMany(ClientCandidate::class);
     }
 
     public function submissions()

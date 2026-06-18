@@ -54,7 +54,11 @@ class ClientInterviewController extends Controller
 
         $query = QueryBuilder::for(
             LongTermJobInterview::with(['job', 'candidate', 'application'])
-                ->whereIn('long_term_job_id', $jobIds),
+                ->where('agency_id', $client->agency_id)
+                ->where(function (Builder $scope) use ($jobIds, $client): void {
+                    $scope->whereIn('long_term_job_id', $jobIds)
+                        ->orWhere('client_id', $client->id);
+                }),
             $request
         )
             ->allowedFilters(
@@ -119,7 +123,11 @@ class ClientInterviewController extends Controller
         $interviews->getCollection()->transform(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview));
 
         $next = LongTermJobInterview::with(['job', 'candidate'])
-            ->whereIn('long_term_job_id', $jobIds)
+            ->where('agency_id', $client->agency_id)
+            ->where(function (Builder $scope) use ($jobIds, $client): void {
+                $scope->whereIn('long_term_job_id', $jobIds)
+                    ->orWhere('client_id', $client->id);
+            })
             ->where('scheduled_date', '>=', now()->toDateString())
             ->where('status', 'scheduled')
             ->orderBy('scheduled_date')
@@ -250,7 +258,7 @@ class ClientInterviewController extends Controller
     private function ownsInterview(Client $client, LongTermJobInterview $interview): bool
     {
         return $interview->agency_id === $client->agency_id
-            && $interview->job?->client_id === $client->id;
+            && ($interview->client_id === $client->id || $interview->job?->client_id === $client->id);
     }
 
     private function changeDeadlinePassed(LongTermJobInterview $interview): bool

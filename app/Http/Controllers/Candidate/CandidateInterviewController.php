@@ -43,7 +43,7 @@ class CandidateInterviewController extends Controller
         $request->merge(['filter' => $queryBuilderFilters]);
 
         $query = QueryBuilder::for(
-            LongTermJobInterview::with(['job', 'job.client', 'application'])
+            LongTermJobInterview::with(['job', 'job.client', 'client', 'application'])
                 ->where('candidate_id', $candidate->id)
                 ->where('agency_id', $request->current_agency->id),
             $request
@@ -107,7 +107,7 @@ class CandidateInterviewController extends Controller
         $interviews = $query->paginate(20);
         $interviews->getCollection()->transform(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview));
 
-        $next = LongTermJobInterview::with(['job', 'job.client'])
+        $next = LongTermJobInterview::with(['job', 'job.client', 'client'])
             ->where('candidate_id', $candidate->id)
             ->where('agency_id', $request->current_agency->id)
             ->where('scheduled_date', '>=', now()->toDateString())
@@ -137,7 +137,7 @@ class CandidateInterviewController extends Controller
         }
 
         return $this->sendResponse(
-            $this->formatInterview($interview->load(['job', 'job.client', 'application'])),
+            $this->formatInterview($interview->load(['job', 'job.client', 'client', 'application'])),
             'Interview retrieved successfully.',
             200
         );
@@ -146,7 +146,7 @@ class CandidateInterviewController extends Controller
     private function formatInterview(LongTermJobInterview $interview): array
     {
         $job = $interview->job;
-        $client = $job?->client;
+        $client = $job?->client ?? $interview->client;
         $description = $interview->description ?: $job?->description;
 
         return [

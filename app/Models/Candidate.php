@@ -81,6 +81,11 @@ class Candidate extends Model
         return $this->hasMany(LongTermJobReview::class);
     }
 
+    public function clientLinks()
+    {
+        return $this->hasMany(ClientCandidate::class);
+    }
+
     public function getAverageRatingAttribute(): ?float
     {
         if ($this->relationLoaded('reviews') && $this->reviews->isNotEmpty()) {

@@ -12,20 +12,37 @@ use App\Http\Resources\Client\CandidateReviewResource;
 use App\Http\Resources\Client\HireRequestResource;
 use App\Models\Candidate;
 use App\Models\CandidateJobRequest;
+use App\Models\ClientCandidate;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
+use App\Models\LongTermJobInterview;
 use App\Models\LongTermJobReview;
+use App\Models\Payment;
 use App\Models\ShortTermJob;
+use App\Services\StripeService;
+use App\Traits\FormatsTime;
+use App\Traits\LinksClientCandidate;
+use App\Traits\PresentsCandidate;
 use App\Traits\ResolvesClient;
+use App\Traits\SendsNotifications;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ClientCandidateController extends Controller
 {
+    use FormatsTime;
+    use LinksClientCandidate;
+    use PresentsCandidate;
     use ResolvesClient;
+    use SendsNotifications;
+
+    public function __construct(
+        private StripeService $stripeService
+    ) {}
 
     // GET /client/candidates?tab=new|previous
     public function index(Request $request): JsonResponse
@@ -44,6 +61,8 @@ class ClientCandidateController extends Controller
             ->where('agency_id', $request->current_agency->id)
             ->whereIn('id', $candidateIds)
             ->paginate(12);
+
+        $this->attachCandidateLinks($client->id, $candidates->getCollection());
 
         return $this->sendResponse(
             CandidateCardResource::collection($candidates),
@@ -104,6 +123,10 @@ class ClientCandidateController extends Controller
 
         $myReview = $reviews->firstWhere('client_id', $client->id);
 
+        $link = ClientCandidate::where('client_id', $client->id)
+            ->where('candidate_id', $candidate->id)
+            ->first();
+
         return $this->sendResponse([
             'candidate' => new CandidateDetailResource($candidate),
             'reviews' => [
@@ -113,6 +136,7 @@ class ClientCandidateController extends Controller
                 'items' => CandidateReviewResource::collection($reviews),
             ],
             'application' => $this->latestApplicationContext($client->id, $candidate->id),
+            'link' => $this->formatLink($link),
             'actions' => [
                 'can_review' => true,
                 'can_hire_request' => true,
@@ -215,9 +239,60 @@ class ClientCandidateController extends Controller
             return $this->sendError('Long-term hires require scheduling an interview first.', [], 422);
         }
 
-        $jobRequest = DB::transaction(function () use ($request, $client, $candidate, $validated): CandidateJobRequest {
+        $agency = $request->current_agency;
+        $paymentRequired = (bool) $agency->short_term_payment_required
+            && $agency->hasStripeKeys()
+            && $agency->short_term_job_fee > 0;
+
+        if ($paymentRequired && empty($validated['payment_method_id'])) {
+            return $this->sendError('Payment information is required to send this hire request.', [], 422);
+        }
+
+        $fee = $paymentRequired ? (float) $agency->short_term_job_fee : 0.0;
+        $feeCurrency = $agency->short_term_job_fee_currency ?? 'usd';
+        $savePaymentMethod = (bool) ($validated['save_payment_method'] ?? false);
+        $paymentIntentId = null;
+        $savedPaymentMethod = null;
+
+        // Charge the agency fee up front — nothing is created if it fails.
+        if ($paymentRequired) {
+            try {
+                $customerId = $this->stripeService->ensureCustomer($client, $agency);
+
+                $intent = $this->stripeService->createJobPaymentIntent(
+                    $client,
+                    $agency,
+                    null,
+                    $fee,
+                    $feeCurrency,
+                    $customerId,
+                    $savePaymentMethod
+                );
+
+                $confirmed = $this->stripeService->confirmPaymentIntent($agency, $intent->id, $validated['payment_method_id']);
+
+                if ($confirmed->status !== 'succeeded') {
+                    return $this->sendError('Payment failed. Status: '.$confirmed->status, [], 422);
+                }
+
+                $paymentIntentId = $confirmed->id;
+
+                if ($savePaymentMethod) {
+                    $savedPaymentMethod = $this->stripeService->storePaymentMethod(
+                        $client,
+                        $agency,
+                        $validated['payment_method_id'],
+                        $validated['cardholder_name'] ?? null
+                    );
+                }
+            } catch (\Throwable $e) {
+                return $this->sendError('Payment could not be processed.', $e->getMessage(), 422);
+            }
+        }
+
+        $jobRequest = DB::transaction(function () use ($agency, $client, $candidate, $validated, $paymentRequired, $fee, $feeCurrency, $paymentIntentId, $savedPaymentMethod): CandidateJobRequest {
             $job = ShortTermJob::create([
-                'agency_id' => $request->current_agency->id,
+                'agency_id' => $agency->id,
                 'client_id' => $client->id,
                 'candidate_id' => $candidate->id,
                 'location_id' => $validated['location_id'] ?? null,
@@ -232,14 +307,33 @@ class ClientCandidateController extends Controller
                 'compensation_currency' => $validated['compensation_currency'] ?? 'usd',
                 'compensation_type' => $validated['compensation_type'] ?? 'per_hour',
                 'status' => 'pending_approval',
+                'stripe_payment_intent_id' => $paymentIntentId,
             ]);
 
             foreach ($validated['dates'] as $date) {
                 $job->dates()->create($date);
             }
 
+            Payment::create([
+                'agency_id' => $agency->id,
+                'client_id' => $client->id,
+                'short_term_job_id' => $job->id,
+                'client_payment_method_id' => $savedPaymentMethod?->id,
+                'stripe_payment_intent_id' => $paymentIntentId,
+                'cardholder_name' => $validated['cardholder_name'] ?? null,
+                'billing_country' => $validated['billing_country'] ?? null,
+                'billing_postal_code' => $validated['billing_postal_code'] ?? null,
+                'amount' => $fee,
+                'tax' => 0,
+                'currency' => $feeCurrency,
+                'note' => $validated['note'] ?? null,
+                'status' => $paymentRequired ? 'succeeded' : 'pending',
+            ]);
+
+            $this->linkClientCandidate($client, $candidate->id, 'hired', $validated['note'] ?? null);
+
             return CandidateJobRequest::create([
-                'agency_id' => $request->current_agency->id,
+                'agency_id' => $agency->id,
                 'client_id' => $client->id,
                 'candidate_id' => $candidate->id,
                 'short_term_job_id' => $job->id,
@@ -257,6 +351,9 @@ class ClientCandidateController extends Controller
     }
 
     // POST /client/candidates/{candidate}/interview-request
+    // Long-term hires schedule an interview straight from the candidate's
+    // profile. It is persisted (no posted job yet) so both the candidate and
+    // the agency see it; admin posts the long-term job after the interview.
     public function interviewRequest(StoreInterviewRequestRequest $request, Candidate $candidate): JsonResponse
     {
         $client = $this->resolveClient($request);
@@ -271,16 +368,136 @@ class ClientCandidateController extends Controller
 
         $validated = $request->validated();
 
-        return $this->sendResponse([
+        if ($validated['job_type'] !== 'long-term') {
+            return $this->sendError('Only long-term hires schedule an interview. Short-term hires use the hire request flow.', [], 422);
+        }
+
+        $interview = DB::transaction(function () use ($request, $client, $candidate, $validated): LongTermJobInterview {
+            $interview = LongTermJobInterview::create([
+                'agency_id' => $request->current_agency->id,
+                'client_id' => $client->id,
+                'candidate_id' => $candidate->id,
+                'scheduled_date' => $validated['scheduled_date'],
+                'available_from' => $validated['available_from'],
+                'available_to' => $validated['available_to'],
+                'interview_type' => $validated['interview_type'],
+                'description' => $validated['description'] ?? null,
+                'special_note' => $validated['special_note'] ?? null,
+                'status' => 'scheduled',
+            ]);
+
+            $this->linkClientCandidate($client, $candidate->id, 'interview_scheduled');
+
+            return $interview;
+        });
+
+        $body = sprintf(
+            '%s requested a %s interview with %s on %s (%s).',
+            trim($client->first_name.' '.$client->last_name),
+            str_replace('_', ' ', $interview->interview_type),
+            $this->candidateFullName($candidate),
+            $interview->scheduled_date?->format('M d, Y'),
+            $this->formatTime($interview->available_from).' - '.$this->formatTime($interview->available_to)
+        );
+        $meta = [
+            'interview_id' => $interview->id,
             'candidate_id' => $candidate->id,
-            'job_type' => $validated['job_type'],
-            'interview_type' => $validated['interview_type'],
-            'scheduled_date' => $validated['scheduled_date'],
-            'available_from' => $validated['available_from'],
-            'available_to' => $validated['available_to'],
-            'status' => 'scheduled',
-            'requested_at' => now()->toIso8601String(),
-        ], 'Interview request created.', 201);
+            'client_id' => $client->id,
+        ];
+
+        $this->notifyAgencyAdmins($request->current_agency->id, 'interview_requested', 'Interview Requested', $body, null, $meta);
+        $this->notifyPortalUser($request->current_agency->id, $candidate->email, 'interview_requested', 'Interview Requested', $body, null, $meta);
+
+        return $this->sendResponse($this->formatInterviewResponse($interview, $candidate), 'Interview scheduled successfully.', 201);
+    }
+
+    // PUT /client/candidates/{candidate}/link
+    // Update the My Candidates link (status / notes) for a candidate.
+    public function updateLink(Request $request, Candidate $candidate): JsonResponse
+    {
+        $client = $this->resolveClient($request);
+
+        if (! $client) {
+            return $this->sendError('Client profile not found.', [], 404);
+        }
+
+        if ($candidate->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Candidate not found.', [], 404);
+        }
+
+        $validated = $request->validate([
+            'status' => ['nullable', 'in:interested,interview_scheduled,hired,declined'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $link = $this->linkClientCandidate(
+            $client,
+            $candidate->id,
+            $validated['status'] ?? null,
+            $validated['notes'] ?? null
+        );
+
+        return $this->sendResponse($this->formatLink($link), 'Candidate link updated.', 200);
+    }
+
+    /**
+     * Attach each candidate's "My Candidates" link (status / notes / linked_at)
+     * so the card resource can present it without an extra query per row.
+     *
+     * @param  Collection<int, Candidate>  $candidates
+     */
+    private function attachCandidateLinks(int $clientId, Collection $candidates): void
+    {
+        $links = ClientCandidate::where('client_id', $clientId)
+            ->whereIn('candidate_id', $candidates->pluck('id'))
+            ->get()
+            ->keyBy('candidate_id');
+
+        $candidates->each(function (Candidate $candidate) use ($links): void {
+            $candidate->setRelation('clientLink', $links->get($candidate->id));
+        });
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function formatLink(?ClientCandidate $link): ?array
+    {
+        if (! $link) {
+            return null;
+        }
+
+        return [
+            'candidate_id' => $link->candidate_id,
+            'status' => $link->status,
+            'status_label' => Str::headline($link->status),
+            'notes' => $link->notes,
+            'linked_at' => $link->linked_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatInterviewResponse(LongTermJobInterview $interview, Candidate $candidate): array
+    {
+        return [
+            'id' => $interview->id,
+            'candidate' => [
+                'id' => $candidate->id,
+                'name' => $this->candidateFullName($candidate),
+                'image_url' => $candidate->image_url,
+            ],
+            'job_type' => 'long-term',
+            'interview_type' => $interview->interview_type,
+            'description' => $interview->description,
+            'special_note' => $interview->special_note,
+            'scheduled_date' => $interview->scheduled_date?->toDateString(),
+            'available_from' => $this->formatTime($interview->available_from),
+            'available_to' => $this->formatTime($interview->available_to),
+            'status' => $interview->status,
+            'requested_at' => $interview->created_at?->toIso8601String(),
+        ];
     }
 
     /**
