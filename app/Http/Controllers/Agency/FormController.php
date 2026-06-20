@@ -77,11 +77,7 @@ class FormController extends Controller
             'schema' => $this->builder->normalizeSchema($request->input('schema', ['blocks' => []])),
         ]);
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Form created successfully',
-            'data' => $form,
-        ], 201);
+        return $this->sendResponse($form, 'Form created successfully', 201);
     }
 
     /**
