@@ -372,25 +372,39 @@ class CandidateSeeder extends Seeder
             );
         }
 
-        $requiredKeys = ['resume', 'certification', 'background_check'];
+        $requiredDocuments = [
+            ['key' => 'resume', 'status' => 'uploaded', 'mime_type' => 'application/pdf', 'extension' => 'pdf'],
+            ['key' => 'certification', 'status' => 'uploaded', 'mime_type' => 'image/jpeg', 'extension' => 'jpg'],
+            ['key' => 'background_check', 'status' => 'pending', 'mime_type' => null, 'extension' => null],
+        ];
 
         foreach ($candidates as $candidate) {
-            foreach ($requiredKeys as $key) {
+            foreach ($requiredDocuments as $document) {
+                $isUploaded = $document['status'] === 'uploaded';
+                $slug = strtolower($candidate->first_name.'-'.$candidate->last_name.'-'.$document['key']);
+                $fileName = $slug.'.'.($document['extension'] ?? 'pdf');
+
                 CandidateDocument::firstOrCreate(
                     [
                         'candidate_id' => $candidate->id,
-                        'required_key' => $key,
+                        'required_key' => $document['key'],
                     ],
                     [
                         'agency_id' => $agency->id,
                         'category' => 'required',
-                        'title' => ucwords(str_replace('_', ' ', $key)),
-                        'description' => 'Required '.$key.' document for candidate.',
-                        'status' => 'pending',
+                        'title' => ucwords(str_replace('_', ' ', $document['key'])),
+                        'description' => 'Required '.$document['key'].' document for candidate.',
+                        'file_path' => $isUploaded ? 'candidate-documents/'.$candidate->id.'/'.$fileName : null,
+                        'original_file_name' => $isUploaded ? $fileName : null,
+                        'mime_type' => $document['mime_type'],
+                        'size' => $isUploaded ? rand(150000, 950000) : null,
+                        'status' => $document['status'],
                         'metadata' => json_encode(['upload_required' => true]),
                     ]
                 );
             }
+
+            $agreementFileName = strtolower($candidate->first_name.'-'.$candidate->last_name).'-service-agreement.pdf';
 
             CandidateDocument::firstOrCreate(
                 [
@@ -402,7 +416,12 @@ class CandidateSeeder extends Seeder
                     'category' => 'agreement',
                     'title' => $candidateTemplate->name.' - '.$candidate->first_name.' '.$candidate->last_name,
                     'description' => $candidateTemplate->content,
-                    'status' => 'pending',
+                    'file_path' => 'candidate-documents/'.$candidate->id.'/'.$agreementFileName,
+                    'original_file_name' => $agreementFileName,
+                    'mime_type' => 'application/pdf',
+                    'size' => rand(200000, 600000),
+                    'status' => 'signed',
+                    'signed_at' => now()->subDays(rand(5, 60)),
                     'metadata' => json_encode(['sent_via' => 'email', 'template_name' => $candidateTemplate->name]),
                 ]
             );
