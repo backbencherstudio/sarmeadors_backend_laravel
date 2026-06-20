@@ -11,7 +11,16 @@ class Form extends Model
         'name',
         'slug',
         'entity',
+        'application_type',
+        'user_type',
+        'job_type',
+        'schema',
         'status',
+    ];
+
+    protected $casts = [
+        'schema' => 'array',
+        'status' => 'boolean',
     ];
 
     public function fields()

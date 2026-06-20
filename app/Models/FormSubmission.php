@@ -9,6 +9,12 @@ class FormSubmission extends Model
     protected $fillable = [
         'form_id',
         'entity_id',
+        'entity_type',
+        'data',
+    ];
+
+    protected $casts = [
+        'data' => 'array',
     ];
 
     public function values()

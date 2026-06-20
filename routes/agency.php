@@ -235,12 +235,17 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     // reasons
     Route::post('/status-reasons', [StatusController::class, 'storeReasons']);
 
-    // Form
+    // Dynamic form builder
+    Route::get('/forms', [FormController::class, 'index']);
     Route::post('/forms', [FormController::class, 'store']);
-    Route::post('/form-fields', [FormFieldController::class, 'store']);
-
-    Route::post('/form-fields/reorder', [FormFieldController::class, 'reorder']);
     Route::get('/forms/{slug}', [FormController::class, 'show']);
+    Route::put('/forms/{id}', [FormController::class, 'update']);
+    Route::patch('/forms/{id}/status', [FormController::class, 'toggleStatus']);
+    Route::post('/forms/{slug}/submit', [FormController::class, 'submit']);
+
+    // Legacy flat form fields
+    Route::post('/form-fields', [FormFieldController::class, 'store']);
+    Route::post('/form-fields/reorder', [FormFieldController::class, 'reorder']);
 
     // Client Registration
     Route::post('/clients', [ClientController::class, 'store']);
