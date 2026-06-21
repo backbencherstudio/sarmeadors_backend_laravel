@@ -58,6 +58,25 @@ class Agency extends Model
         return ! empty($this->stripe_publishable_key) && ! empty($this->stripe_secret_key);
     }
 
+    /**
+     * The agency *intends* to charge a fee for short-term job postings,
+     * regardless of whether Stripe is wired up yet.
+     */
+    public function shortTermPaymentIntended(): bool
+    {
+        return (bool) $this->short_term_payment_required && $this->short_term_job_fee > 0;
+    }
+
+    /**
+     * Payment can actually be collected: the agency wants a fee AND Stripe is
+     * configured. When this is false but {@see shortTermPaymentIntended()} is
+     * true, the agency has a broken payment setup.
+     */
+    public function shortTermPaymentActive(): bool
+    {
+        return $this->shortTermPaymentIntended() && $this->hasStripeKeys();
+    }
+
     protected $hidden = [
         'stripe_secret_key',
         'stripe_publishable_key',

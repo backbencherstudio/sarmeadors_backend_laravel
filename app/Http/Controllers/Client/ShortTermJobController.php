@@ -294,9 +294,18 @@ class ShortTermJobController extends Controller
                 return $this->sendError('Client profile not found.', [], 404);
             }
 
-            $paymentRequired = $agency->short_term_payment_required
-                && $agency->hasStripeKeys()
-                && $agency->short_term_job_fee > 0;
+            // The agency requires a fee but hasn't connected Stripe: block the
+            // post instead of silently creating a free job (which would lose the
+            // agency money). The agency must finish payment setup first.
+            if ($agency->shortTermPaymentIntended() && ! $agency->hasStripeKeys()) {
+                return $this->sendError(
+                    'This agency requires payment to post a short-term job, but has not finished setting up payments yet. Please contact the agency.',
+                    [],
+                    422
+                );
+            }
+
+            $paymentRequired = $agency->shortTermPaymentActive();
 
             $validated = $request->validate([
                 // Job Details

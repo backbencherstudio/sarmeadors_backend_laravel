@@ -123,14 +123,20 @@ class AgencySettingsController extends Controller
         try {
             $agency = $request->current_agency;
 
-            $paymentRequired = (bool) $agency->short_term_payment_required
-                && $agency->hasStripeKeys()
-                && $agency->short_term_job_fee > 0;
+            $paymentRequired = $agency->shortTermPaymentActive();
+            // Agency wants a fee but Stripe isn't connected — a broken setup.
+            // The frontend should block posting and tell the user to contact
+            // the agency instead of rendering a card form it can't complete.
+            $paymentSetupIncomplete = $agency->shortTermPaymentIntended() && ! $agency->hasStripeKeys();
 
             return $this->sendResponse([
                 'payment_required' => $paymentRequired,
-                'short_term_job_fee' => $paymentRequired ? $agency->short_term_job_fee : null,
-                'short_term_job_fee_currency' => $paymentRequired ? $agency->short_term_job_fee_currency : null,
+                'payment_setup_incomplete' => $paymentSetupIncomplete,
+                'short_term_job_fee' => $agency->shortTermPaymentIntended() ? $agency->short_term_job_fee : null,
+                'short_term_job_fee_currency' => $agency->shortTermPaymentIntended() ? $agency->short_term_job_fee_currency : null,
+                // Publishable key is safe to expose; the frontend needs it to
+                // tokenize the card (generate the payment_method_id) via Stripe.js.
+                'stripe_publishable_key' => $paymentRequired ? $agency->stripe_publishable_key : null,
             ], 'success', 200);
         } catch (\Throwable $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);

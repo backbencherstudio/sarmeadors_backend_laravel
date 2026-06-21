@@ -25,13 +25,15 @@ class AgencySeeder extends Seeder
             'max_clients' => 100,
             'max_candidates' => 1000,
 
-            // Stripe — fill in real keys to enable payments
-            'stripe_publishable_key' => null,
-            'stripe_secret_key' => null,
+            // Stripe — default placeholder test keys so the payment flow is
+            // active out of the box. Replace with real Stripe test/live keys
+            // for actual charges to succeed.
+            'stripe_publishable_key' => 'pk_test_51SeederDefaultPublishableKey00000000',
+            'stripe_secret_key' => 'sk_test_51SeederDefaultSecretKey0000000000000000',
             'stripe_webhook_secret' => null,
 
-            // Short-term job fee — off by default
-            'short_term_payment_required' => false,
+            // Short-term job fee — payment required on
+            'short_term_payment_required' => true,
             'short_term_job_fee' => 40.00,
             'short_term_job_fee_currency' => 'usd',
             'short_term_auto_approve' => true,
