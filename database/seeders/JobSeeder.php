@@ -137,6 +137,12 @@ class JobSeeder extends Seeder
             ['title' => 'Toddler Playdate Care', 'status' => 'pending_payment', 'clientIdx' => 4, 'candidateIdx' => null],
             ['title' => 'Weekend Morning Care', 'status' => 'running', 'clientIdx' => 5, 'candidateIdx' => 0],
             ['title' => 'Saturday Sitter', 'status' => 'marketplace', 'clientIdx' => 5, 'candidateIdx' => null],
+
+            // One posting per remaining status so every short-term state is represented.
+            ['title' => 'Draft Babysitting Request', 'status' => 'draft', 'clientIdx' => 0, 'candidateIdx' => null],
+            ['title' => 'Overnight Care Request', 'status' => 'pending_approval', 'clientIdx' => 1, 'candidateIdx' => null],
+            ['title' => 'Cancelled Weekend Sitter', 'status' => 'cancelled', 'clientIdx' => 2, 'candidateIdx' => 1],
+            ['title' => 'Rejected Late Night Care', 'status' => 'rejected', 'clientIdx' => 3, 'candidateIdx' => null],
         ];
 
         $jobs = [];
@@ -161,6 +167,13 @@ class JobSeeder extends Seeder
                     'compensation_currency' => 'usd',
                     'compensation_type' => 'per_hour',
                     'status' => $config['status'],
+                    'rejection_reason' => $config['status'] === 'rejected'
+                        ? 'Agency could not verify the requested availability for this booking.'
+                        : null,
+                    'cancellation_reason' => $config['status'] === 'cancelled'
+                        ? 'Client cancelled due to a change in family plans.'
+                        : null,
+                    'cancelled_at' => $config['status'] === 'cancelled' ? now()->subDays(3) : null,
                     'broadcast_requested' => $config['status'] === 'marketplace',
                 ]
             );
@@ -192,6 +205,10 @@ class JobSeeder extends Seeder
             ['title' => 'Completed After-School Nanny 2024', 'status' => 'completed', 'clientIdx' => 3, 'candidateIdx' => 5, 'start' => '-320 days', 'end' => '-25 days'],
             ['title' => 'Completed Part-Time Nanny 2024', 'status' => 'completed', 'clientIdx' => 4, 'candidateIdx' => 6, 'start' => '-300 days', 'end' => '-30 days'],
             ['title' => 'Completed Weekend Nanny 2024', 'status' => 'completed', 'clientIdx' => 5, 'candidateIdx' => 7, 'start' => '-280 days', 'end' => '-18 days'],
+
+            // Cancelled & rejected placements so every long-term status is represented.
+            ['title' => 'Cancelled Live-Out Nanny', 'status' => 'cancelled', 'clientIdx' => 2, 'candidateIdx' => 2, 'start' => '-15 days', 'end' => '+200 days'],
+            ['title' => 'Rejected Live-In Nanny', 'status' => 'rejected', 'clientIdx' => 3, 'candidateIdx' => null, 'start' => '+20 days', 'end' => '+300 days'],
         ];
 
         $jobs = [];
@@ -241,6 +258,13 @@ class JobSeeder extends Seeder
                     'secondary_email' => 'david.'.strtolower($client->last_name).'@example.com',
                     'secondary_phone' => '+1 305 200 0099',
                     'status' => $config['status'],
+                    'rejection_reason' => $config['status'] === 'rejected'
+                        ? 'Family requirements could not be matched with an available nanny at this time.'
+                        : null,
+                    'cancellation_reason' => $config['status'] === 'cancelled'
+                        ? 'Placement cancelled after the family relocated unexpectedly.'
+                        : null,
+                    'cancelled_at' => $config['status'] === 'cancelled' ? now()->subDays(5) : null,
                     'broadcast_requested' => in_array($config['status'], ['marketplace', 'pending_approval'], true),
                 ]
             );
