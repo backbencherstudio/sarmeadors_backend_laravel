@@ -16,6 +16,16 @@ class LongTermJobChild extends Model
         'allergies',
     ];
 
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'date_of_birth' => 'date:Y-m-d',
+        ];
+    }
+
     public function job()
     {
         return $this->belongsTo(LongTermJob::class, 'long_term_job_id');
