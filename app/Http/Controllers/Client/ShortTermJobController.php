@@ -11,6 +11,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class ShortTermJobController extends Controller
 {
@@ -28,6 +30,22 @@ class ShortTermJobController extends Controller
             ->first();
     }
 
+    /**
+     * Translate the top-level `status` query param into the `filter[...]` shape
+     * Spatie QueryBuilder expects, so the existing tab contract
+     * (`?status=marketplace`) keeps working alongside native `?filter[status]=`.
+     */
+    private function jobFilterRequest(Request $request): Request
+    {
+        $filter = is_array($request->query('filter')) ? $request->query('filter') : [];
+
+        if ($request->filled('status')) {
+            $filter['status'] = $request->query('status');
+        }
+
+        return Request::create($request->url(), 'GET', ['filter' => $filter]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         try {
@@ -37,16 +55,13 @@ class ShortTermJobController extends Controller
                 return $this->sendError('Client profile not found.', [], 404);
             }
 
-            $status = $request->query('status');
-
-            $query = ShortTermJob::with(['dates', 'children', 'location'])
+            $baseQuery = ShortTermJob::with(['dates', 'children', 'location'])
                 ->where('client_id', $client->id);
 
-            if ($status) {
-                $query->where('status', $status);
-            }
-
-            $jobs = $query->latest()->get();
+            $jobs = QueryBuilder::for($baseQuery, $this->jobFilterRequest($request))
+                ->allowedFilters(AllowedFilter::exact('status'))
+                ->latest()
+                ->get();
 
             $counts = ShortTermJob::where('client_id', $client->id)
                 ->selectRaw('status, count(*) as total')

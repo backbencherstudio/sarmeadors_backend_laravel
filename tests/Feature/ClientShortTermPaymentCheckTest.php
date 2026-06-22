@@ -40,6 +40,22 @@ class ClientShortTermPaymentCheckTest extends TestCase
             ->assertJsonPath('data.stripe_publishable_key', 'pk_test_frontend_key');
     }
 
+    public function test_stripe_keys_are_stored_as_plaintext(): void
+    {
+        [$agency] = $this->createClientScenario();
+
+        $agency->update([
+            'stripe_publishable_key' => 'pk_test_frontend_key',
+            'stripe_secret_key' => 'sk_test_secret_key',
+        ]);
+
+        $raw = \DB::table('agencies')->where('id', $agency->id)->first();
+
+        $this->assertSame('pk_test_frontend_key', $raw->stripe_publishable_key);
+        $this->assertSame('sk_test_secret_key', $raw->stripe_secret_key);
+        $this->assertSame('pk_test_frontend_key', $agency->fresh()->stripe_publishable_key);
+    }
+
     public function test_payment_check_flags_incomplete_setup_when_fee_required_but_stripe_missing(): void
     {
         [$agency, $user] = $this->createClientScenario();

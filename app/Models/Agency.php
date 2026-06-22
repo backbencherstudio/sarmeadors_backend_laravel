@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -82,30 +81,6 @@ class Agency extends Model
         'stripe_publishable_key',
         'stripe_webhook_secret',
     ];
-
-    protected function stripeSecretKey(): Attribute
-    {
-        return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
-        );
-    }
-
-    protected function stripePublishableKey(): Attribute
-    {
-        return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
-        );
-    }
-
-    protected function stripeWebhookSecret(): Attribute
-    {
-        return Attribute::make(
-            get: fn (?string $value) => $value ? decrypt($value) : null,
-            set: fn (?string $value) => $value ? encrypt($value) : null,
-        );
-    }
 
     public function users()
     {
