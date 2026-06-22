@@ -189,6 +189,10 @@ class StripeService
             'amount' => (int) ($amount * 100),
             'currency' => strtolower($currency),
             'description' => 'Job Posting Fee'.($job ? ' – '.$job->title : ''),
+            'automatic_payment_methods' => [
+                'enabled' => true,
+                'allow_redirects' => 'never',
+            ],
             'metadata' => [
                 'job_id' => $job?->id,
                 'client_id' => $client->id,
