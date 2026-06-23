@@ -275,4 +275,31 @@ class AgencyTypeController extends Controller
 
         return response()->json(['message' => 'Agency type deleted successfully']);
     }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyType = Type::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyType) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyType->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency type status updated successfully',
+            'current_status' => $agencyType->status,
+        ]);
+    }
 }
