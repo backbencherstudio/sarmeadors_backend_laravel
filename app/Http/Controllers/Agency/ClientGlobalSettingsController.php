@@ -13,11 +13,11 @@ class ClientGlobalSettingsController extends Controller
     {
         $agency_id = auth('api')->user()->agency_id;
 
-        $settings = AgencyClientGlobalSetting::where('agency_id', $agency_id)->first();
+        $saved = AgencyClientGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
 
         return response()->json([
             'status' => true,
-            'data' => $settings ? $settings->settings : $this->defaultSettings(),
+            'data' => array_replace_recursive($this->defaultSettings(), $saved),
         ]);
     }
 
