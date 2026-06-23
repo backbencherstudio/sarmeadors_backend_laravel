@@ -197,6 +197,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('tag-update/{id}', [AgencyTagController::class, 'update']);
     Route::put('tag-bulk-update', [AgencyTagController::class, 'bulkUpdate']);
     Route::delete('tag-destroy/{id}', [AgencyTagController::class, 'destroy']);
+    Route::patch('tag-change-status/{id}', [AgencyTagController::class, 'changeStatus']);
 
     // agency event type management route
     Route::get('event-types', [AgencyEventTypeController::class, 'index']);
