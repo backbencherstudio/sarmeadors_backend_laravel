@@ -18,7 +18,7 @@ class AgencyLocationController extends Controller
 
         $agencyLocations = Location::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
-                return $query->where('location', 'like', '%' . $search . '%');
+                return $query->where('location', 'like', '%'.$search.'%');
             })->latest()->paginate($perPage);
 
         $agencyLocations->appends(['search' => $search, 'per_page' => $perPage]);
@@ -34,7 +34,7 @@ class AgencyLocationController extends Controller
                 'total' => $agencyLocations->total(),
                 'next_page_url' => $agencyLocations->nextPageUrl(),
                 'prev_page_url' => $agencyLocations->previousPageUrl(),
-            ]
+            ],
         ], 200);
     }
 
@@ -46,16 +46,16 @@ class AgencyLocationController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyLocation) {
+        if (! $agencyLocation) {
             return response()->json([
                 'status' => false,
-                'message' => 'Agency location not found or unauthorized'
+                'message' => 'Agency location not found or unauthorized',
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $agencyLocation
+            'data' => $agencyLocation,
         ], 200);
     }
 
@@ -72,8 +72,8 @@ class AgencyLocationController extends Controller
 
         $locations = $request->filled('locations') ? $request->input('locations') : [$request->input('location')];
         $locations = collect($locations)
-            ->filter(fn($value) => !is_null($value) && $value !== '')
-            ->map(fn($value) => trim($value))
+            ->filter(fn ($value) => ! is_null($value) && $value !== '')
+            ->map(fn ($value) => trim($value))
             ->filter()
             ->unique()
             ->values();
@@ -81,7 +81,7 @@ class AgencyLocationController extends Controller
         if ($locations->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one location using "location" or "locations".'
+                'message' => 'Please provide at least one location using "location" or "locations".',
             ], 422);
         }
 
@@ -90,17 +90,17 @@ class AgencyLocationController extends Controller
             ->pluck('location')
             ->toArray();
 
-        if (!empty($existingLocations)) {
+        if (! empty($existingLocations)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some locations already exist.',
-                'duplicates' => $existingLocations
+                'duplicates' => $existingLocations,
             ], 422);
         }
 
         $status = $request->status ?? 1;
         $now = now();
-        $rows = $locations->map(fn($location) => [
+        $rows = $locations->map(fn ($location) => [
             'agency_id' => $agencyId,
             'location' => $location,
             'status' => $status,
@@ -135,7 +135,7 @@ class AgencyLocationController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyLocation) {
+        if (! $agencyLocation) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -144,7 +144,7 @@ class AgencyLocationController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('locations')->ignore($agencyLocation->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('locations')->ignore($agencyLocation->id)->where(fn ($query) => $query->where('agency_id', $agencyId)),
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -154,7 +154,7 @@ class AgencyLocationController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency location updated successfully',
-            'data' => $agencyLocation
+            'data' => $agencyLocation,
         ], 200);
     }
 
@@ -170,13 +170,13 @@ class AgencyLocationController extends Controller
         ]);
 
         $updates = collect($request->input('updates'))
-            ->map(fn($item) => [...$item, 'location' => trim($item['location'])])
+            ->map(fn ($item) => [...$item, 'location' => trim($item['location'])])
             ->values();
 
-        if ($updates->contains(fn($item) => $item['location'] === '')) {
+        if ($updates->contains(fn ($item) => $item['location'] === '')) {
             return response()->json([
                 'status' => false,
-                'message' => 'Location cannot be empty.'
+                'message' => 'Location cannot be empty.',
             ], 422);
         }
 
@@ -194,7 +194,7 @@ class AgencyLocationController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Some Agency locations were not found or unauthorized.',
-                'missing_ids' => $missingIds
+                'missing_ids' => $missingIds,
             ], 404);
         }
 
@@ -204,11 +204,11 @@ class AgencyLocationController extends Controller
             ->pluck('location')
             ->toArray();
 
-        if (!empty($locationConflicts)) {
+        if (! empty($locationConflicts)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some locations already exist.',
-                'duplicates' => $locationConflicts
+                'duplicates' => $locationConflicts,
             ], 422);
         }
 
@@ -233,7 +233,7 @@ class AgencyLocationController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency locations updated successfully',
-            'data' => $updated
+            'data' => $updated,
         ], 200);
     }
 
@@ -243,12 +243,39 @@ class AgencyLocationController extends Controller
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$agencyLocation) {
+        if (! $agencyLocation) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
         $agencyLocation->delete();
 
         return response()->json(['message' => 'Agency location deleted successfully']);
+    }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyLocation = Location::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyLocation) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyLocation->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency location status updated successfully',
+            'current_status' => $agencyLocation->status,
+        ]);
     }
 }

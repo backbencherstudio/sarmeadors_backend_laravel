@@ -179,6 +179,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('location-update/{id}', [AgencyLocationController::class, 'update']);
     Route::put('location-bulk-update', [AgencyLocationController::class, 'bulkUpdate']);
     Route::delete('location-destroy/{id}', [AgencyLocationController::class, 'destroy']);
+    Route::patch('location-change-status/{id}', [AgencyLocationController::class, 'changeStatus']);
 
     // agency checklist management route
     Route::get('checklist', [AgencyChecklistController::class, 'index']);
