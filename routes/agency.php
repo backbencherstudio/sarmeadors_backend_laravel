@@ -170,6 +170,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('type-update/{id}', [AgencyTypeController::class, 'update']);
     Route::put('type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
     Route::delete('type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
+    Route::patch('type-change-status/{id}', [AgencyTypeController::class, 'changeStatus']);
 
     // agency location management route
     Route::get('locations', [AgencyLocationController::class, 'index']);
