@@ -16,9 +16,9 @@ class AgencyChecklistController extends Controller
         $search = $request->query('search');
         $type = $request->query('type');
 
-        if (!is_null($type)) {
+        if (! is_null($type)) {
             $type = is_string($type) ? strtolower(trim($type)) : $type;
-            if (!in_array($type, ['candidate', 'client'], true)) {
+            if (! in_array($type, ['candidate', 'client'], true)) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Invalid type. Allowed: candidate, client.',
@@ -28,7 +28,7 @@ class AgencyChecklistController extends Controller
 
         $agencyCheckList = CheckList::where('agency_id', auth('api')->user()->agency_id)
             ->when($search, function ($query, $search) {
-                return $query->where('name', 'like', '%' . $search . '%');
+                return $query->where('name', 'like', '%'.$search.'%');
             })
             ->when($type, function ($query, $type) {
                 return $query->where('type', $type);
@@ -49,7 +49,7 @@ class AgencyChecklistController extends Controller
                 'total' => $agencyCheckList->total(),
                 'next_page_url' => $agencyCheckList->nextPageUrl(),
                 'prev_page_url' => $agencyCheckList->previousPageUrl(),
-            ]
+            ],
         ], 200);
     }
 
@@ -61,16 +61,16 @@ class AgencyChecklistController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyCheckList) {
+        if (! $agencyCheckList) {
             return response()->json([
                 'status' => false,
-                'message' => 'Agency Checklist not found or unauthorized'
+                'message' => 'Agency Checklist not found or unauthorized',
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'data' => $agencyCheckList
+            'data' => $agencyCheckList,
         ], 200);
     }
 
@@ -93,8 +93,8 @@ class AgencyChecklistController extends Controller
 
         $names = $request->filled('names') ? $request->input('names') : [$request->input('name')];
         $names = collect($names)
-            ->filter(fn($value) => !is_null($value) && $value !== '')
-            ->map(fn($value) => trim($value))
+            ->filter(fn ($value) => ! is_null($value) && $value !== '')
+            ->map(fn ($value) => trim($value))
             ->filter()
             ->unique()
             ->values();
@@ -102,7 +102,7 @@ class AgencyChecklistController extends Controller
         if ($names->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Please provide at least one checklist using "name" or "names".'
+                'message' => 'Please provide at least one checklist using "name" or "names".',
             ], 422);
         }
 
@@ -111,18 +111,18 @@ class AgencyChecklistController extends Controller
             ->pluck('name')
             ->toArray();
 
-        if (!empty($existingNames)) {
+        if (! empty($existingNames)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some checklist already exist.',
-                'duplicates' => $existingNames
+                'duplicates' => $existingNames,
             ], 422);
         }
 
         $type = $request->input('type');
         $status = $request->status ?? 1;
         $now = now();
-        $rows = $names->map(fn($name) => [
+        $rows = $names->map(fn ($name) => [
             'agency_id' => $agencyId,
             'name' => $name,
             'type' => $type,
@@ -158,7 +158,7 @@ class AgencyChecklistController extends Controller
             ->where('agency_id', $agencyId)
             ->first();
 
-        if (!$agencyCheckList) {
+        if (! $agencyCheckList) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
@@ -167,7 +167,7 @@ class AgencyChecklistController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('check_lists')->ignore($agencyCheckList->id)->where(fn($query) => $query->where('agency_id', $agencyId))
+                Rule::unique('check_lists')->ignore($agencyCheckList->id)->where(fn ($query) => $query->where('agency_id', $agencyId)),
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -177,7 +177,7 @@ class AgencyChecklistController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency checklist updated successfully',
-            'data' => $agencyCheckList
+            'data' => $agencyCheckList,
         ], 200);
     }
 
@@ -193,13 +193,13 @@ class AgencyChecklistController extends Controller
         ]);
 
         $updates = collect($request->input('updates'))
-            ->map(fn($item) => [...$item, 'name' => trim($item['name'])])
+            ->map(fn ($item) => [...$item, 'name' => trim($item['name'])])
             ->values();
 
-        if ($updates->contains(fn($item) => $item['name'] === '')) {
+        if ($updates->contains(fn ($item) => $item['name'] === '')) {
             return response()->json([
                 'status' => false,
-                'message' => 'Name cannot be empty.'
+                'message' => 'Name cannot be empty.',
             ], 422);
         }
 
@@ -217,7 +217,7 @@ class AgencyChecklistController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Some agency checklist were not found or unauthorized.',
-                'missing_ids' => $missingIds
+                'missing_ids' => $missingIds,
             ], 404);
         }
 
@@ -227,11 +227,11 @@ class AgencyChecklistController extends Controller
             ->pluck('name')
             ->toArray();
 
-        if (!empty($nameConflicts)) {
+        if (! empty($nameConflicts)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Some checklist already exist.',
-                'duplicates' => $nameConflicts
+                'duplicates' => $nameConflicts,
             ], 422);
         }
 
@@ -256,7 +256,7 @@ class AgencyChecklistController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Agency checklist updated successfully',
-            'data' => $updated
+            'data' => $updated,
         ], 200);
     }
 
@@ -266,12 +266,39 @@ class AgencyChecklistController extends Controller
             ->where('agency_id', auth('api')->user()->agency_id)
             ->first();
 
-        if (!$agencyCheckList) {
+        if (! $agencyCheckList) {
             return response()->json(['message' => 'Unauthorized or Not Found'], 403);
         }
 
         $agencyCheckList->delete();
 
         return response()->json(['message' => 'Agency checklist deleted successfully']);
+    }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyCheckList = CheckList::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyCheckList) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyCheckList->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency checklist status updated successfully',
+            'current_status' => $agencyCheckList->status,
+        ]);
     }
 }

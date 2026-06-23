@@ -188,6 +188,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('checklist-update/{id}', [AgencyChecklistController::class, 'update']);
     Route::put('checklist-bulk-update', [AgencyChecklistController::class, 'bulkUpdate']);
     Route::delete('checklist-destroy/{id}', [AgencyChecklistController::class, 'destroy']);
+    Route::patch('checklist-change-status/{id}', [AgencyChecklistController::class, 'changeStatus']);
 
     // agency tags management route
     Route::get('tags', [AgencyTagController::class, 'index']);
