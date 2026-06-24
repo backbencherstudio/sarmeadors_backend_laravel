@@ -74,14 +74,7 @@ class CandidateMyJobController extends Controller
 
         if (in_array($filters['job_type'], ['all', 'short_term'])) {
             $shortTermQuery = ShortTermJob::query()
-                ->with([
-                    'client',
-                    'children',
-                    'dates',
-                    'latestAttendance',
-                    'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                    'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                ])
+                ->with($this->jobRelations('short_term', $filters['view'], $candidate))
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
 
@@ -98,14 +91,7 @@ class CandidateMyJobController extends Controller
 
         if (in_array($filters['job_type'], ['all', 'long_term'])) {
             $longTermQuery = LongTermJob::query()
-                ->with([
-                    'client',
-                    'children',
-                    'schedules',
-                    'latestAttendance',
-                    'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                    'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                ])
+                ->with($this->jobRelations('long_term', $filters['view'], $candidate))
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
 
@@ -121,6 +107,29 @@ class CandidateMyJobController extends Controller
         }
 
         return $jobs->values();
+    }
+
+    /**
+     * Relations to eager load for a job query. The calendar view expands every
+     * booking date into per-day events, so it needs children, occurrences, and
+     * the candidate's attendance and reviews. The list view only renders a
+     * summary card, so it needs the client and latest attendance.
+     *
+     * @return array<int|string, string|\Closure>
+     */
+    private function jobRelations(string $type, string $view, Candidate $candidate): array
+    {
+        if ($view !== 'calendar') {
+            return ['client', 'latestAttendance'];
+        }
+
+        return [
+            'client',
+            'children',
+            $type === 'short_term' ? 'dates' : 'schedules',
+            'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
+            'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
+        ];
     }
 
     private function queryBuilderRequest(Request $request, array $filters): Request
