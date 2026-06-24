@@ -169,12 +169,17 @@ class CandidateMyJobsTest extends TestCase
         $runningResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Running Job')
+            ->assertJsonPath('data.jobs.0.id', $runningJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Running Nanny')
-            ->assertJsonPath('data.jobs.0.attendance.checked_in_at', '8:52 AM')
-            ->assertJsonPath('data.jobs.0.attendance.checked_out_at', '9:05 AM')
-            ->assertJsonPath('data.jobs.0.actions.can_check_in', false)
-            ->assertJsonPath('data.jobs.0.actions.check_in_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-in")
-            ->assertJsonPath('data.jobs.0.actions.check_out_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-out");
+            ->assertJsonPath('data.jobs.0.job_type', 'short_term')
+            ->assertJsonPath('data.jobs.0.status', 'running')
+            ->assertJsonPath('data.jobs.0.client_name', 'Arlene McCoy')
+            ->assertJsonPath('data.jobs.0.address.city', 'Crownthorpe')
+            ->assertJsonPath('data.jobs.0.compensation.type', 'per_hour')
+            ->assertJsonPath('data.jobs.0.can_check_in', false)
+            ->assertJsonPath('data.jobs.0.can_check_out', false)
+            ->assertJsonMissingPath('data.jobs.0.actions')
+            ->assertJsonMissingPath('data.jobs_by_date');
 
         $completedResponse = $this
             ->actingAs($user, 'api')
@@ -184,12 +189,12 @@ class CandidateMyJobsTest extends TestCase
         $completedResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Completed Job')
+            ->assertJsonPath('data.jobs.0.id', $completedJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Completed Nanny')
-            ->assertJsonPath('data.jobs.0.working_time.total_minutes', 125)
-            ->assertJsonPath('data.jobs.0.working_time.total_label', '2h 5m')
-            ->assertJsonPath('data.jobs.0.actions.can_view_review', true)
-            ->assertJsonPath('data.jobs.0.actions.can_leave_review', false)
-            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/long-term/{$completedJob->id}/client-report");
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term')
+            ->assertJsonPath('data.jobs.0.status', 'completed')
+            ->assertJsonPath('data.jobs.0.can_check_in', false)
+            ->assertJsonPath('data.jobs.0.can_check_out', false);
 
         $this
             ->actingAs($user, 'api')
@@ -216,10 +221,11 @@ class CandidateMyJobsTest extends TestCase
         $cancelledResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Cancelled Job')
+            ->assertJsonPath('data.jobs.0.id', $cancelledJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Cancelled Nanny')
-            ->assertJsonPath('data.jobs.0.cancellation.reason', 'Family plans changed.')
-            ->assertJsonPath('data.jobs.0.actions.can_report_client', true)
-            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/short-term/{$cancelledJob->id}/client-report");
+            ->assertJsonPath('data.jobs.0.status', 'cancelled')
+            ->assertJsonPath('data.jobs.0.latest_attendance', null)
+            ->assertJsonPath('data.jobs.0.can_check_in', false);
 
         $this
             ->actingAs($user, 'api')
