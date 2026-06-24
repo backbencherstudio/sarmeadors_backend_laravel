@@ -3,23 +3,33 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Models\DocumentTemplate;
+use App\Models\MessageTemplate;
 use App\Models\Status;
-use App\Models\StatusTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class StatusTemplateController extends Controller
 {
-    public function getProcessFlow()
+    public function getProcessFlow(Request $request)
     {
-        $agencyId = auth()->user()->agency_id;
+        $agencyId = auth('api')->user()->agency_id;
+        $type = $request->query('type', 'client');
 
-        $flow = Status::where('agency_id', $agencyId)
-            ->with('statusTemplates.template')
+        if (! in_array($type, ['client', 'candidate'], true)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid type. Allowed: client, candidate.',
+            ], 422);
+        }
+
+        $statuses = Status::where('agency_id', $agencyId)
+            ->where('type', $type)
             ->orderBy('serial', 'asc')
             ->get();
 
-        if ($flow->isEmpty()) {
+        if ($statuses->isEmpty()) {
             return response()->json([
                 'status' => 'info',
                 'message' => 'No process flow found.',
@@ -27,24 +37,20 @@ class StatusTemplateController extends Controller
             ], 200);
         }
 
-        $formattedFlow = $flow->map(function ($status) {
+        $formattedFlow = $statuses->map(function ($status) use ($agencyId, $type) {
             return [
                 'status_id' => $status->id,
                 'status_name' => $status->name,
                 'status_color' => $status->color,
                 'serial' => $status->serial,
                 'status_type' => $status->type,
-                'templates' => $status->statusTemplates->groupBy('template_type')->map(function ($items) {
-                    return $items->map(function ($item) {
-                        return [
-                            'status_template_id' => $item->id,
-                            'template_id' => $item->template->id,
-                            'template_title' => $item->template->title,
-                            'template_content' => $item->template->content,
-                            'template_type' => $item->template->type,
-                        ];
-                    });
-                }),
+                'document_templates' => DocumentTemplate::where('agency_id', $agencyId)
+                    ->where('trigger_status_id', $status->id)
+                    ->where('user_type', $type)
+                    ->get(['id', 'name', 'user_type', 'trigger_status_id', 'post_sign_status_id']),
+                'email_templates' => MessageTemplate::where('agency_id', $agencyId)
+                    ->where('status', $status->id)
+                    ->get(['id', 'name', 'subject', 'status']),
             ];
         });
 
@@ -55,111 +61,145 @@ class StatusTemplateController extends Controller
         ], 200);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $data = StatusTemplate::whereHas('status', function ($q) {
-            $q->where('agency_id', auth()->user()->agency_id);
-        })
-            ->with(['status', 'template'])
-            ->find($id);
+        $agencyId = auth('api')->user()->agency_id;
 
-        if (! $data) {
+        $request->validate([
+            'template_type' => 'required|in:email_template,document_template',
+        ]);
+
+        $template = $this->findTemplate($request->template_type, $id, $agencyId);
+
+        if (! $template) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Status template not found or Unauthorized access',
+                'message' => 'Template not found or unauthorized access',
             ], 404);
         }
+
+        $statusId = $request->template_type === 'document_template'
+            ? $template->trigger_status_id
+            : $template->status;
+
+        $status = $statusId ? Status::where('agency_id', $agencyId)->find($statusId) : null;
 
         return response()->json([
             'status' => 'success',
             'message' => 'Data retrieved successfully',
             'data' => [
-                'status_template_id' => $data->id,
-                'status_id' => $data->status_id,
-                'status_name' => $data->status->name,
-                'template_id' => $data->template_id,
-                'template_title' => $data->template->title,
-                'template_type' => $data->template_type,
-                'template_content' => $data->template->content,
+                'template_id' => $template->id,
+                'template_type' => $request->template_type,
+                'status_id' => $status?->id,
+                'status_name' => $status?->name,
+                'template' => $template,
             ],
         ], 200);
     }
 
     public function store(Request $request)
     {
+        $agencyId = auth('api')->user()->agency_id;
+
         $request->validate([
             'status_id' => 'required|integer',
             'template_id' => 'required|integer',
-            'template_type' => 'required|string',
+            'template_type' => 'required|in:email_template,document_template',
         ]);
 
         $status = Status::where('id', $request->status_id)
-            ->where('agency_id', auth()->user()->agency_id)
+            ->where('agency_id', $agencyId)
             ->first();
 
         if (! $status) {
             return response()->json(['message' => 'Unauthorized Status ID'], 403);
         }
 
-        $statusTemplate = StatusTemplate::create([
-            'status_id' => $request->status_id,
-            'template_id' => $request->template_id,
-            'template_type' => $request->template_type,
-        ]);
+        $template = $this->findTemplate($request->template_type, $request->template_id, $agencyId);
 
-        return response()->json(['status' => 'success', 'data' => $statusTemplate], 201);
+        if (! $template) {
+            return response()->json(['message' => 'Template not found or unauthorized'], 404);
+        }
+
+        if ($request->template_type === 'document_template') {
+            $template->update(['trigger_status_id' => $status->id]);
+        } else {
+            $template->update(['status' => $status->id]);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Template attached to status successfully',
+            'data' => $template,
+        ], 201);
     }
 
     public function update(Request $request, $id)
     {
+        $agencyId = auth('api')->user()->agency_id;
+
         $request->validate([
             'status_id' => 'required|integer',
-            'template_id' => 'required|integer',
-            'template_type' => 'required|string',
+            'template_type' => 'required|in:email_template,document_template',
         ]);
 
-        $statusTemplate = StatusTemplate::whereHas('status', function ($q) {
-            $q->where('agency_id', auth()->user()->agency_id);
-        })->find($id);
+        $status = Status::where('id', $request->status_id)
+            ->where('agency_id', $agencyId)
+            ->first();
 
-        if (! $statusTemplate) {
-            return response()->json(['message' => 'Status Template not found or Unauthorized'], 404);
-        }
-
-        $validStatus = Status::where('id', $request->status_id)
-            ->where('agency_id', auth()->user()->agency_id)
-            ->exists();
-
-        if (! $validStatus) {
+        if (! $status) {
             return response()->json(['message' => 'The selected Status is unauthorized'], 403);
         }
 
-        $statusTemplate->update([
-            'status_id' => $request->status_id,
-            'template_id' => $request->template_id,
-            'template_type' => $request->template_type,
-        ]);
+        $template = $this->findTemplate($request->template_type, $id, $agencyId);
+
+        if (! $template) {
+            return response()->json(['message' => 'Template not found or unauthorized'], 404);
+        }
+
+        if ($request->template_type === 'document_template') {
+            $template->update(['trigger_status_id' => $status->id]);
+        } else {
+            $template->update(['status' => $status->id]);
+        }
 
         return response()->json([
             'status' => 'success',
             'message' => 'Status template updated successfully',
-            'data' => $statusTemplate->load('template'),
+            'data' => $template,
         ], 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $statusTemplate = StatusTemplate::whereHas('status', function ($q) {
-            $q->where('agency_id', auth()->user()->agency_id);
-        })->find($id);
+        $agencyId = auth('api')->user()->agency_id;
 
-        if (! $statusTemplate) {
-            return response()->json(['message' => 'Status template not found or Unauthorized access'], 404);
+        $request->validate([
+            'template_type' => 'required|in:email_template,document_template',
+        ]);
+
+        $template = $this->findTemplate($request->template_type, $id, $agencyId);
+
+        if (! $template) {
+            return response()->json(['message' => 'Template not found or unauthorized access'], 404);
         }
 
-        $statusTemplate->delete();
+        if ($request->template_type === 'document_template') {
+            $template->update(['trigger_status_id' => null]);
+        } else {
+            $template->update(['status' => null]);
+        }
 
-        return response()->json(['status' => 'success', 'message' => 'Deleted']);
+        return response()->json(['status' => 'success', 'message' => 'Template detached from status']);
+    }
+
+    private function findTemplate(string $templateType, int $templateId, int $agencyId): DocumentTemplate|MessageTemplate|null
+    {
+        if ($templateType === 'document_template') {
+            return DocumentTemplate::where('agency_id', $agencyId)->find($templateId);
+        }
+
+        return MessageTemplate::where('agency_id', $agencyId)->find($templateId);
     }
 
     // Create new status
@@ -170,7 +210,15 @@ class StatusTemplateController extends Controller
         $request->validate([
             'after_status_id' => 'required|exists:statuses,id',
             'type' => 'required|in:client,candidate|max:50',
-            'name' => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,'.$authUser->agency_id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('statuses')->where(function ($query) use ($authUser, $request) {
+                    return $query->where('agency_id', $authUser->agency_id)
+                        ->where('type', $request->type);
+                }),
+            ],
             'color' => 'required|string|max:50',
         ]);
 
