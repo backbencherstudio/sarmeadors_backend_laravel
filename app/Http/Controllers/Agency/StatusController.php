@@ -10,15 +10,15 @@ use Illuminate\Validation\Rule;
 
 class StatusController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $authUser = auth('api')->user();
 
-        $query = Status::with('agency:id,first_name')->orderBy('serial');
+        $query = Status::with('agency:id,name')->orderBy('serial');
         $query->where('agency_id', $authUser->agency_id);
 
-        if (request()->filled('type')) {
-            $query->where('type', request('type'));
+        if ($request->query('type')) {
+            $query->where('type', $request->query('type'));
         }
 
         return response()->json([
@@ -34,9 +34,16 @@ class StatusController extends Controller
 
         $request->validate([
             'type' => 'required|in:client,candidate|max:50',
-            'name' => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,'.$authUser->agency_id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('statuses')->where(function ($query) use ($authUser, $request) {
+                    return $query->where('agency_id', $authUser->agency_id)
+                        ->where('type', $request->type);
+                }),
+            ],
             'color' => 'required|string|max:50',
-
         ]);
 
         $lastSerial = Status::where('agency_id', $authUser->agency_id)
@@ -87,7 +94,15 @@ class StatusController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255|unique:statuses,name,'.$status->id.',id,agency_id,'.$authUser->agency_id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('statuses')->ignore($status->id)->where(function ($query) use ($authUser, $status) {
+                    return $query->where('agency_id', $authUser->agency_id)
+                        ->where('type', $status->type);
+                }),
+            ],
             'color' => 'required|string|max:50',
         ]);
 
