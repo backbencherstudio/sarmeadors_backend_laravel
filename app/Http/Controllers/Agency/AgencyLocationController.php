@@ -251,4 +251,31 @@ class AgencyLocationController extends Controller
 
         return response()->json(['message' => 'Agency location deleted successfully']);
     }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyLocation = Location::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyLocation) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyLocation->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency location status updated successfully',
+            'current_status' => $agencyLocation->status,
+        ]);
+    }
 }

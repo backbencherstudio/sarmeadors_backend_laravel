@@ -11,7 +11,9 @@ use App\Http\Controllers\Agency\AgencyNotificationController;
 use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
+use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
 use App\Http\Controllers\Agency\ClientController;
+use App\Http\Controllers\Agency\ClientGlobalSettingsController;
 use App\Http\Controllers\Agency\DocumentTemplateController;
 use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Agency\FormFieldController;
@@ -150,6 +152,14 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     // agency global info management route
     Route::get('/agency-info', [AgencyController::class, 'info']);
     Route::post('info-update/{id}', [AgencyController::class, 'infoUpdate']);
+
+    // client global settings
+    Route::get('settings/client', [ClientGlobalSettingsController::class, 'getClientGlobalSettings']);
+    Route::post('settings/client', [ClientGlobalSettingsController::class, 'updateClientGlobalSettings']);
+
+    // candidate global settings
+    Route::get('settings/candidate', [CandidateGlobalSettingsController::class, 'getCandidateGlobalSettings']);
+    Route::post('settings/candidate', [CandidateGlobalSettingsController::class, 'updateCandidateGlobalSettings']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
@@ -161,6 +171,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('type-update/{id}', [AgencyTypeController::class, 'update']);
     Route::put('type-bulk-update', [AgencyTypeController::class, 'bulkUpdate']);
     Route::delete('type-destroy/{id}', [AgencyTypeController::class, 'destroy']);
+    Route::patch('type-change-status/{id}', [AgencyTypeController::class, 'changeStatus']);
 
     // agency location management route
     Route::get('locations', [AgencyLocationController::class, 'index']);
@@ -169,6 +180,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('location-update/{id}', [AgencyLocationController::class, 'update']);
     Route::put('location-bulk-update', [AgencyLocationController::class, 'bulkUpdate']);
     Route::delete('location-destroy/{id}', [AgencyLocationController::class, 'destroy']);
+    Route::patch('location-change-status/{id}', [AgencyLocationController::class, 'changeStatus']);
 
     // agency checklist management route
     Route::get('checklist', [AgencyChecklistController::class, 'index']);
@@ -177,6 +189,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('checklist-update/{id}', [AgencyChecklistController::class, 'update']);
     Route::put('checklist-bulk-update', [AgencyChecklistController::class, 'bulkUpdate']);
     Route::delete('checklist-destroy/{id}', [AgencyChecklistController::class, 'destroy']);
+    Route::patch('checklist-change-status/{id}', [AgencyChecklistController::class, 'changeStatus']);
 
     // agency tags management route
     Route::get('tags', [AgencyTagController::class, 'index']);
@@ -185,6 +198,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('tag-update/{id}', [AgencyTagController::class, 'update']);
     Route::put('tag-bulk-update', [AgencyTagController::class, 'bulkUpdate']);
     Route::delete('tag-destroy/{id}', [AgencyTagController::class, 'destroy']);
+    Route::patch('tag-change-status/{id}', [AgencyTagController::class, 'changeStatus']);
 
     // agency event type management route
     Route::get('event-types', [AgencyEventTypeController::class, 'index']);

@@ -167,7 +167,7 @@ class AgencyTagController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('check_lists')->ignore($agencyTag->id)->where(fn ($query) => $query->where('agency_id', $agencyId)),
+                Rule::unique('tags')->ignore($agencyTag->id)->where(fn ($query) => $query->where('agency_id', $agencyId)),
             ],
             'status' => 'nullable|in:0,1',
         ]);
@@ -273,5 +273,32 @@ class AgencyTagController extends Controller
         $agencyTag->delete();
 
         return response()->json(['message' => 'Agency tag deleted successfully']);
+    }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyTag = Tag::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyTag) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyTag->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency tag status updated successfully',
+            'current_status' => $agencyTag->status,
+        ]);
     }
 }

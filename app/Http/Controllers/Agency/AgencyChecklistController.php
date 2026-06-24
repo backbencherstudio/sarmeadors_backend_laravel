@@ -274,4 +274,31 @@ class AgencyChecklistController extends Controller
 
         return response()->json(['message' => 'Agency checklist deleted successfully']);
     }
+
+    public function changeStatus(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $agencyCheckList = CheckList::where('id', $id)
+            ->where('agency_id', $agencyId)
+            ->first();
+
+        if (! $agencyCheckList) {
+            return response()->json(['message' => 'Unauthorized or Not Found'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:0,1',
+        ]);
+
+        $agencyCheckList->update([
+            'status' => $request->status,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency checklist status updated successfully',
+            'current_status' => $agencyCheckList->status,
+        ]);
+    }
 }
