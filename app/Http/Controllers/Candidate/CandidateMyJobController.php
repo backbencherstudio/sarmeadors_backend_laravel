@@ -78,8 +78,8 @@ class CandidateMyJobController extends Controller
                     'client',
                     'children',
                     'dates',
-                    'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                    'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
+                    'attendance' => fn($query) => $query->where('candidate_id', $candidate->id),
+                    'reviews' => fn($query) => $query->where('candidate_id', $candidate->id),
                 ])
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
@@ -87,7 +87,7 @@ class CandidateMyJobController extends Controller
             $shortTermJobs = QueryBuilder::for($shortTermQuery, $queryBuilderRequest)
                 ->allowedFilters(...$this->allowedJobFilters())
                 ->get()
-                ->map(fn (ShortTermJob $job): array => [
+                ->map(fn(ShortTermJob $job): array => [
                     'type' => 'short_term',
                     'job' => $job,
                 ]);
@@ -101,8 +101,8 @@ class CandidateMyJobController extends Controller
                     'client',
                     'children',
                     'schedules',
-                    'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
-                    'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
+                    'attendance' => fn($query) => $query->where('candidate_id', $candidate->id),
+                    'reviews' => fn($query) => $query->where('candidate_id', $candidate->id),
                 ])
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
@@ -110,7 +110,7 @@ class CandidateMyJobController extends Controller
             $longTermJobs = QueryBuilder::for($longTermQuery, $queryBuilderRequest)
                 ->allowedFilters(...$this->allowedJobFilters())
                 ->get()
-                ->map(fn (LongTermJob $job): array => [
+                ->map(fn(LongTermJob $job): array => [
                     'type' => 'long_term',
                     'job' => $job,
                 ]);
@@ -179,7 +179,7 @@ class CandidateMyJobController extends Controller
         $end = $start->copy()->endOfMonth();
 
         $events = $jobs
-            ->flatMap(fn (array $item): Collection => $this->formatCalendarEvents($item['type'], $item['job'], $start, $end))
+            ->flatMap(fn(array $item): Collection => $this->formatCalendarEvents($item['type'], $item['job'], $start, $end))
             ->sortBy(['date', 'time.from'])
             ->values();
 
@@ -192,7 +192,7 @@ class CandidateMyJobController extends Controller
                 'status' => $filters['status'],
             ],
             'events' => $events,
-            'events_by_date' => $events->groupBy('date'),
+            // 'events_by_date' => $events->groupBy('date'),
         ];
     }
 
@@ -200,8 +200,8 @@ class CandidateMyJobController extends Controller
     {
         if ($type === 'short_term') {
             return $job->dates
-                ->filter(fn ($date): bool => Carbon::parse($date->booking_date)->betweenIncluded($start, $end))
-                ->map(fn ($date): array => $this->formatJobCard($type, $job, [
+                ->filter(fn($date): bool => Carbon::parse($date->booking_date)->betweenIncluded($start, $end))
+                ->map(fn($date): array => $this->formatJobCard($type, $job, [
                     'date' => Carbon::parse($date->booking_date)->toDateString(),
                     'time_from' => $date->start_time,
                     'time_to' => $date->end_time,
@@ -209,7 +209,7 @@ class CandidateMyJobController extends Controller
         }
 
         return $this->longTermOccurrences($job, $start, $end)
-            ->map(fn (array $occurrence): array => $this->formatJobCard($type, $job, $occurrence));
+            ->map(fn(array $occurrence): array => $this->formatJobCard($type, $job, $occurrence));
     }
 
     private function longTermOccurrences(LongTermJob $job, Carbon $start, Carbon $end): Collection
@@ -225,8 +225,8 @@ class CandidateMyJobController extends Controller
 
         return $job->schedules->flatMap(function ($schedule) use ($dates): Collection {
             return $dates
-                ->filter(fn (Carbon $date): bool => $date->dayOfWeek === (int) $schedule->day_of_week)
-                ->map(fn (Carbon $date): array => [
+                ->filter(fn(Carbon $date): bool => $date->dayOfWeek === (int) $schedule->day_of_week)
+                ->map(fn(Carbon $date): array => [
                     'date' => $date->toDateString(),
                     'time_from' => $schedule->start_time,
                     'time_to' => $schedule->end_time,
@@ -237,7 +237,7 @@ class CandidateMyJobController extends Controller
     private function formatList(Collection $jobs, array $filters): array
     {
         $cards = $jobs
-            ->flatMap(fn (array $item): Collection => $this->formatListCards($item['type'], $item['job']))
+            ->flatMap(fn(array $item): Collection => $this->formatListCards($item['type'], $item['job']))
             ->sortBy([['date', 'asc'], ['time.from', 'asc']])
             ->values();
 
@@ -249,7 +249,7 @@ class CandidateMyJobController extends Controller
             ],
             'title' => $this->formatStatusHeading($filters['status']),
             'jobs' => $cards,
-            'jobs_by_date' => $cards->groupBy(fn (array $card): string => $card['date'] ?? 'unscheduled'),
+            'jobs_by_date' => $cards->groupBy(fn(array $card): string => $card['date'] ?? 'unscheduled'),
         ];
     }
 
@@ -258,7 +258,7 @@ class CandidateMyJobController extends Controller
         if ($type === 'short_term') {
             return $job->dates
                 ->sortBy(['booking_date', 'start_time'])
-                ->map(fn ($date): array => $this->formatJobCard($type, $job, [
+                ->map(fn($date): array => $this->formatJobCard($type, $job, [
                     'date' => Carbon::parse($date->booking_date)->toDateString(),
                     'time_from' => $date->start_time,
                     'time_to' => $date->end_time,
@@ -269,7 +269,7 @@ class CandidateMyJobController extends Controller
         $windowEnd = now()->copy()->addMonths(2)->endOfMonth();
 
         return $this->longTermOccurrences($job, $windowStart, $windowEnd)
-            ->map(fn (array $occurrence): array => $this->formatJobCard($type, $job, $occurrence));
+            ->map(fn(array $occurrence): array => $this->formatJobCard($type, $job, $occurrence));
     }
 
     private function formatJobCard(string $type, ShortTermJob|LongTermJob $job, array $occurrence): array
@@ -278,7 +278,7 @@ class CandidateMyJobController extends Controller
         $review = $job->reviews->first();
 
         return [
-            'id' => $type.'_'.$job->id.'_'.$occurrence['date'],
+            'id' => $type . '_' . $job->id . '_' . $occurrence['date'],
             'job_id' => $job->id,
             'job_type' => $type,
             'job_type_label' => $type === 'short_term' ? 'Short-term' : 'Long-term',
@@ -297,7 +297,7 @@ class CandidateMyJobController extends Controller
             'time' => [
                 'from' => $this->formatTime($occurrence['time_from']),
                 'to' => $this->formatTime($occurrence['time_to']),
-                'range' => $this->formatTime($occurrence['time_from']).' - '.$this->formatTime($occurrence['time_to']),
+                'range' => $this->formatTime($occurrence['time_from']) . ' - ' . $this->formatTime($occurrence['time_to']),
             ],
             'compensation' => $this->formatCompensation($job),
             'status' => $job->status,
@@ -330,7 +330,7 @@ class CandidateMyJobController extends Controller
                 'title' => $job->title,
                 'subtitle' => $this->formatClientName($job),
                 'date' => Carbon::parse($occurrence['date'])->format('d M, D'),
-                'time_range' => $this->formatTime($occurrence['time_from']).' - '.$this->formatTime($occurrence['time_to']),
+                'time_range' => $this->formatTime($occurrence['time_from']) . ' - ' . $this->formatTime($occurrence['time_to']),
                 'can_check_in' => $this->canCheckIn($job, $occurrence['date'], $attendance),
             ],
         ];
@@ -338,7 +338,7 @@ class CandidateMyJobController extends Controller
 
     private function formatWorkingTime(ShortTermJob|LongTermJob $job): array
     {
-        $totalMinutes = (int) $job->attendance->sum(fn (ShortTermJobAttendance|LongTermJobAttendance $attendance): int => $attendance->duration_minutes);
+        $totalMinutes = (int) $job->attendance->sum(fn(ShortTermJobAttendance|LongTermJobAttendance $attendance): int => $attendance->duration_minutes);
 
         return [
             'total_minutes' => $totalMinutes,
@@ -349,8 +349,8 @@ class CandidateMyJobController extends Controller
     private function attendanceForDate(string $type, ShortTermJob|LongTermJob $job, string $date): ShortTermJobAttendance|LongTermJobAttendance|null
     {
         return $type === 'short_term'
-            ? $job->attendance->first(fn (ShortTermJobAttendance $attendance): bool => $attendance->booking_date?->toDateString() === $date)
-            : $job->attendance->first(fn (LongTermJobAttendance $attendance): bool => $attendance->date?->toDateString() === $date);
+            ? $job->attendance->first(fn(ShortTermJobAttendance $attendance): bool => $attendance->booking_date?->toDateString() === $date)
+            : $job->attendance->first(fn(LongTermJobAttendance $attendance): bool => $attendance->date?->toDateString() === $date);
     }
 
     private function formatAttendance(ShortTermJobAttendance|LongTermJobAttendance|null $attendance): array
@@ -402,7 +402,7 @@ class CandidateMyJobController extends Controller
 
     private function formatClientName(ShortTermJob|LongTermJob $job): ?string
     {
-        return $job->client ? trim($job->client->first_name.' '.$job->client->last_name) : null;
+        return $job->client ? trim($job->client->first_name . ' ' . $job->client->last_name) : null;
     }
 
     private function formatDuration(int $minutes): string
@@ -410,7 +410,7 @@ class CandidateMyJobController extends Controller
         $hours = intdiv($minutes, 60);
         $remainingMinutes = $minutes % 60;
 
-        return trim($hours.'h '.$remainingMinutes.'m');
+        return trim($hours . 'h ' . $remainingMinutes . 'm');
     }
 
     private function candidateJobUrl(string $type, ShortTermJob|LongTermJob $job, ?string $suffix): string
@@ -438,7 +438,7 @@ class CandidateMyJobController extends Controller
             'completed' => 'Completed Job',
             'cancelled' => 'Cancelled Job',
             'all' => 'All Jobs',
-            default => Str::headline($status).' Job',
+            default => Str::headline($status) . ' Job',
         };
     }
 }
