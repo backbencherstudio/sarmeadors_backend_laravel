@@ -11,6 +11,7 @@ use App\Http\Controllers\Agency\AgencyNotificationController;
 use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
+use App\Http\Controllers\Agency\CandidateController;
 use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
 use App\Http\Controllers\Agency\ClientController;
 use App\Http\Controllers\Agency\ClientGlobalSettingsController;
@@ -165,6 +166,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     // candidate global settings
     Route::get('settings/candidate', [CandidateGlobalSettingsController::class, 'getCandidateGlobalSettings']);
     Route::post('settings/candidate', [CandidateGlobalSettingsController::class, 'updateCandidateGlobalSettings']);
+
+    // candidate table settings (dashboard columns + candidate statuses) for the "Candidate Table Settings" panel
+    Route::get('settings/candidate/table', [CandidateGlobalSettingsController::class, 'getCandidateTableSettings']);
+    Route::post('settings/candidate/table', [CandidateGlobalSettingsController::class, 'updateCandidateTableSettings']);
+    Route::get('settings/candidate/table/columns', [CandidateGlobalSettingsController::class, 'getAvailableCandidateColumns']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
@@ -271,4 +277,9 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
     Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
+
+    Route::get('/candidates', [CandidateController::class, 'index']);
+    Route::post('/candidates', [CandidateController::class, 'store']);
+    Route::get('/candidates/{id}', [CandidateController::class, 'show']);
+    Route::patch('/candidates/{id}/status', [CandidateController::class, 'updateStatus']);
 });

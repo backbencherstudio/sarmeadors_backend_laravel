@@ -19,6 +19,9 @@ class Candidate extends Model
         'image',
         'type_id',
         'location_id',
+        'checklist_id',
+        'tag_id',
+        'status_id',
 
         // Personal info
         'date_of_birth',
@@ -62,6 +65,9 @@ class Candidate extends Model
     protected $casts = [
         'type_id' => 'array',
         'location_id' => 'array',
+        'checklist_id' => 'array',
+        'tag_id' => 'array',
+        'status_id' => 'array',
         'available_for' => 'array',
         'interested_in_iowa' => 'boolean',
         'work_legally_in_us' => 'boolean',
@@ -74,6 +80,11 @@ class Candidate extends Model
     public function getImageUrlAttribute()
     {
         return $this->image ? asset('storage/'.$this->image) : null;
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim($this->first_name.' '.$this->last_name);
     }
 
     public function reviews()
@@ -104,19 +115,14 @@ class Candidate extends Model
         return $this->reviews()->count();
     }
 
-    public function type()
-    {
-        return $this->belongsTo(Type::class);
-    }
-
-    public function location()
-    {
-        return $this->belongsTo(Location::class);
-    }
-
     public function agency()
     {
         return $this->belongsTo(Agency::class);
+    }
+
+    public function submissions()
+    {
+        return $this->hasMany(FormSubmission::class, 'entity_id');
     }
 
     public function availability()
