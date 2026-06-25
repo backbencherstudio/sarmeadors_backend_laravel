@@ -4,11 +4,132 @@ namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
 use App\Models\AgencyClientGlobalSetting;
+use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class ClientGlobalSettingsController extends Controller
 {
+    /**
+     * Columns the client data table is able to render. Keep this list in sync with
+     * the resolution logic in ClientController::index().
+     *
+     * @return array<string,string>
+     */
+    public static function availableColumns(): array
+    {
+        return [
+            'name' => 'Name',
+            'email_address' => 'Email Address',
+            'phone_number' => 'Phone Number',
+            'registration_date' => 'Registration Date',
+            'status' => 'Status',
+            'payment_status' => 'Payment Status',
+            'hear_about_us' => 'Hear About Us',
+        ];
+    }
+
+    /**
+     * Ensure every field in `table_fields` has a `display_labels` entry, defaulting
+     * to its canonical label from availableColumns() when the caller didn't provide one.
+     *
+     * @param  array<int,string>  $tableFields
+     * @param  array<string,string>  $displayLabels
+     * @return array<string,string>
+     */
+    private function fillMissingLabels(array $tableFields, array $displayLabels): array
+    {
+        foreach ($tableFields as $field) {
+            if (! array_key_exists($field, $displayLabels)) {
+                $displayLabels[$field] = self::availableColumns()[$field] ?? $field;
+            }
+        }
+
+        return $displayLabels;
+    }
+
+    public function getAvailableClientColumns()
+    {
+        $columns = collect(self::availableColumns())
+            ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])
+            ->values();
+
+        return response()->json([
+            'status' => true,
+            'data' => $columns,
+        ]);
+    }
+
+    public function getClientTableSettings()
+    {
+        $agency_id = auth('api')->user()->agency_id;
+
+        $saved = AgencyClientGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
+        $dashboard = array_replace_recursive($this->defaultSettings()['dashboard'], $saved['dashboard'] ?? []);
+
+        $statuses = Status::where('agency_id', $agency_id)
+            ->where('type', 'client')
+            ->orderBy('serial')
+            ->get(['id', 'name', 'color', 'serial', 'any_reason', 'reason']);
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'dashboard' => $dashboard,
+                'statuses' => $statuses,
+            ],
+        ]);
+    }
+
+    public function updateClientTableSettings(Request $request)
+    {
+        $agency_id = auth('api')->user()->agency_id;
+
+        $validator = Validator::make($request->all(), [
+            'table_fields' => 'nullable|array',
+            'table_fields.*' => [Rule::in(array_keys(self::availableColumns()))],
+            'display_labels' => 'nullable|array',
+            'use_admin_level_setting' => 'nullable|boolean',
+            'quick_search_field' => ['nullable', 'string', Rule::in(array_keys(self::availableColumns()))],
+            'default_sort_field' => ['nullable', 'string', Rule::in(array_keys(self::availableColumns()))],
+            'last_login_retrieval_days' => 'nullable|integer',
+            'show_status_statistical_breakdowns' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $existing = AgencyClientGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
+
+        $tableFields = $request->input('table_fields', []);
+
+        $dashboard = [
+            'table_fields' => $tableFields,
+            'display_labels' => $this->fillMissingLabels($tableFields, $request->input('display_labels', [])),
+            'use_admin_level_setting' => (bool) $request->input('use_admin_level_setting'),
+            'quick_search_field' => $request->input('quick_search_field'),
+            'default_sort_field' => $request->input('default_sort_field'),
+            'last_login_retrieval_days' => $request->input('last_login_retrieval_days'),
+            'show_status_statistical_breakdowns' => (bool) $request->input('show_status_statistical_breakdowns'),
+        ];
+
+        $merged = array_replace_recursive($this->defaultSettings(), $existing);
+        $merged['dashboard'] = $dashboard;
+
+        AgencyClientGlobalSetting::updateOrCreate(
+            ['agency_id' => $agency_id],
+            ['settings' => $merged]
+        );
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client table settings updated successfully',
+            'data' => $dashboard,
+        ]);
+    }
+
     public function getClientGlobalSettings()
     {
         $agency_id = auth('api')->user()->agency_id;
@@ -28,6 +149,7 @@ class ClientGlobalSettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'settings' => 'required|array',
             'settings.dashboard.table_fields' => 'nullable|array',
+            'settings.dashboard.table_fields.*' => [Rule::in(array_keys(self::availableColumns()))],
             'settings.dashboard.display_labels' => 'nullable|array',
             'settings.dashboard.use_admin_level_setting' => 'nullable|boolean',
             'settings.dashboard.quick_search_field' => 'nullable|string',
@@ -83,7 +205,10 @@ class ClientGlobalSettingsController extends Controller
         $safeSettings = [
             'dashboard' => [
                 'table_fields' => $request->input('settings.dashboard.table_fields', []),
-                'display_labels' => $request->input('settings.dashboard.display_labels', []),
+                'display_labels' => $this->fillMissingLabels(
+                    $request->input('settings.dashboard.table_fields', []),
+                    $request->input('settings.dashboard.display_labels', [])
+                ),
                 'use_admin_level_setting' => (bool) $request->input('settings.dashboard.use_admin_level_setting'),
                 'quick_search_field' => $request->input('settings.dashboard.quick_search_field'),
                 'default_sort_field' => $request->input('settings.dashboard.default_sort_field'),
@@ -145,7 +270,11 @@ class ClientGlobalSettingsController extends Controller
         ];
 
         $existing = AgencyClientGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
-        $merged = array_replace_recursive($this->defaultSettings(), $existing, $safeSettings);
+        $merged = array_replace_recursive($this->defaultSettings(), $existing);
+
+        foreach ($safeSettings as $section => $values) {
+            $merged[$section] = $values;
+        }
 
         AgencyClientGlobalSetting::updateOrCreate(
             ['agency_id' => $agency_id],

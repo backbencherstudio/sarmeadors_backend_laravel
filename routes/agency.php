@@ -157,6 +157,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::get('settings/client', [ClientGlobalSettingsController::class, 'getClientGlobalSettings']);
     Route::post('settings/client', [ClientGlobalSettingsController::class, 'updateClientGlobalSettings']);
 
+    // client table settings (dashboard columns + client statuses) for the "Client Table Settings" panel
+    Route::get('settings/client/table', [ClientGlobalSettingsController::class, 'getClientTableSettings']);
+    Route::post('settings/client/table', [ClientGlobalSettingsController::class, 'updateClientTableSettings']);
+    Route::get('settings/client/table/columns', [ClientGlobalSettingsController::class, 'getAvailableClientColumns']);
+
     // candidate global settings
     Route::get('settings/candidate', [CandidateGlobalSettingsController::class, 'getCandidateGlobalSettings']);
     Route::post('settings/candidate', [CandidateGlobalSettingsController::class, 'updateCandidateGlobalSettings']);
@@ -262,6 +267,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('/form-fields/reorder', [FormFieldController::class, 'reorder']);
 
     // Client Registration
+    Route::get('/clients', [ClientController::class, 'index']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
 });

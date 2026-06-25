@@ -139,7 +139,11 @@ class CandidateGlobalSettingsController extends Controller
         ];
 
         $existing = AgencyCandidateGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
-        $merged = array_replace_recursive($this->defaultSettings(), $existing, $safeSettings);
+        $merged = array_replace_recursive($this->defaultSettings(), $existing);
+
+        foreach ($safeSettings as $section => $values) {
+            $merged[$section] = $values;
+        }
 
         AgencyCandidateGlobalSetting::updateOrCreate(
             ['agency_id' => $agency_id],
