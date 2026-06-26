@@ -245,6 +245,88 @@ class CandidateMyJobsTest extends TestCase
         ]);
     }
 
+    public function test_candidate_my_jobs_list_filters_by_remaining_statuses(): void
+    {
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $rejectedShortTerm = $this->createShortTermJob($agency, $candidate, $client, [
+            'title' => 'Rejected Babysitting',
+            'status' => 'rejected',
+            'rejection_reason' => 'Agency could not verify the requested availability.',
+        ]);
+
+        ShortTermJobDate::create([
+            'short_term_job_id' => $rejectedShortTerm->id,
+            'booking_date' => now()->addDays(3)->format('Y-m-d'),
+            'start_time' => '10:00',
+            'end_time' => '14:00',
+        ]);
+
+        $pendingApprovalLongTerm = $this->createLongTermJob($agency, $candidate, $client, [
+            'title' => 'Pending Approval Nanny',
+            'status' => 'pending_approval',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $pendingApprovalLongTerm->id,
+            'day_of_week' => 1,
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+        ]);
+
+        $marketplaceLongTerm = $this->createLongTermJob($agency, $candidate, $client, [
+            'title' => 'Marketplace Nanny',
+            'status' => 'marketplace',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $marketplaceLongTerm->id,
+            'day_of_week' => 2,
+            'start_time' => '09:00',
+            'end_time' => '18:00',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=rejected')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Rejected Job')
+            ->assertJsonPath('data.jobs.0.status', 'rejected')
+            ->assertJsonPath('data.jobs.0.title', 'Rejected Babysitting')
+            ->assertJsonPath('data.jobs.0.job_type', 'short_term');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=pending_approval')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Pending Approval Job')
+            ->assertJsonPath('data.jobs.0.status', 'pending_approval')
+            ->assertJsonPath('data.jobs.0.title', 'Pending Approval Nanny')
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=marketplace')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Marketplace Job')
+            ->assertJsonPath('data.jobs.0.status', 'marketplace')
+            ->assertJsonPath('data.jobs.0.title', 'Marketplace Nanny')
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term');
+
+        $allResponse = $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&status=all');
+
+        $allResponse
+            ->assertOk()
+            ->assertJsonPath('data.title', 'All Jobs')
+            ->assertJsonCount(3, 'data.jobs');
+    }
+
     public function test_candidate_attendance_check_in_and_check_out_routes_validate_job_schedule(): void
     {
         Carbon::setTestNow('2026-01-18 09:00:00');
