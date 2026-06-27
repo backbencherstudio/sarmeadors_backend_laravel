@@ -39,14 +39,14 @@ class CandidateMyJobController extends Controller
             return $this->sendResponse(
                 $this->formatCalendar($jobs, $filters),
                 'Calendar jobs retrieved.',
-                200
+                200,
             );
         }
 
         return $this->sendResponse(
             $this->formatList($jobs, $filters),
             'Jobs retrieved.',
-            200
+            200,
         );
     }
 
@@ -55,53 +55,88 @@ class CandidateMyJobController extends Controller
         $requestFilters = $request->query('filter', []);
         $queryFilters = is_array($requestFilters) ? $requestFilters : [];
         $view = (string) $request->query('view', 'calendar');
-        $defaultStatus = $view === 'calendar' ? 'all' : 'running';
 
         return [
             'view' => $view,
             'month' => (int) $request->query('month', now()->month),
             'year' => (int) $request->query('year', now()->year),
-            'job_type' => $request->query('job_type', $queryFilters['job_type'] ?? 'all'),
-            'status' => $request->query('status', $queryFilters['status'] ?? $defaultStatus),
-            'search' => trim((string) $request->query('search', $queryFilters['search'] ?? '')),
+            'job_type' => $request->query(
+                'job_type',
+                $queryFilters['job_type'] ?? 'all',
+            ),
+            'status' => $request->query(
+                'status',
+                $queryFilters['status'] ?? 'all',
+            ),
+            'search' => trim(
+                (string) $request->query(
+                    'search',
+                    $queryFilters['search'] ?? '',
+                ),
+            ),
         ];
     }
 
-    private function loadJobs(Request $request, Candidate $candidate, array $filters): Collection
-    {
+    private function loadJobs(
+        Request $request,
+        Candidate $candidate,
+        array $filters,
+    ): Collection {
         $jobs = collect();
         $queryBuilderRequest = $this->queryBuilderRequest($request, $filters);
 
         if (in_array($filters['job_type'], ['all', 'short_term'])) {
             $shortTermQuery = ShortTermJob::query()
-                ->with($this->jobRelations('short_term', $filters['view'], $candidate))
+                ->with(
+                    $this->jobRelations(
+                        'short_term',
+                        $filters['view'],
+                        $candidate,
+                    ),
+                )
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
 
-            $shortTermJobs = QueryBuilder::for($shortTermQuery, $queryBuilderRequest)
+            $shortTermJobs = QueryBuilder::for(
+                $shortTermQuery,
+                $queryBuilderRequest,
+            )
                 ->allowedFilters(...$this->allowedJobFilters())
                 ->get()
-                ->map(fn (ShortTermJob $job): array => [
-                    'type' => 'short_term',
-                    'job' => $job,
-                ]);
+                ->map(
+                    fn (ShortTermJob $job): array => [
+                        'type' => 'short_term',
+                        'job' => $job,
+                    ],
+                );
 
             $jobs = $jobs->concat($shortTermJobs);
         }
 
         if (in_array($filters['job_type'], ['all', 'long_term'])) {
             $longTermQuery = LongTermJob::query()
-                ->with($this->jobRelations('long_term', $filters['view'], $candidate))
+                ->with(
+                    $this->jobRelations(
+                        'long_term',
+                        $filters['view'],
+                        $candidate,
+                    ),
+                )
                 ->where('agency_id', $request->current_agency->id)
                 ->where('candidate_id', $candidate->id);
 
-            $longTermJobs = QueryBuilder::for($longTermQuery, $queryBuilderRequest)
+            $longTermJobs = QueryBuilder::for(
+                $longTermQuery,
+                $queryBuilderRequest,
+            )
                 ->allowedFilters(...$this->allowedJobFilters())
                 ->get()
-                ->map(fn (LongTermJob $job): array => [
-                    'type' => 'long_term',
-                    'job' => $job,
-                ]);
+                ->map(
+                    fn (LongTermJob $job): array => [
+                        'type' => 'long_term',
+                        'job' => $job,
+                    ],
+                );
 
             $jobs = $jobs->concat($longTermJobs);
         }
@@ -117,8 +152,11 @@ class CandidateMyJobController extends Controller
      *
      * @return array<int|string, string|\Closure>
      */
-    private function jobRelations(string $type, string $view, Candidate $candidate): array
-    {
+    private function jobRelations(
+        string $type,
+        string $view,
+        Candidate $candidate,
+    ): array {
         if ($view !== 'calendar') {
             return ['client', 'latestAttendance'];
         }
@@ -127,13 +165,21 @@ class CandidateMyJobController extends Controller
             'client',
             'children',
             $type === 'short_term' ? 'dates' : 'schedules',
-            'attendance' => fn ($query) => $query->where('candidate_id', $candidate->id),
-            'reviews' => fn ($query) => $query->where('candidate_id', $candidate->id),
+            'attendance' => fn ($query) => $query->where(
+                'candidate_id',
+                $candidate->id,
+            ),
+            'reviews' => fn ($query) => $query->where(
+                'candidate_id',
+                $candidate->id,
+            ),
         ];
     }
 
-    private function queryBuilderRequest(Request $request, array $filters): Request
-    {
+    private function queryBuilderRequest(
+        Request $request,
+        array $filters,
+    ): Request {
         $query = [];
 
         if ($filters['status'] !== 'all') {
@@ -151,7 +197,10 @@ class CandidateMyJobController extends Controller
     {
         return [
             AllowedFilter::exact('status'),
-            AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+            AllowedFilter::callback('search', function (
+                Builder $query,
+                mixed $value,
+            ): void {
                 $search = $this->normalizeFilterValue($value);
 
                 if ($search === '') {
@@ -159,14 +208,18 @@ class CandidateMyJobController extends Controller
                 }
 
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('title', 'like', "%{$search}%")
+                    $query
+                        ->where('title', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
                         ->orWhere('home_city', 'like', "%{$search}%")
                         ->orWhere('home_province', 'like', "%{$search}%")
                         ->orWhere('country', 'like', "%{$search}%")
                         ->orWhere('job_address', 'like', "%{$search}%")
-                        ->orWhereHas('client', function (Builder $clientQuery) use ($search): void {
-                            $clientQuery->where('first_name', 'like', "%{$search}%")
+                        ->orWhereHas('client', function (
+                            Builder $clientQuery,
+                        ) use ($search): void {
+                            $clientQuery
+                                ->where('first_name', 'like', "%{$search}%")
                                 ->orWhere('last_name', 'like', "%{$search}%")
                                 ->orWhere('email', 'like', "%{$search}%");
                         });
@@ -186,11 +239,22 @@ class CandidateMyJobController extends Controller
 
     private function formatCalendar(Collection $jobs, array $filters): array
     {
-        $start = Carbon::create($filters['year'], $filters['month'], 1)->startOfMonth();
+        $start = Carbon::create(
+            $filters['year'],
+            $filters['month'],
+            1,
+        )->startOfMonth();
         $end = $start->copy()->endOfMonth();
 
         $events = $jobs
-            ->flatMap(fn (array $item): Collection => $this->formatCalendarEvents($item['type'], $item['job'], $start, $end))
+            ->flatMap(
+                fn (array $item): Collection => $this->formatCalendarEvents(
+                    $item['type'],
+                    $item['job'],
+                    $start,
+                    $end,
+                ),
+            )
             ->sortBy(['date', 'time.from'])
             ->values();
 
@@ -207,26 +271,50 @@ class CandidateMyJobController extends Controller
         ];
     }
 
-    private function formatCalendarEvents(string $type, ShortTermJob|LongTermJob $job, Carbon $start, Carbon $end): Collection
-    {
+    private function formatCalendarEvents(
+        string $type,
+        ShortTermJob|LongTermJob $job,
+        Carbon $start,
+        Carbon $end,
+    ): Collection {
         if ($type === 'short_term') {
             return $job->dates
-                ->filter(fn ($date): bool => Carbon::parse($date->booking_date)->betweenIncluded($start, $end))
-                ->map(fn ($date): array => $this->formatJobCard($type, $job, [
-                    'date' => Carbon::parse($date->booking_date)->toDateString(),
-                    'time_from' => $date->start_time,
-                    'time_to' => $date->end_time,
-                ]));
+                ->filter(
+                    fn ($date): bool => Carbon::parse(
+                        $date->booking_date,
+                    )->betweenIncluded($start, $end),
+                )
+                ->map(
+                    fn ($date): array => $this->formatJobCard($type, $job, [
+                        'date' => Carbon::parse(
+                            $date->booking_date,
+                        )->toDateString(),
+                        'time_from' => $date->start_time,
+                        'time_to' => $date->end_time,
+                    ]),
+                );
         }
 
-        return $this->longTermOccurrences($job, $start, $end)
-            ->map(fn (array $occurrence): array => $this->formatJobCard($type, $job, $occurrence));
+        return $this->longTermOccurrences($job, $start, $end)->map(
+            fn (array $occurrence): array => $this->formatJobCard(
+                $type,
+                $job,
+                $occurrence,
+            ),
+        );
     }
 
-    private function longTermOccurrences(LongTermJob $job, Carbon $start, Carbon $end): Collection
-    {
-        $effectiveStart = $job->start_date ? max(Carbon::parse($job->start_date), $start) : $start;
-        $effectiveEnd = $job->end_date ? min(Carbon::parse($job->end_date), $end) : $end;
+    private function longTermOccurrences(
+        LongTermJob $job,
+        Carbon $start,
+        Carbon $end,
+    ): Collection {
+        $effectiveStart = $job->start_date
+            ? max(Carbon::parse($job->start_date), $start)
+            : $start;
+        $effectiveEnd = $job->end_date
+            ? min(Carbon::parse($job->end_date), $end)
+            : $end;
 
         if ($effectiveStart->gt($effectiveEnd)) {
             return collect();
@@ -234,14 +322,21 @@ class CandidateMyJobController extends Controller
 
         $dates = collect(CarbonPeriod::create($effectiveStart, $effectiveEnd));
 
-        return $job->schedules->flatMap(function ($schedule) use ($dates): Collection {
+        return $job->schedules->flatMap(function ($schedule) use (
+            $dates,
+        ): Collection {
             return $dates
-                ->filter(fn (Carbon $date): bool => $date->dayOfWeek === (int) $schedule->day_of_week)
-                ->map(fn (Carbon $date): array => [
-                    'date' => $date->toDateString(),
-                    'time_from' => $schedule->start_time,
-                    'time_to' => $schedule->end_time,
-                ]);
+                ->filter(
+                    fn (Carbon $date): bool => $date->dayOfWeek ===
+                        (int) $schedule->day_of_week,
+                )
+                ->map(
+                    fn (Carbon $date): array => [
+                        'date' => $date->toDateString(),
+                        'time_from' => $schedule->start_time,
+                        'time_to' => $schedule->end_time,
+                    ],
+                );
         });
     }
 
@@ -255,7 +350,11 @@ class CandidateMyJobController extends Controller
             ],
             'title' => $this->formatStatusHeading($filters['status']),
             'jobs' => $jobs
-                ->map(fn (array $item): array => $this->formatListJobCard($item['job']))
+                ->map(
+                    fn (array $item): array => $this->formatListJobCard(
+                        $item['job'],
+                    ),
+                )
                 ->values(),
         ];
     }
@@ -291,14 +390,24 @@ class CandidateMyJobController extends Controller
             ],
             'status' => $job->status,
             'latest_attendance' => $attendance,
-            'can_check_in' => $job->status === 'running' && (! $attendance || ! $attendance->check_in),
-            'can_check_out' => $job->status === 'running' && $attendance?->check_in && ! $attendance?->check_out,
+            'can_check_in' => $job->status === 'running' &&
+                (! $attendance || ! $attendance->check_in),
+            'can_check_out' => $job->status === 'running' &&
+                $attendance?->check_in &&
+                ! $attendance?->check_out,
         ];
     }
 
-    private function formatJobCard(string $type, ShortTermJob|LongTermJob $job, array $occurrence): array
-    {
-        $attendance = $this->attendanceForDate($type, $job, $occurrence['date']);
+    private function formatJobCard(
+        string $type,
+        ShortTermJob|LongTermJob $job,
+        array $occurrence,
+    ): array {
+        $attendance = $this->attendanceForDate(
+            $type,
+            $job,
+            $occurrence['date'],
+        );
         $review = $job->reviews->first();
 
         return [
@@ -314,55 +423,100 @@ class CandidateMyJobController extends Controller
             ],
             'cover_image_url' => $job->cover_image_url,
             'description' => $job->description,
-            'description_preview' => $job->description ? Str::limit($job->description, 120) : null,
+            'description_preview' => $job->description
+                ? Str::limit($job->description, 120)
+                : null,
             'location' => $this->formatLocation($job),
             'date' => $occurrence['date'],
-            'date_label' => Carbon::parse($occurrence['date'])->format('M d, Y'),
+            'date_label' => Carbon::parse($occurrence['date'])->format(
+                'M d, Y',
+            ),
             'time' => [
                 'from' => $this->formatTime($occurrence['time_from']),
                 'to' => $this->formatTime($occurrence['time_to']),
-                'range' => $this->formatTime($occurrence['time_from']).' - '.$this->formatTime($occurrence['time_to']),
+                'range' => $this->formatTime($occurrence['time_from']).
+                    ' - '.
+                    $this->formatTime($occurrence['time_to']),
             ],
             'compensation' => $this->formatCompensation($job),
             'status' => $job->status,
             'status_label' => $this->formatStatusLabel($job->status),
             'attendance' => $this->formatAttendance($attendance),
             'working_time' => $this->formatWorkingTime($job),
-            'cancellation' => $job->status === 'cancelled' ? [
-                'reason' => $job->cancellation_reason,
-                'cancelled_at' => $job->cancelled_at ? Carbon::parse($job->cancelled_at)->toISOString() : null,
-            ] : null,
-            'review' => $review ? [
-                'id' => $review->id,
-                'rating' => $review->rating,
-                'review' => $review->review,
-            ] : null,
+            'cancellation' => $job->status === 'cancelled'
+                    ? [
+                        'reason' => $job->cancellation_reason,
+                        'cancelled_at' => $job->cancelled_at
+                            ? Carbon::parse($job->cancelled_at)->toISOString()
+                            : null,
+                    ]
+                    : null,
+            'review' => $review
+                ? [
+                    'id' => $review->id,
+                    'rating' => $review->rating,
+                    'review' => $review->review,
+                ]
+                : null,
             'actions' => [
                 'can_view_details' => true,
-                'can_check_in' => $this->canCheckIn($job, $occurrence['date'], $attendance),
-                'can_check_out' => $this->canCheckOut($job, $occurrence['date'], $attendance),
-                'can_report_client' => in_array($job->status, ['completed', 'cancelled']),
+                'can_check_in' => $this->canCheckIn(
+                    $job,
+                    $occurrence['date'],
+                    $attendance,
+                ),
+                'can_check_out' => $this->canCheckOut(
+                    $job,
+                    $occurrence['date'],
+                    $attendance,
+                ),
+                'can_report_client' => in_array($job->status, [
+                    'completed',
+                    'cancelled',
+                ]),
                 'can_leave_review' => $job->status === 'completed' && ! $review,
                 'can_view_review' => $review !== null,
                 'view_details_url' => $this->candidateJobUrl($type, $job, null),
-                'check_in_url' => $this->candidateJobUrl($type, $job, 'check-in'),
-                'check_out_url' => $this->candidateJobUrl($type, $job, 'check-out'),
+                'check_in_url' => $this->candidateJobUrl(
+                    $type,
+                    $job,
+                    'check-in',
+                ),
+                'check_out_url' => $this->candidateJobUrl(
+                    $type,
+                    $job,
+                    'check-out',
+                ),
                 'reviews_url' => $this->candidateJobUrl($type, $job, 'reviews'),
-                'report_client_url' => $this->candidateJobUrl($type, $job, 'client-report'),
+                'report_client_url' => $this->candidateJobUrl(
+                    $type,
+                    $job,
+                    'client-report',
+                ),
             ],
             'modal' => [
                 'title' => $job->title,
                 'subtitle' => $this->formatClientName($job),
                 'date' => Carbon::parse($occurrence['date'])->format('d M, D'),
-                'time_range' => $this->formatTime($occurrence['time_from']).' - '.$this->formatTime($occurrence['time_to']),
-                'can_check_in' => $this->canCheckIn($job, $occurrence['date'], $attendance),
+                'time_range' => $this->formatTime($occurrence['time_from']).
+                    ' - '.
+                    $this->formatTime($occurrence['time_to']),
+                'can_check_in' => $this->canCheckIn(
+                    $job,
+                    $occurrence['date'],
+                    $attendance,
+                ),
             ],
         ];
     }
 
     private function formatWorkingTime(ShortTermJob|LongTermJob $job): array
     {
-        $totalMinutes = (int) $job->attendance->sum(fn (ShortTermJobAttendance|LongTermJobAttendance $attendance): int => $attendance->duration_minutes);
+        $totalMinutes = (int) $job->attendance->sum(
+            fn (
+                ShortTermJobAttendance|LongTermJobAttendance $attendance,
+            ): int => $attendance->duration_minutes,
+        );
 
         return [
             'total_minutes' => $totalMinutes,
@@ -370,42 +524,69 @@ class CandidateMyJobController extends Controller
         ];
     }
 
-    private function attendanceForDate(string $type, ShortTermJob|LongTermJob $job, string $date): ShortTermJobAttendance|LongTermJobAttendance|null
-    {
+    private function attendanceForDate(
+        string $type,
+        ShortTermJob|LongTermJob $job,
+        string $date,
+    ): ShortTermJobAttendance|LongTermJobAttendance|null {
         return $type === 'short_term'
-            ? $job->attendance->first(fn (ShortTermJobAttendance $attendance): bool => $attendance->booking_date?->toDateString() === $date)
-            : $job->attendance->first(fn (LongTermJobAttendance $attendance): bool => $attendance->date?->toDateString() === $date);
+            ? $job->attendance->first(
+                fn (
+                    ShortTermJobAttendance $attendance,
+                ): bool => $attendance->booking_date?->toDateString() === $date,
+            )
+            : $job->attendance->first(
+                fn (
+                    LongTermJobAttendance $attendance,
+                ): bool => $attendance->date?->toDateString() === $date,
+            );
     }
 
-    private function formatAttendance(ShortTermJobAttendance|LongTermJobAttendance|null $attendance): array
-    {
+    private function formatAttendance(
+        ShortTermJobAttendance|LongTermJobAttendance|null $attendance,
+    ): array {
         return [
             'checked_in_at' => $this->formatTime($attendance?->check_in),
             'checked_out_at' => $this->formatTime($attendance?->check_out),
             'total_minutes' => $attendance?->duration_minutes ?? 0,
-            'total_label' => $attendance ? $this->formatDuration($attendance->duration_minutes) : null,
+            'total_label' => $attendance
+                ? $this->formatDuration($attendance->duration_minutes)
+                : null,
         ];
     }
 
-    private function canCheckIn(ShortTermJob|LongTermJob $job, string $date, ShortTermJobAttendance|LongTermJobAttendance|null $attendance): bool
-    {
-        return $job->status === 'running'
-            && $date === now()->toDateString()
-            && ! $attendance?->check_in;
+    private function canCheckIn(
+        ShortTermJob|LongTermJob $job,
+        string $date,
+        ShortTermJobAttendance|LongTermJobAttendance|null $attendance,
+    ): bool {
+        return $job->status === 'running' &&
+            $date === now()->toDateString() &&
+            ! $attendance?->check_in;
     }
 
-    private function canCheckOut(ShortTermJob|LongTermJob $job, string $date, ShortTermJobAttendance|LongTermJobAttendance|null $attendance): bool
-    {
-        return $job->status === 'running'
-            && $date === now()->toDateString()
-            && filled($attendance?->check_in)
-            && blank($attendance?->check_out);
+    private function canCheckOut(
+        ShortTermJob|LongTermJob $job,
+        string $date,
+        ShortTermJobAttendance|LongTermJobAttendance|null $attendance,
+    ): bool {
+        return $job->status === 'running' &&
+            $date === now()->toDateString() &&
+            filled($attendance?->check_in) &&
+            blank($attendance?->check_out);
     }
 
     private function formatLocation(ShortTermJob|LongTermJob $job): array
     {
         return [
-            'label' => collect([$job->job_address, $job->home_city, $job->home_province, $job->country])->filter()->implode(', '),
+            'label' => collect([
+                $job->job_address,
+                $job->home_city,
+                $job->home_province,
+                $job->country,
+            ])
+                ->filter()
+                ->implode(', '),
             'street_address' => $job->job_address,
             'city' => $job->home_city,
             'province' => $job->home_province,
@@ -426,7 +607,9 @@ class CandidateMyJobController extends Controller
 
     private function formatClientName(ShortTermJob|LongTermJob $job): ?string
     {
-        return $job->client ? trim($job->client->first_name.' '.$job->client->last_name) : null;
+        return $job->client
+            ? trim($job->client->first_name.' '.$job->client->last_name)
+            : null;
     }
 
     private function formatDuration(int $minutes): string
@@ -437,8 +620,11 @@ class CandidateMyJobController extends Controller
         return trim($hours.'h '.$remainingMinutes.'m');
     }
 
-    private function candidateJobUrl(string $type, ShortTermJob|LongTermJob $job, ?string $suffix): string
-    {
+    private function candidateJobUrl(
+        string $type,
+        ShortTermJob|LongTermJob $job,
+        ?string $suffix,
+    ): string {
         $jobTypePath = $type === 'short_term' ? 'short-term' : 'long-term';
         $url = "/api/candidate/jobs/{$jobTypePath}/{$job->id}";
 
