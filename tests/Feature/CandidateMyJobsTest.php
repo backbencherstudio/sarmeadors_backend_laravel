@@ -169,12 +169,17 @@ class CandidateMyJobsTest extends TestCase
         $runningResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Running Job')
+            ->assertJsonPath('data.jobs.0.id', $runningJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Running Nanny')
-            ->assertJsonPath('data.jobs.0.attendance.checked_in_at', '8:52 AM')
-            ->assertJsonPath('data.jobs.0.attendance.checked_out_at', '9:05 AM')
-            ->assertJsonPath('data.jobs.0.actions.can_check_in', false)
-            ->assertJsonPath('data.jobs.0.actions.check_in_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-in")
-            ->assertJsonPath('data.jobs.0.actions.check_out_url', "/api/candidate/jobs/short-term/{$runningJob->id}/check-out");
+            ->assertJsonPath('data.jobs.0.job_type', 'short_term')
+            ->assertJsonPath('data.jobs.0.status', 'running')
+            ->assertJsonPath('data.jobs.0.client_name', 'Arlene McCoy')
+            ->assertJsonPath('data.jobs.0.address.city', 'Crownthorpe')
+            ->assertJsonPath('data.jobs.0.compensation.type', 'per_hour')
+            ->assertJsonPath('data.jobs.0.can_check_in', false)
+            ->assertJsonPath('data.jobs.0.can_check_out', false)
+            ->assertJsonMissingPath('data.jobs.0.actions')
+            ->assertJsonMissingPath('data.jobs_by_date');
 
         $completedResponse = $this
             ->actingAs($user, 'api')
@@ -184,12 +189,12 @@ class CandidateMyJobsTest extends TestCase
         $completedResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Completed Job')
+            ->assertJsonPath('data.jobs.0.id', $completedJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Completed Nanny')
-            ->assertJsonPath('data.jobs.0.working_time.total_minutes', 125)
-            ->assertJsonPath('data.jobs.0.working_time.total_label', '2h 5m')
-            ->assertJsonPath('data.jobs.0.actions.can_view_review', true)
-            ->assertJsonPath('data.jobs.0.actions.can_leave_review', false)
-            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/long-term/{$completedJob->id}/client-report");
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term')
+            ->assertJsonPath('data.jobs.0.status', 'completed')
+            ->assertJsonPath('data.jobs.0.can_check_in', false)
+            ->assertJsonPath('data.jobs.0.can_check_out', false);
 
         $this
             ->actingAs($user, 'api')
@@ -216,10 +221,11 @@ class CandidateMyJobsTest extends TestCase
         $cancelledResponse
             ->assertOk()
             ->assertJsonPath('data.title', 'Cancelled Job')
+            ->assertJsonPath('data.jobs.0.id', $cancelledJob->id)
             ->assertJsonPath('data.jobs.0.title', 'Cancelled Nanny')
-            ->assertJsonPath('data.jobs.0.cancellation.reason', 'Family plans changed.')
-            ->assertJsonPath('data.jobs.0.actions.can_report_client', true)
-            ->assertJsonPath('data.jobs.0.actions.report_client_url', "/api/candidate/jobs/short-term/{$cancelledJob->id}/client-report");
+            ->assertJsonPath('data.jobs.0.status', 'cancelled')
+            ->assertJsonPath('data.jobs.0.latest_attendance', null)
+            ->assertJsonPath('data.jobs.0.can_check_in', false);
 
         $this
             ->actingAs($user, 'api')
@@ -237,6 +243,88 @@ class CandidateMyJobsTest extends TestCase
             'job_type' => 'short_term',
             'status' => 'pending',
         ]);
+    }
+
+    public function test_candidate_my_jobs_list_filters_by_remaining_statuses(): void
+    {
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $rejectedShortTerm = $this->createShortTermJob($agency, $candidate, $client, [
+            'title' => 'Rejected Babysitting',
+            'status' => 'rejected',
+            'rejection_reason' => 'Agency could not verify the requested availability.',
+        ]);
+
+        ShortTermJobDate::create([
+            'short_term_job_id' => $rejectedShortTerm->id,
+            'booking_date' => now()->addDays(3)->format('Y-m-d'),
+            'start_time' => '10:00',
+            'end_time' => '14:00',
+        ]);
+
+        $pendingApprovalLongTerm = $this->createLongTermJob($agency, $candidate, $client, [
+            'title' => 'Pending Approval Nanny',
+            'status' => 'pending_approval',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $pendingApprovalLongTerm->id,
+            'day_of_week' => 1,
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+        ]);
+
+        $marketplaceLongTerm = $this->createLongTermJob($agency, $candidate, $client, [
+            'title' => 'Marketplace Nanny',
+            'status' => 'marketplace',
+        ]);
+
+        LongTermJobSchedule::create([
+            'long_term_job_id' => $marketplaceLongTerm->id,
+            'day_of_week' => 2,
+            'start_time' => '09:00',
+            'end_time' => '18:00',
+        ]);
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=rejected')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Rejected Job')
+            ->assertJsonPath('data.jobs.0.status', 'rejected')
+            ->assertJsonPath('data.jobs.0.title', 'Rejected Babysitting')
+            ->assertJsonPath('data.jobs.0.job_type', 'short_term');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=pending_approval')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Pending Approval Job')
+            ->assertJsonPath('data.jobs.0.status', 'pending_approval')
+            ->assertJsonPath('data.jobs.0.title', 'Pending Approval Nanny')
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term');
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&filter[status]=marketplace')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Marketplace Job')
+            ->assertJsonPath('data.jobs.0.status', 'marketplace')
+            ->assertJsonPath('data.jobs.0.title', 'Marketplace Nanny')
+            ->assertJsonPath('data.jobs.0.job_type', 'long_term');
+
+        $allResponse = $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/jobs?view=list&status=all');
+
+        $allResponse
+            ->assertOk()
+            ->assertJsonPath('data.title', 'All Jobs')
+            ->assertJsonCount(3, 'data.jobs');
     }
 
     public function test_candidate_attendance_check_in_and_check_out_routes_validate_job_schedule(): void
