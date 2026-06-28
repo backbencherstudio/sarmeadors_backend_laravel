@@ -4,13 +4,18 @@ namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
 use App\Models\AgencyClientGlobalSetting;
+use App\Models\CheckList;
 use App\Models\Client;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValue;
 use App\Models\FormSubmission;
+use App\Models\Location;
 use App\Models\Status;
+use App\Models\Tag;
+use App\Models\Type;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -46,24 +51,57 @@ class ClientController extends Controller
 
         $perPage = $request->query('per_page', 10);
         $search = $request->query('search');
+        $quickSearch = $request->query('quick_search');
         $sortField = $request->query('sort_field', $defaultSortField);
         $sortDirection = $request->query('sort_direction', 'desc') === 'asc' ? 'asc' : 'desc';
 
         $query = Client::where('agency_id', $agencyId);
 
+        // Fixed "Search by Name, Email or Phone Number" box: always checks all
+        // three, regardless of the agency's configured `quick_search_field`.
         if ($search) {
-            $searchColumn = $this->columnMap[$quickSearchField] ?? null;
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"]);
+            });
+        }
 
-            if ($searchColumn && $searchColumn !== 'status_id') {
-                $query->where($searchColumn, 'like', "%{$search}%");
-            } else {
-                $query->where(function ($q) use ($search) {
-                    $q->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('mobile', 'like', "%{$search}%");
+        // Configurable "Search for keyword/phrase anywhere on user profile" box:
+        // honors the agency's `quick_search_field` table setting, falling back to
+        // the same broad name/email/phone match when no field is configured.
+        if ($quickSearch) {
+            if ($quickSearchField === 'name') {
+                $query->where(function ($q) use ($quickSearch) {
+                    $q->where('first_name', 'like', "%{$quickSearch}%")
+                        ->orWhere('last_name', 'like', "%{$quickSearch}%")
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$quickSearch}%"]);
                 });
+            } else {
+                $searchColumn = $this->columnMap[$quickSearchField] ?? null;
+
+                if ($searchColumn && $searchColumn !== 'status_id') {
+                    $query->where($searchColumn, 'like', "%{$quickSearch}%");
+                } else {
+                    $query->where(function ($q) use ($quickSearch) {
+                        $q->where('first_name', 'like', "%{$quickSearch}%")
+                            ->orWhere('last_name', 'like', "%{$quickSearch}%")
+                            ->orWhere('email', 'like', "%{$quickSearch}%")
+                            ->orWhere('mobile', 'like', "%{$quickSearch}%")
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$quickSearch}%"]);
+                    });
+                }
             }
+        }
+
+        $this->applyJsonInFilter($query, 'type_id', $this->normalizeIdList($request->query('type_ids')));
+        $this->applyJsonInFilter($query, 'location_id', $this->normalizeIdList($request->query('location_ids')));
+        $this->applyJsonInFilter($query, 'status_id', $this->normalizeIdList($request->query('status_ids')));
+
+        foreach ($this->normalizeIdList($request->query('hide_status_ids')) as $hiddenStatusId) {
+            $query->whereJsonDoesntContain('status_id', $hiddenStatusId);
         }
 
         $sortColumn = $this->columnMap[$sortField] ?? 'created_at';
@@ -79,7 +117,10 @@ class ClientController extends Controller
             ->get()
             ->keyBy('id');
 
-        $rows = $clients->getCollection()->map(function ($client) use ($tableFields, $statusesById) {
+        $typesById = Type::where('agency_id', $agencyId)->get()->keyBy('id');
+        $locationsById = Location::where('agency_id', $agencyId)->get()->keyBy('id');
+
+        $rows = $clients->getCollection()->map(function ($client) use ($tableFields, $statusesById, $typesById, $locationsById) {
             $row = ['id' => $client->id];
 
             foreach ($tableFields as $field) {
@@ -92,6 +133,9 @@ class ClientController extends Controller
                     default => $client->{$field} ?? null,
                 };
             }
+
+            $row['type'] = $this->resolveNames($client->type_id, $typesById, 'name');
+            $row['location'] = $this->resolveNames($client->location_id, $locationsById, 'location');
 
             return $row;
         })->values();
@@ -134,6 +178,98 @@ class ClientController extends Controller
             'name' => $status->name,
             'color' => $status->color,
         ];
+    }
+
+    /**
+     * Resolve a JSON id array (`type_id`/`location_id`) into display names using
+     * an agency-scoped, id-keyed collection of `Type`/`Location` records.
+     *
+     * @param  array<int,int>|null  $ids
+     * @return array<int,string>
+     */
+    private function resolveNames(?array $ids, $byId, string $nameField): array
+    {
+        return collect($ids ?? [])
+            ->map(fn ($id) => $byId->get($id)?->{$nameField})
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Normalize a `type_ids`/`location_ids`/`status_ids` query value (comma-separated
+     * string or array) into a list of unique integer ids.
+     *
+     * @return array<int,int>
+     */
+    private function normalizeIdList(mixed $value): array
+    {
+        if (empty($value)) {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $value = explode(',', $value);
+        }
+
+        return collect($value)
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Restrict the query to rows whose JSON array column contains at least
+     * one of the given ids (OR semantics), when ids are provided.
+     *
+     * @param  array<int,int>  $ids
+     */
+    private function applyJsonInFilter($query, string $column, array $ids): void
+    {
+        if (empty($ids)) {
+            return;
+        }
+
+        $query->where(function ($q) use ($column, $ids) {
+            foreach ($ids as $id) {
+                $q->orWhereJsonContains($column, $id);
+            }
+        });
+    }
+
+    public function statusStatistics()
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $statuses = Status::where('agency_id', $agencyId)
+            ->where('type', 'client')
+            ->orderBy('serial')
+            ->get();
+
+        $total = Client::where('agency_id', $agencyId)->count();
+
+        $data = $statuses->map(function ($status) use ($agencyId, $total) {
+            $count = Client::where('agency_id', $agencyId)
+                ->whereJsonContains('status_id', $status->id)
+                ->count();
+
+            return [
+                'id' => $status->id,
+                'name' => $status->name,
+                'color' => $status->color,
+                'count' => $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
+            ];
+        })->values();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client status statistics retrieved successfully',
+            'data' => $data,
+            'meta' => ['total' => $total],
+        ]);
     }
     // {
     // "form_id": 1,
@@ -203,6 +339,7 @@ class ClientController extends Controller
                 'checklist_id' => $request->checklist_id,
                 'tag_id' => $request->tag_id,
                 'status_id' => $request->status_id,
+                'status_changed_at' => $request->status_id ? now() : null,
             ]);
 
             $submission = FormSubmission::create([
@@ -254,13 +391,69 @@ class ClientController extends Controller
         }
     }
 
+    /**
+     * Client detail page header card: photo, name, resolved status (with how
+     * long it's been in that status), email, phone, registration date.
+     */
     public function show($id)
     {
-        $client = Client::with([
-            'submissions.values.field',
-        ])->findOrFail($id);
+        $agencyId = auth('api')->user()->agency_id;
 
-        return response()->json($client);
+        $client = Client::where('agency_id', $agencyId)
+            ->with(['submissions.values.field'])
+            ->findOrFail($id);
+
+        $status = Status::where('agency_id', $agencyId)
+            ->where('type', 'client')
+            ->find($client->status_id[0] ?? null);
+
+        $statusSince = $client->status_changed_at ?? $client->created_at;
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client retrieved successfully',
+            'data' => [
+                'id' => $client->id,
+                'full_name' => $client->full_name,
+                'image_url' => $client->image_url,
+                'email' => $client->email,
+                'mobile' => $client->mobile,
+                'registration_date' => $client->created_at,
+                'status' => $status ? [
+                    'id' => $status->id,
+                    'name' => $status->name,
+                    'color' => $status->color,
+                ] : null,
+                'status_changed_at' => $statusSince,
+                'status_duration_label' => $this->formatStatusDuration($statusSince),
+                'submissions' => $client->submissions,
+            ],
+        ]);
+    }
+
+    private function formatStatusDuration($since): string
+    {
+        if (! $since) {
+            return 'just now';
+        }
+
+        $diff = $since->diff(now());
+
+        $parts = [];
+
+        if ($diff->d > 0) {
+            $parts[] = $diff->d.' day'.($diff->d > 1 ? 's' : '');
+        }
+
+        if ($diff->h > 0) {
+            $parts[] = $diff->h.' hour'.($diff->h > 1 ? 's' : '');
+        }
+
+        if ($diff->i > 0) {
+            $parts[] = $diff->i.' minute'.($diff->i > 1 ? 's' : '');
+        }
+
+        return $parts ? implode(', ', $parts) : 'just now';
     }
 
     public function updateStatus(Request $request, $id)
@@ -279,7 +472,10 @@ class ClientController extends Controller
             ],
         ]);
 
-        $client->update(['status_id' => [(int) $request->status_id]]);
+        $client->update([
+            'status_id' => [(int) $request->status_id],
+            'status_changed_at' => now(),
+        ]);
 
         $status = Status::find($request->status_id);
 
@@ -295,5 +491,108 @@ class ClientController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * "Lists" tab on the client detail page: every agency-level Type/Checklist/
+     * Location/Tag option, each flagged whether it's currently assigned to this
+     * client (i.e. present in the client's `type_id`/`checklist_id`/`location_id`/`tag_id`).
+     */
+    public function lists($id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client lists retrieved successfully',
+            'data' => [
+                'types' => $this->buildAssignableList(
+                    Type::where('agency_id', $agencyId)->where('type', 'client')->get(),
+                    $client->type_id,
+                    'name'
+                ),
+                'checklist' => $this->buildAssignableList(
+                    CheckList::where('agency_id', $agencyId)->where('type', 'client')->get(),
+                    $client->checklist_id,
+                    'name'
+                ),
+                'locations' => $this->buildAssignableList(
+                    Location::where('agency_id', $agencyId)->get(),
+                    $client->location_id,
+                    'location'
+                ),
+                'tags' => $this->buildAssignableList(
+                    Tag::where('agency_id', $agencyId)->where('type', 'client')->get(),
+                    $client->tag_id,
+                    'name'
+                ),
+            ],
+        ]);
+    }
+
+    /**
+     * Toggle which Types/Checklist items/Locations/Tags are assigned to this
+     * client. Each key is optional so a single checkbox toggle (e.g. just
+     * `location_id`) doesn't require resending the other three lists.
+     */
+    public function updateLists(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
+
+        $request->validate([
+            'type_id' => 'sometimes|array',
+            'type_id.*' => [
+                'integer',
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'checklist_id' => 'sometimes|array',
+            'checklist_id.*' => [
+                'integer',
+                Rule::exists('check_lists', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'location_id' => 'sometimes|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+            'tag_id' => 'sometimes|array',
+            'tag_id.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+        ]);
+
+        $client->update($request->only(['type_id', 'checklist_id', 'location_id', 'tag_id']));
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client lists updated successfully',
+            'data' => [
+                'type_id' => $client->type_id,
+                'checklist_id' => $client->checklist_id,
+                'location_id' => $client->location_id,
+                'tag_id' => $client->tag_id,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  Collection  $items
+     * @param  array<int,int>|null  $assignedIds
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildAssignableList($items, ?array $assignedIds, string $nameField): array
+    {
+        $assignedIds = collect($assignedIds ?? [])->map(fn ($id) => (int) $id);
+
+        return $items->map(fn ($item) => [
+            'id' => $item->id,
+            'name' => $item->{$nameField},
+            'assigned' => $assignedIds->contains($item->id),
+        ])->values()->all();
     }
 }
