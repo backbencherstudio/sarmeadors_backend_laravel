@@ -22,6 +22,7 @@ class Candidate extends Model
         'checklist_id',
         'tag_id',
         'status_id',
+        'status_changed_at',
 
         // Personal info
         'date_of_birth',
@@ -75,6 +76,7 @@ class Candidate extends Model
         'has_ssn' => 'boolean',
         'date_of_birth' => 'date',
         'start_date' => 'date',
+        'status_changed_at' => 'datetime',
     ];
 
     public function getImageUrlAttribute()
