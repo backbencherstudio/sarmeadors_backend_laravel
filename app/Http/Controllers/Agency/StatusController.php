@@ -179,19 +179,37 @@ class StatusController extends Controller
         ]);
     }
 
+    /**
+     * Sync which statuses require a reason when a client/candidate is changed to
+     * them. Statuses passed in `statuses` are flagged as requiring a reason with
+     * the given text; every other status of the same `type` for this agency is
+     * reset to not require one, mirroring the "Select statuses which need a
+     * reason..." multi-select in the table settings panel.
+     */
     public function storeReasons(Request $request)
     {
+        $authUser = auth('api')->user();
+
         $request->validate([
+            'type' => 'required|in:client,candidate',
             'statuses' => 'required|array',
-            'statuses.*.id' => 'required|exists:statuses,id',
-            'statuses.*.reason' => 'required|max:1000',
+            'statuses.*.id' => [
+                'required',
+                'integer',
+                Rule::exists('statuses', 'id')->where(function ($query) use ($authUser, $request) {
+                    $query->where('agency_id', $authUser->agency_id)->where('type', $request->type);
+                }),
+            ],
+            'statuses.*.reason' => 'required|string|max:1000',
         ]);
 
-        $agencyId = auth('api')->user()->agency_id;
+        $agencyId = $authUser->agency_id;
 
         DB::beginTransaction();
 
         try {
+
+            $selectedIds = collect($request->statuses)->pluck('id')->all();
 
             foreach ($request->statuses as $statusData) {
 
@@ -202,6 +220,11 @@ class StatusController extends Controller
                         'reason' => $statusData['reason'],
                     ]);
             }
+
+            Status::where('agency_id', $agencyId)
+                ->where('type', $request->type)
+                ->whereNotIn('id', $selectedIds)
+                ->update(['any_reason' => 0, 'reason' => null]);
 
             DB::commit();
 
