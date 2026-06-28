@@ -274,12 +274,18 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
 
     // Client Registration
     Route::get('/clients', [ClientController::class, 'index']);
+    Route::get('/clients/status-statistics', [ClientController::class, 'statusStatistics']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
     Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
+    Route::get('/clients/{id}/lists', [ClientController::class, 'lists']);
+    Route::patch('/clients/{id}/lists', [ClientController::class, 'updateLists']);
 
     Route::get('/candidates', [CandidateController::class, 'index']);
+    Route::get('/candidates/status-statistics', [CandidateController::class, 'statusStatistics']);
     Route::post('/candidates', [CandidateController::class, 'store']);
     Route::get('/candidates/{id}', [CandidateController::class, 'show']);
     Route::patch('/candidates/{id}/status', [CandidateController::class, 'updateStatus']);
+    Route::get('/candidates/{id}/lists', [CandidateController::class, 'lists']);
+    Route::patch('/candidates/{id}/lists', [CandidateController::class, 'updateLists']);
 });
