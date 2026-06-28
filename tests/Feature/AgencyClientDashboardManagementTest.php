@@ -13,6 +13,8 @@ use App\Models\Tag;
 use App\Models\Type;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -268,6 +270,7 @@ class AgencyClientDashboardManagementTest extends TestCase
         [$agency, $user] = $this->createAgencyScenario();
 
         $active = Status::create(['agency_id' => $agency->id, 'name' => 'Active', 'color' => '#00ff00', 'serial' => 1, 'type' => 'client']);
+        $chicago = Location::create(['agency_id' => $agency->id, 'location' => 'Chicago', 'status' => 1]);
 
         $client = Client::create([
             'agency_id' => $agency->id,
@@ -277,13 +280,18 @@ class AgencyClientDashboardManagementTest extends TestCase
             'mobile' => '5551234',
             'status_id' => [$active->id],
             'status_changed_at' => now()->subHours(2)->subMinutes(44),
+            'location_id' => [$chicago->id],
         ]);
 
         $response = $this->actingAsAgency($user)->getJson("/api/agency/clients/{$client->id}");
 
         $response->assertOk()
             ->assertJsonPath('data.id', $client->id)
+            ->assertJsonPath('data.first_name', 'Pristia')
+            ->assertJsonPath('data.last_name', 'Candra')
             ->assertJsonPath('data.full_name', 'Pristia Candra')
+            ->assertJsonPath('data.location_id', [$chicago->id])
+            ->assertJsonPath('data.locations', ['Chicago'])
             ->assertJsonPath('data.status.name', 'Active')
             ->assertJsonPath('data.status.color', '#00ff00')
             ->assertJsonPath('data.status_duration_label', '2 hours, 44 minutes');
@@ -313,6 +321,88 @@ class AgencyClientDashboardManagementTest extends TestCase
             ->assertOk();
 
         $this->assertNotNull($client->fresh()->status_changed_at);
+    }
+
+    public function test_client_profile_can_be_updated(): void
+    {
+        [$agency, $user] = $this->createAgencyScenario();
+
+        $chicago = Location::create(['agency_id' => $agency->id, 'location' => 'Chicago', 'status' => 1]);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'last_name' => 'Candra', 'email' => 'pristia@example.com', 'mobile' => '5550000']);
+
+        $response = $this->actingAsAgency($user)->postJson("/api/agency/clients/{$client->id}", [
+            'first_name' => 'Pristia',
+            'last_name' => 'Updated',
+            'email' => 'ckctm12@gmail.com',
+            'mobile' => '+1433467689',
+            'location_id' => [$chicago->id],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.full_name', 'Pristia Updated')
+            ->assertJsonPath('data.email', 'ckctm12@gmail.com')
+            ->assertJsonPath('data.mobile', '+1433467689')
+            ->assertJsonPath('data.location_id', [$chicago->id]);
+
+        $fresh = $client->fresh();
+        $this->assertSame('Updated', $fresh->last_name);
+        $this->assertSame('ckctm12@gmail.com', $fresh->email);
+    }
+
+    public function test_client_profile_update_accepts_comma_separated_location_id_from_multipart_forms(): void
+    {
+        [$agency, $user] = $this->createAgencyScenario();
+
+        $chicago = Location::create(['agency_id' => $agency->id, 'location' => 'Chicago', 'status' => 1]);
+        $miami = Location::create(['agency_id' => $agency->id, 'location' => 'Miami', 'status' => 1]);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
+
+        // Postman/multipart forms send this as a single "3,4" string, not a real array.
+        $response = $this->actingAsAgency($user)->post("/api/agency/clients/{$client->id}", [
+            'first_name' => 'Niaz Ahmed',
+            'last_name' => 'Nayeem',
+            'email' => 'niaz@gmail.com',
+            'mobile' => '01886509310',
+            'location_id' => "{$chicago->id},{$miami->id}",
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.location_id', [$chicago->id, $miami->id]);
+
+        $this->assertSame([$chicago->id, $miami->id], $client->fresh()->location_id);
+    }
+
+    public function test_client_profile_picture_can_be_changed(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $user] = $this->createAgencyScenario();
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
+
+        $file = UploadedFile::fake()->image('avatar.jpg');
+
+        $response = $this->actingAsAgency($user)
+            ->post("/api/agency/clients/{$client->id}", [
+                'image' => $file,
+            ], ['Content-Type' => 'multipart/form-data']);
+
+        $response->assertOk();
+
+        $path = $client->fresh()->image;
+        $this->assertNotNull($path);
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_client_profile_update_rejects_duplicate_email(): void
+    {
+        [$agency, $user] = $this->createAgencyScenario();
+
+        Client::create(['agency_id' => $agency->id, 'first_name' => 'Bob', 'email' => 'taken@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
+
+        $this->actingAsAgency($user)
+            ->postJson("/api/agency/clients/{$client->id}", ['email' => 'taken@example.com'])
+            ->assertStatus(422);
     }
 
     public function test_client_lists_endpoint_flags_currently_assigned_options(): void

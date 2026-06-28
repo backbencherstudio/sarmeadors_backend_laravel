@@ -17,6 +17,7 @@ use App\Models\Type;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -392,6 +393,60 @@ class ClientController extends Controller
     }
 
     /**
+     * "Profile" tab on the client detail page: personal details + profile
+     * picture + locations, edited by the agency admin on the client's behalf.
+     */
+    public function updateProfile(Request $request, $id)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
+
+        // multipart/form-data (e.g. Postman) can only send `location_id` as a
+        // single "3,4" string, not a real array, so normalize it before validating.
+        if ($request->has('location_id')) {
+            $request->merge(['location_id' => $this->normalizeIdList($request->input('location_id'))]);
+        }
+
+        $request->validate([
+            'first_name' => 'sometimes|required|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'email' => ['sometimes', 'required', 'email', Rule::unique('clients', 'email')->ignore($client->id)],
+            'mobile' => 'nullable|string|max:20',
+            'image' => 'nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
+            'location_id' => 'nullable|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where('agency_id', $agencyId),
+            ],
+        ]);
+
+        if ($request->hasFile('image')) {
+            if ($client->image) {
+                Storage::disk('public')->delete($client->image);
+            }
+
+            $client->image = $request->file('image')->store('clients', 'public');
+        }
+
+        $client->fill($request->only(['first_name', 'last_name', 'email', 'mobile', 'location_id']));
+        $client->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Client profile updated successfully',
+            'data' => [
+                'id' => $client->id,
+                'full_name' => $client->full_name,
+                'image_url' => $client->image_url,
+                'email' => $client->email,
+                'mobile' => $client->mobile,
+                'location_id' => $client->location_id,
+            ],
+        ]);
+    }
+
+    /**
      * Client detail page header card: photo, name, resolved status (with how
      * long it's been in that status), email, phone, registration date.
      */
@@ -414,10 +469,18 @@ class ClientController extends Controller
             'message' => 'Client retrieved successfully',
             'data' => [
                 'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
                 'full_name' => $client->full_name,
                 'image_url' => $client->image_url,
                 'email' => $client->email,
                 'mobile' => $client->mobile,
+                'location_id' => $client->location_id,
+                'locations' => $this->resolveNames(
+                    $client->location_id,
+                    Location::where('agency_id', $agencyId)->get()->keyBy('id'),
+                    'location'
+                ),
                 'registration_date' => $client->created_at,
                 'status' => $status ? [
                     'id' => $status->id,

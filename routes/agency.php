@@ -277,6 +277,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/clients/status-statistics', [ClientController::class, 'statusStatistics']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::post('/clients/{id}', [ClientController::class, 'updateProfile']);
     Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
     Route::get('/clients/{id}/lists', [ClientController::class, 'lists']);
     Route::patch('/clients/{id}/lists', [ClientController::class, 'updateLists']);
