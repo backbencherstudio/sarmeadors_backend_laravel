@@ -48,12 +48,12 @@ class CandidateAvailabilityController extends Controller
                 CandidateAvailabilityDay::updateOrCreate(
                     [
                         'candidate_availability_id' => $availability->id,
-                        'day_of_week' => $dayData['day_of_week'],
+                        'day_of_week' => CandidateAvailabilityDay::dayIndex($dayData['day']),
                     ],
                     [
                         'is_available' => $dayData['is_available'],
-                        'start_time' => $dayData['start_time'] ?? null,
-                        'end_time' => $dayData['end_time'] ?? null,
+                        'start_time' => $dayData['from'] ?? null,
+                        'end_time' => $dayData['to'] ?? null,
                     ]
                 );
             }

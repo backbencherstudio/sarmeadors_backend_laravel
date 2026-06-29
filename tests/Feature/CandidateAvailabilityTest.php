@@ -43,16 +43,16 @@ class CandidateAvailabilityTest extends TestCase
                 'timezone' => 'America/New_York',
                 'days' => [
                     [
-                        'day_of_week' => 1,
+                        'day' => 'monday',
                         'is_available' => true,
-                        'start_time' => '09:00',
-                        'end_time' => '17:00',
+                        'from' => '09:00',
+                        'to' => '17:00',
                     ],
                     [
-                        'day_of_week' => 5,
+                        'day' => 'friday',
                         'is_available' => false,
-                        'start_time' => null,
-                        'end_time' => null,
+                        'from' => null,
+                        'to' => null,
                     ],
                 ],
             ]);
