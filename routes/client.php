@@ -33,7 +33,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
 
     // Profile management
     Route::get('profile', [ClientProfileController::class, 'show']);
-    Route::put('profile', [ClientProfileController::class, 'update']);
+    Route::post('profile', [ClientProfileController::class, 'update']);
     Route::put('profile/password', [ClientProfileController::class, 'updatePassword']);
     Route::delete('profile', [ClientProfileController::class, 'destroy']);
 
