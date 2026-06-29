@@ -278,7 +278,7 @@ class CandidateSeeder extends Seeder
                 ['day_of_week' => 4, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],
                 ['day_of_week' => 5, 'is_available' => true, 'start_time' => '08:00:00', 'end_time' => '16:00:00'],
                 ['day_of_week' => 6, 'is_available' => $index % 2 === 0, 'start_time' => '10:00:00', 'end_time' => '16:00:00'],
-                ['day_of_week' => 7, 'is_available' => false, 'start_time' => null, 'end_time' => null],
+                ['day_of_week' => 0, 'is_available' => false, 'start_time' => null, 'end_time' => null],
             ];
 
             foreach ($days as $day) {
