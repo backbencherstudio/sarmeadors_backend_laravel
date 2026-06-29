@@ -22,6 +22,7 @@ class Client extends Model
         'checklist_id',
         'tag_id',
         'status_id',
+        'status_changed_at',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Client extends Model
         'checklist_id' => 'array',
         'tag_id' => 'array',
         'status_id' => 'array',
+        'status_changed_at' => 'datetime',
     ];
 
     public function getImageUrlAttribute()

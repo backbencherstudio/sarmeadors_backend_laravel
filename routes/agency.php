@@ -11,6 +11,7 @@ use App\Http\Controllers\Agency\AgencyNotificationController;
 use App\Http\Controllers\Agency\AgencySettingsController;
 use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
+use App\Http\Controllers\Agency\CandidateController;
 use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
 use App\Http\Controllers\Agency\ClientController;
 use App\Http\Controllers\Agency\ClientGlobalSettingsController;
@@ -157,9 +158,19 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::get('settings/client', [ClientGlobalSettingsController::class, 'getClientGlobalSettings']);
     Route::post('settings/client', [ClientGlobalSettingsController::class, 'updateClientGlobalSettings']);
 
+    // client table settings (dashboard columns + client statuses) for the "Client Table Settings" panel
+    Route::get('settings/client/table', [ClientGlobalSettingsController::class, 'getClientTableSettings']);
+    Route::post('settings/client/table', [ClientGlobalSettingsController::class, 'updateClientTableSettings']);
+    Route::get('settings/client/table/columns', [ClientGlobalSettingsController::class, 'getAvailableClientColumns']);
+
     // candidate global settings
     Route::get('settings/candidate', [CandidateGlobalSettingsController::class, 'getCandidateGlobalSettings']);
     Route::post('settings/candidate', [CandidateGlobalSettingsController::class, 'updateCandidateGlobalSettings']);
+
+    // candidate table settings (dashboard columns + candidate statuses) for the "Candidate Table Settings" panel
+    Route::get('settings/candidate/table', [CandidateGlobalSettingsController::class, 'getCandidateTableSettings']);
+    Route::post('settings/candidate/table', [CandidateGlobalSettingsController::class, 'updateCandidateTableSettings']);
+    Route::get('settings/candidate/table/columns', [CandidateGlobalSettingsController::class, 'getAvailableCandidateColumns']);
 });
 
 Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->prefix('agency')->group(function () {
@@ -262,6 +273,19 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('/form-fields/reorder', [FormFieldController::class, 'reorder']);
 
     // Client Registration
+    Route::get('/clients', [ClientController::class, 'index']);
+    Route::get('/clients/status-statistics', [ClientController::class, 'statusStatistics']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
+    Route::get('/clients/{id}/lists', [ClientController::class, 'lists']);
+    Route::patch('/clients/{id}/lists', [ClientController::class, 'updateLists']);
+
+    Route::get('/candidates', [CandidateController::class, 'index']);
+    Route::get('/candidates/status-statistics', [CandidateController::class, 'statusStatistics']);
+    Route::post('/candidates', [CandidateController::class, 'store']);
+    Route::get('/candidates/{id}', [CandidateController::class, 'show']);
+    Route::patch('/candidates/{id}/status', [CandidateController::class, 'updateStatus']);
+    Route::get('/candidates/{id}/lists', [CandidateController::class, 'lists']);
+    Route::patch('/candidates/{id}/lists', [CandidateController::class, 'updateLists']);
 });

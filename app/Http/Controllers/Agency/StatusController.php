@@ -10,15 +10,15 @@ use Illuminate\Validation\Rule;
 
 class StatusController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $authUser = auth('api')->user();
 
-        $query = Status::with('agency:id,first_name')->orderBy('serial');
+        $query = Status::with('agency:id,name')->orderBy('serial');
         $query->where('agency_id', $authUser->agency_id);
 
-        if (request()->filled('type')) {
-            $query->where('type', request('type'));
+        if ($request->query('type')) {
+            $query->where('type', $request->query('type'));
         }
 
         return response()->json([
@@ -34,9 +34,16 @@ class StatusController extends Controller
 
         $request->validate([
             'type' => 'required|in:client,candidate|max:50',
-            'name' => 'required|string|max:100|unique:statuses,name,NULL,id,agency_id,'.$authUser->agency_id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('statuses')->where(function ($query) use ($authUser, $request) {
+                    return $query->where('agency_id', $authUser->agency_id)
+                        ->where('type', $request->type);
+                }),
+            ],
             'color' => 'required|string|max:50',
-
         ]);
 
         $lastSerial = Status::where('agency_id', $authUser->agency_id)
@@ -87,7 +94,15 @@ class StatusController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255|unique:statuses,name,'.$status->id.',id,agency_id,'.$authUser->agency_id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('statuses')->ignore($status->id)->where(function ($query) use ($authUser, $status) {
+                    return $query->where('agency_id', $authUser->agency_id)
+                        ->where('type', $status->type);
+                }),
+            ],
             'color' => 'required|string|max:50',
         ]);
 
@@ -164,19 +179,37 @@ class StatusController extends Controller
         ]);
     }
 
+    /**
+     * Sync which statuses require a reason when a client/candidate is changed to
+     * them. Statuses passed in `statuses` are flagged as requiring a reason with
+     * the given text; every other status of the same `type` for this agency is
+     * reset to not require one, mirroring the "Select statuses which need a
+     * reason..." multi-select in the table settings panel.
+     */
     public function storeReasons(Request $request)
     {
+        $authUser = auth('api')->user();
+
         $request->validate([
+            'type' => 'required|in:client,candidate',
             'statuses' => 'required|array',
-            'statuses.*.id' => 'required|exists:statuses,id',
-            'statuses.*.reason' => 'required|max:1000',
+            'statuses.*.id' => [
+                'required',
+                'integer',
+                Rule::exists('statuses', 'id')->where(function ($query) use ($authUser, $request) {
+                    $query->where('agency_id', $authUser->agency_id)->where('type', $request->type);
+                }),
+            ],
+            'statuses.*.reason' => 'required|string|max:1000',
         ]);
 
-        $agencyId = auth('api')->user()->agency_id;
+        $agencyId = $authUser->agency_id;
 
         DB::beginTransaction();
 
         try {
+
+            $selectedIds = collect($request->statuses)->pluck('id')->all();
 
             foreach ($request->statuses as $statusData) {
 
@@ -187,6 +220,11 @@ class StatusController extends Controller
                         'reason' => $statusData['reason'],
                     ]);
             }
+
+            Status::where('agency_id', $agencyId)
+                ->where('type', $request->type)
+                ->whereNotIn('id', $selectedIds)
+                ->update(['any_reason' => 0, 'reason' => null]);
 
             DB::commit();
 
