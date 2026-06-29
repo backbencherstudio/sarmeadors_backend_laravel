@@ -30,7 +30,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
 
     // Profile management
     Route::get('profile', [CandidateProfileController::class, 'show']);
-    Route::put('profile', [CandidateProfileController::class, 'update']);
+    Route::post('profile', [CandidateProfileController::class, 'update']);
     Route::put('profile/password', [CandidateProfileController::class, 'updatePassword']);
     Route::delete('profile', [CandidateProfileController::class, 'destroy']);
 
