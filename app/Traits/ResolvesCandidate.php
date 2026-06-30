@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 /**
  * Resolves the Candidate record tied to the authenticated user within the
  * agency resolved by the subdomain middleware (`$request->current_agency`).
+ * Secondary logins (see App\Models\CandidateSecondaryLogin) authenticate as
+ * this same primary user (see AuthController::login), so a plain email
+ * match is always correct here.
  */
 trait ResolvesCandidate
 {
