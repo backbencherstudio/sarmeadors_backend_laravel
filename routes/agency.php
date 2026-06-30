@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Agency\AgencyCandidateDocumentController;
 use App\Http\Controllers\Agency\AgencyChecklistController;
 use App\Http\Controllers\Agency\AgencyController;
 use App\Http\Controllers\Agency\AgencyEventController;
@@ -327,6 +328,13 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'show']);
     Route::patch('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'update']);
     Route::patch('/candidates/{id}/notes/{noteId}/pin', [CandidateNoteController::class, 'togglePin']);
+
+    // Candidate detail "Documents" tab
+    Route::get('/candidates/{id}/documents', [AgencyCandidateDocumentController::class, 'index']);
+    Route::post('/candidates/{id}/documents/required/{key}', [AgencyCandidateDocumentController::class, 'uploadRequired']);
+    Route::post('/candidates/{id}/documents/additional', [AgencyCandidateDocumentController::class, 'uploadAdditional']);
+    Route::patch('/candidates/{id}/documents/additional/{documentId}', [AgencyCandidateDocumentController::class, 'updateAdditional']);
+    Route::delete('/candidates/{id}/documents/{documentId}', [AgencyCandidateDocumentController::class, 'destroy']);
 
     // Candidate detail "Profile" tab
     Route::get('/candidates/{id}/profile', [CandidateProfileController::class, 'show']);
