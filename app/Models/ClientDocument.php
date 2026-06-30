@@ -14,6 +14,7 @@ class ClientDocument extends Model
         'title',
         'description',
         'status',
+        'is_active',
         'signature',
         'signed_content',
         'signed_content_type',
@@ -26,6 +27,7 @@ class ClientDocument extends Model
     protected $casts = [
         'metadata' => 'array',
         'signed_at' => 'datetime',
+        'is_active' => 'boolean',
     ];
 
     public function getFileUrlAttribute(): ?string

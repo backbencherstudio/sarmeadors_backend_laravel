@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Portal Domain
+    |--------------------------------------------------------------------------
+    |
+    | Root domain the client/candidate-facing portal frontend is hosted on.
+    | Each agency gets its own subdomain off this root, e.g.
+    | "{agency.subdomain_prefix}.{portal_domain}", used to build links such
+    | as the portal password reset link.
+    |
+    */
+
+    'portal_domain' => env('PORTAL_DOMAIN', 'enginehire.io'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
