@@ -15,6 +15,7 @@ use App\Http\Controllers\Agency\CandidateController;
 use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
 use App\Http\Controllers\Agency\CandidateNoteController;
 use App\Http\Controllers\Agency\CandidatePasswordController;
+use App\Http\Controllers\Agency\CandidateProfileController;
 use App\Http\Controllers\Agency\ClientController;
 use App\Http\Controllers\Agency\ClientDocumentController;
 use App\Http\Controllers\Agency\ClientGlobalSettingsController;
@@ -326,6 +327,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'show']);
     Route::patch('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'update']);
     Route::patch('/candidates/{id}/notes/{noteId}/pin', [CandidateNoteController::class, 'togglePin']);
+
+    // Candidate detail "Profile" tab
+    Route::get('/candidates/{id}/profile', [CandidateProfileController::class, 'show']);
+    Route::patch('/candidates/{id}/profile', [CandidateProfileController::class, 'update']);
 
     // Candidate detail "Password" tab
     Route::get('/candidates/{id}/password', [CandidatePasswordController::class, 'show']);
