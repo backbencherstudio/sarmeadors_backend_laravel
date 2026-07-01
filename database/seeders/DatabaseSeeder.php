@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CandidateSeeder::class);
         $this->call(ClientSeeder::class);
         $this->call(JobSeeder::class);
+        $this->call(InterviewSeeder::class);
         $this->call(CandidateMyJobStatusSeeder::class);
 
         // Supporting domain data (depend on agency/clients/candidates above)
