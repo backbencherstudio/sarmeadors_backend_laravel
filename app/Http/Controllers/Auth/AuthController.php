@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\CandidateSecondaryLogin;
+use App\Models\ClientSecondaryLogin;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
@@ -23,18 +26,28 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Attempt login
+        // Attempt primary login
         $credentials = $validator->validated();
-        if (! $token = auth('api')->attempt($credentials)) {
+
+        if ($token = auth('api')->attempt($credentials)) {
+            return $this->respondWithToken($token, auth('api')->user());
+        }
+
+        // Fallback: check secondary login tables — these credentials authenticate
+        // as the linked primary User rather than creating a new account.
+        $secondary = ClientSecondaryLogin::where('email', $credentials['email'])->first()
+            ?? CandidateSecondaryLogin::where('email', $credentials['email'])->first();
+
+        if (! $secondary || ! Hash::check($credentials['password'], $secondary->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid credentials',
             ], 401);
         }
 
-        $user = auth('api')->user();
+        $token = auth('api')->login($secondary->user);
 
-        return $this->respondWithToken($token, $user);
+        return $this->respondWithToken($token, $secondary->user);
     }
 
     public function me()

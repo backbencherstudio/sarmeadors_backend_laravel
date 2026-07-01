@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Agency\AgencyCandidateDocumentController;
 use App\Http\Controllers\Agency\AgencyChecklistController;
 use App\Http\Controllers\Agency\AgencyController;
 use App\Http\Controllers\Agency\AgencyEventController;
@@ -13,8 +14,14 @@ use App\Http\Controllers\Agency\AgencyTagController;
 use App\Http\Controllers\Agency\AgencyTypeController;
 use App\Http\Controllers\Agency\CandidateController;
 use App\Http\Controllers\Agency\CandidateGlobalSettingsController;
+use App\Http\Controllers\Agency\CandidateNoteController;
+use App\Http\Controllers\Agency\CandidatePasswordController;
+use App\Http\Controllers\Agency\CandidateProfileController;
 use App\Http\Controllers\Agency\ClientController;
+use App\Http\Controllers\Agency\ClientDocumentController;
 use App\Http\Controllers\Agency\ClientGlobalSettingsController;
+use App\Http\Controllers\Agency\ClientNoteController;
+use App\Http\Controllers\Agency\ClientPasswordController;
 use App\Http\Controllers\Agency\DocumentTemplateController;
 use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Agency\FormFieldController;
@@ -277,9 +284,33 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/clients/status-statistics', [ClientController::class, 'statusStatistics']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::post('/clients/{id}', [ClientController::class, 'updateProfile']);
     Route::patch('/clients/{id}/status', [ClientController::class, 'updateStatus']);
     Route::get('/clients/{id}/lists', [ClientController::class, 'lists']);
     Route::patch('/clients/{id}/lists', [ClientController::class, 'updateLists']);
+
+    // Client detail "Documents" tab
+    Route::get('/clients/{id}/documents', [ClientDocumentController::class, 'index']);
+    Route::get('/clients/{id}/documents/templates', [ClientDocumentController::class, 'availableTemplates']);
+    Route::post('/clients/{id}/documents', [ClientDocumentController::class, 'store']);
+    Route::get('/clients/{id}/documents/{templateId}', [ClientDocumentController::class, 'show']);
+    Route::get('/clients/{id}/documents/{templateId}/download', [ClientDocumentController::class, 'downloadPdf']);
+    Route::patch('/clients/{id}/documents/{templateId}/toggle', [ClientDocumentController::class, 'toggleActive']);
+
+    // Client detail "Notes" tab
+    Route::get('/clients/{id}/notes', [ClientNoteController::class, 'index']);
+    Route::get('/clients/{id}/notes/admins', [ClientNoteController::class, 'availableAdmins']);
+    Route::post('/clients/{id}/notes', [ClientNoteController::class, 'store']);
+    Route::delete('/clients/{id}/notes', [ClientNoteController::class, 'destroy']);
+    Route::get('/clients/{id}/notes/{noteId}', [ClientNoteController::class, 'show']);
+    Route::patch('/clients/{id}/notes/{noteId}', [ClientNoteController::class, 'update']);
+    Route::patch('/clients/{id}/notes/{noteId}/pin', [ClientNoteController::class, 'togglePin']);
+
+    // Client detail "Password" tab
+    Route::get('/clients/{id}/password', [ClientPasswordController::class, 'show']);
+    Route::patch('/clients/{id}/password', [ClientPasswordController::class, 'updatePassword']);
+    Route::post('/clients/{id}/secondary-logins', [ClientPasswordController::class, 'storeSecondaryLogin']);
+    Route::delete('/clients/{id}/secondary-logins/{loginId}', [ClientPasswordController::class, 'destroySecondaryLogin']);
 
     Route::get('/candidates', [CandidateController::class, 'index']);
     Route::get('/candidates/status-statistics', [CandidateController::class, 'statusStatistics']);
@@ -288,4 +319,30 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::patch('/candidates/{id}/status', [CandidateController::class, 'updateStatus']);
     Route::get('/candidates/{id}/lists', [CandidateController::class, 'lists']);
     Route::patch('/candidates/{id}/lists', [CandidateController::class, 'updateLists']);
+
+    // Candidate detail "Notes" tab
+    Route::get('/candidates/{id}/notes', [CandidateNoteController::class, 'index']);
+    Route::get('/candidates/{id}/notes/admins', [CandidateNoteController::class, 'availableAdmins']);
+    Route::post('/candidates/{id}/notes', [CandidateNoteController::class, 'store']);
+    Route::delete('/candidates/{id}/notes', [CandidateNoteController::class, 'destroy']);
+    Route::get('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'show']);
+    Route::patch('/candidates/{id}/notes/{noteId}', [CandidateNoteController::class, 'update']);
+    Route::patch('/candidates/{id}/notes/{noteId}/pin', [CandidateNoteController::class, 'togglePin']);
+
+    // Candidate detail "Documents" tab
+    Route::get('/candidates/{id}/documents', [AgencyCandidateDocumentController::class, 'index']);
+    Route::post('/candidates/{id}/documents/required/{key}', [AgencyCandidateDocumentController::class, 'uploadRequired']);
+    Route::post('/candidates/{id}/documents/additional', [AgencyCandidateDocumentController::class, 'uploadAdditional']);
+    Route::patch('/candidates/{id}/documents/additional/{documentId}', [AgencyCandidateDocumentController::class, 'updateAdditional']);
+    Route::delete('/candidates/{id}/documents/{documentId}', [AgencyCandidateDocumentController::class, 'destroy']);
+
+    // Candidate detail "Profile" tab
+    Route::get('/candidates/{id}/profile', [CandidateProfileController::class, 'show']);
+    Route::patch('/candidates/{id}/profile', [CandidateProfileController::class, 'update']);
+
+    // Candidate detail "Password" tab
+    Route::get('/candidates/{id}/password', [CandidatePasswordController::class, 'show']);
+    Route::patch('/candidates/{id}/password', [CandidatePasswordController::class, 'updatePassword']);
+    Route::post('/candidates/{id}/secondary-logins', [CandidatePasswordController::class, 'storeSecondaryLogin']);
+    Route::delete('/candidates/{id}/secondary-logins/{loginId}', [CandidatePasswordController::class, 'destroySecondaryLogin']);
 });

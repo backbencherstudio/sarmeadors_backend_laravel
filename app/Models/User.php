@@ -58,4 +58,14 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(AgencyNote::class);
     }
+
+    public function clientSecondaryLogins()
+    {
+        return $this->hasMany(ClientSecondaryLogin::class);
+    }
+
+    public function candidateSecondaryLogins()
+    {
+        return $this->hasMany(CandidateSecondaryLogin::class);
+    }
 }
