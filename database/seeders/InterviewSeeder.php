@@ -66,7 +66,7 @@ class InterviewSeeder extends Seeder
             ->take(6)
             ->values();
 
-        $variants = ['upcoming', 'previous', 'cancelled'];
+        $variants = ['upcoming', 'requested', 'previous', 'cancelled', 'rescheduled'];
         $count = 0;
 
         foreach ($applications as $index => $application) {
@@ -98,10 +98,10 @@ class InterviewSeeder extends Seeder
     private function seedDirectInterviews(Agency $agency, Collection $clients, Collection $candidates): int
     {
         $configs = [
-            ['clientIdx' => 0, 'candidateIdx' => 2, 'variant' => 'upcoming'],
-            ['clientIdx' => 1, 'candidateIdx' => 3, 'variant' => 'previous'],
+            ['clientIdx' => 0, 'candidateIdx' => 2, 'variant' => 'requested'],
+            ['clientIdx' => 1, 'candidateIdx' => 3, 'variant' => 'upcoming'],
             ['clientIdx' => 2, 'candidateIdx' => 4, 'variant' => 'cancelled'],
-            ['clientIdx' => 3, 'candidateIdx' => 5, 'variant' => 'upcoming'],
+            ['clientIdx' => 3, 'candidateIdx' => 5, 'variant' => 'rescheduled'],
             ['clientIdx' => 4, 'candidateIdx' => 6, 'variant' => 'previous'],
         ];
 
@@ -139,6 +139,18 @@ class InterviewSeeder extends Seeder
     private function variantAttributes(string $variant, int $index): array
     {
         return match ($variant) {
+            // Client asked; awaiting the agency to set the meeting. No link yet.
+            'requested' => [
+                'scheduled_date' => now()->addDays(6 + $index)->format('Y-m-d'),
+                'available_from' => '13:00:00',
+                'available_to' => '14:00:00',
+                'interview_type' => 'zoom',
+                'interview_link' => null,
+                'description' => 'Video interview to meet the family and discuss expectations.',
+                'special_note' => null,
+                'reschedule_reason' => null,
+                'status' => 'requested',
+            ],
             'previous' => [
                 'scheduled_date' => now()->subDays(7 + $index)->format('Y-m-d'),
                 'available_from' => '14:00:00',
@@ -158,8 +170,27 @@ class InterviewSeeder extends Seeder
                 'interview_link' => 'https://meet.google.com/xyz-'.(1000 + $index),
                 'description' => 'Interview cancelled before it took place.',
                 'special_note' => null,
-                'reschedule_reason' => 'Family had to postpone due to a scheduling conflict.',
+                'reschedule_reason' => null,
+                'cancellation_reason' => 'The family cancelled due to a change in plans.',
                 'status' => 'cancelled',
+            ],
+            // A confirmed meeting with a client reschedule request awaiting the
+            // agency: the confirmed slot stays put; the proposed slot + reason
+            // live in the reschedule_* fields until the agency approves.
+            'rescheduled' => [
+                'scheduled_date' => now()->addDays(5 + $index)->format('Y-m-d'),
+                'available_from' => '11:00:00',
+                'available_to' => '12:00:00',
+                'interview_type' => 'zoom',
+                'interview_link' => 'https://zoom.us/j/'.(8000000 + $index),
+                'description' => 'Video interview to meet the family and discuss expectations.',
+                'special_note' => 'Please join 5 minutes early with a stable connection.',
+                'reschedule_reason' => 'Client requested a later time due to a work commitment.',
+                'reschedule_requested_at' => now()->subDay(),
+                'reschedule_date' => now()->addDays(9 + $index)->format('Y-m-d'),
+                'reschedule_from' => '16:00:00',
+                'reschedule_to' => '17:00:00',
+                'status' => 'scheduled',
             ],
             default => [
                 'scheduled_date' => now()->addDays(3 + $index)->format('Y-m-d'),

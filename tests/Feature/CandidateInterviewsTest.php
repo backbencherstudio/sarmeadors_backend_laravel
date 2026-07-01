@@ -140,6 +140,29 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.meeting.link', 'https://zoom.us/j/demo-link');
     }
 
+    public function test_candidate_does_not_see_requests_still_awaiting_the_agency(): void
+    {
+        Carbon::setTestNow('2026-01-10 09:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Awaiting Agency',
+            scheduledDate: '2026-01-18',
+            status: 'requested'
+        );
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/interviews?view=list')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.interviews.data');
+    }
+
     private function createCandidateScenario(): array
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();

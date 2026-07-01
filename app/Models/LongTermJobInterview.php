@@ -14,11 +14,20 @@ class LongTermJobInterview extends Model
         'candidate_id',
         'client_id',
         'agency_id',
+        'title',
         'scheduled_date',
         'available_from',
         'available_to',
+        'timezone',
+        'location',
         'special_note',
         'reschedule_reason',
+        'reschedule_requested_at',
+        'reschedule_date',
+        'reschedule_from',
+        'reschedule_to',
+        'cancellation_reason',
+        'assigned_to',
         'interview_type',
         'interview_link',
         'description',
@@ -27,7 +36,38 @@ class LongTermJobInterview extends Model
 
     protected $casts = [
         'scheduled_date' => 'date',
+        'reschedule_requested_at' => 'datetime',
+        'reschedule_date' => 'date',
+        'assigned_to' => 'array',
     ];
+
+    /**
+     * A reschedule the client has requested but the agency has not yet
+     * approved by moving it onto the confirmed schedule.
+     */
+    public function hasPendingReschedule(): bool
+    {
+        return $this->status === 'scheduled' && $this->reschedule_requested_at !== null;
+    }
+
+    /**
+     * The agency must act: a brand-new client request to set up, or a client
+     * reschedule to approve. Scheduling is agency-only, so nothing sits with the
+     * candidate.
+     */
+    public function isAwaitingAgency(): bool
+    {
+        return $this->status === 'requested' || $this->hasPendingReschedule();
+    }
+
+    /**
+     * Agency-created events carry their own title; client/candidate requests
+     * borrow the job's title.
+     */
+    public function displayTitle(): ?string
+    {
+        return $this->title ?: $this->job?->title;
+    }
 
     public function job(): BelongsTo
     {

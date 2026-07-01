@@ -383,7 +383,8 @@ class ClientCandidateController extends Controller
                 'interview_type' => $validated['interview_type'],
                 'description' => $validated['description'] ?? null,
                 'special_note' => $validated['special_note'] ?? null,
-                'status' => 'scheduled',
+                // Awaiting the candidate's response; the agency issues the link on confirmation.
+                'status' => 'requested',
             ]);
 
             $this->linkClientCandidate($client, $candidate->id, 'interview_scheduled');
@@ -408,7 +409,7 @@ class ClientCandidateController extends Controller
         $this->notifyAgencyAdmins($request->current_agency->id, 'interview_requested', 'Interview Requested', $body, null, $meta);
         $this->notifyPortalUser($request->current_agency->id, $candidate->email, 'interview_requested', 'Interview Requested', $body, null, $meta);
 
-        return $this->sendResponse($this->formatInterviewResponse($interview, $candidate), 'Interview scheduled successfully.', 201);
+        return $this->sendResponse($this->formatInterviewResponse($interview, $candidate), 'Interview request sent to the candidate.', 201);
     }
 
     // PUT /client/candidates/{candidate}/link

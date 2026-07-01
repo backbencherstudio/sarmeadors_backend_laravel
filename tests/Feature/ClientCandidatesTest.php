@@ -239,9 +239,11 @@ class ClientCandidatesTest extends TestCase
                 'available_to' => '11:00',
             ]);
 
+        // A profile interview-request now waits on the candidate before the
+        // agency confirms it, so it is persisted as "requested" (not scheduled).
         $response
             ->assertCreated()
-            ->assertJsonPath('data.status', 'scheduled')
+            ->assertJsonPath('data.status', 'requested')
             ->assertJsonPath('data.interview_type', 'zoom')
             ->assertJsonPath('data.candidate.id', $candidate->id);
 
@@ -251,7 +253,7 @@ class ClientCandidatesTest extends TestCase
             'agency_id' => $agency->id,
             'long_term_job_id' => null,
             'long_term_job_application_id' => null,
-            'status' => 'scheduled',
+            'status' => 'requested',
             'interview_type' => 'zoom',
         ]);
 

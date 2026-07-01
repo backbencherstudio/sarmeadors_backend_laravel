@@ -237,16 +237,23 @@ class ClientInterviewsTest extends TestCase
                 'reason' => 'A family emergency came up on the original date.',
             ]);
 
+        // A reschedule is only a request: the confirmed meeting is untouched and
+        // the proposed slot is surfaced under reschedule_request until the agency
+        // approves it.
         $response
             ->assertOk()
-            ->assertJsonPath('data.date', '2026-01-22')
-            ->assertJsonPath('data.time.range', '2:00 PM - 3:00 PM')
-            ->assertJsonPath('data.reschedule_reason', 'A family emergency came up on the original date.')
-            ->assertJsonPath('data.status', 'scheduled');
+            ->assertJsonPath('message', 'Reschedule request sent to the agency.')
+            ->assertJsonPath('data.date', '2026-01-18')
+            ->assertJsonPath('data.status', 'scheduled')
+            ->assertJsonPath('data.pending_reschedule', true)
+            ->assertJsonPath('data.reschedule_request.date', '2026-01-22')
+            ->assertJsonPath('data.reschedule_request.to', '3:00 PM')
+            ->assertJsonPath('data.reschedule_request.reason', 'A family emergency came up on the original date.');
 
         $this->assertDatabaseHas('long_term_job_interviews', [
             'id' => $interview->id,
-            'scheduled_date' => '2026-01-22 00:00:00',
+            'scheduled_date' => '2026-01-18 00:00:00',
+            'reschedule_date' => '2026-01-22 00:00:00',
             'reschedule_reason' => 'A family emergency came up on the original date.',
         ]);
     }

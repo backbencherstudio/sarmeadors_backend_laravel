@@ -98,10 +98,11 @@ class LongTermJobApplicationController extends Controller
                 'available_to' => 'required|date_format:H:i|after:available_from',
                 'special_note' => 'nullable|string|max:1000',
                 'interview_type' => 'nullable|in:in_person,zoom,google_meet',
-                'interview_link' => 'nullable|string|max:500',
                 'description' => 'nullable|string|max:2000',
             ]);
 
+            // Created as a request awaiting the candidate; the agency issues the
+            // meeting link when it confirms, so the client does not set one here.
             $interview = LongTermJobInterview::updateOrCreate(
                 ['long_term_job_application_id' => $application->id],
                 [
@@ -113,15 +114,14 @@ class LongTermJobApplicationController extends Controller
                     'available_to' => $validated['available_to'],
                     'special_note' => $validated['special_note'] ?? null,
                     'interview_type' => $validated['interview_type'] ?? 'in_person',
-                    'interview_link' => $validated['interview_link'] ?? null,
                     'description' => $validated['description'] ?? null,
-                    'status' => 'scheduled',
+                    'status' => 'requested',
                 ]
             );
 
             $application->update(['status' => 'interviewed']);
 
-            return $this->sendResponse($interview, 'Interview scheduled successfully.', 200);
+            return $this->sendResponse($interview, 'Interview request sent to the candidate.', 200);
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {

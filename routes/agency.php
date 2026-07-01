@@ -6,6 +6,7 @@ use App\Http\Controllers\Agency\AgencyController;
 use App\Http\Controllers\Agency\AgencyEventController;
 use App\Http\Controllers\Agency\AgencyEventTypeController;
 use App\Http\Controllers\Agency\AgencyGlobalJobSettingsController;
+use App\Http\Controllers\Agency\AgencyInterviewController;
 use App\Http\Controllers\Agency\AgencyLocationController;
 use App\Http\Controllers\Agency\AgencyNoteController;
 use App\Http\Controllers\Agency\AgencyNotificationController;
@@ -120,6 +121,16 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin'])->prefix('agenc
     Route::get('jobs/long-term/{longTermJob}/applicants', [AgencyLongTermJobApplicationController::class, 'index']);
     Route::get('jobs/long-term/{longTermJob}/applicants/{application}', [AgencyLongTermJobApplicationController::class, 'show']);
     Route::put('jobs/long-term/{longTermJob}/applicants/{application}/confirm-hire', [AgencyLongTermJobApplicationController::class, 'confirmHire']);
+
+    // Agency interview management: agency sets, reschedules and cancels every
+    // interview (list + calendar). Clients/candidates can only request and view.
+    Route::get('interviews', [AgencyInterviewController::class, 'index']);
+    Route::post('interviews', [AgencyInterviewController::class, 'store']);
+    Route::get('interviews/{interview}', [AgencyInterviewController::class, 'show']);
+    Route::put('interviews/{interview}/schedule', [AgencyInterviewController::class, 'schedule']);
+    Route::put('interviews/{interview}/decline', [AgencyInterviewController::class, 'decline']);
+    Route::put('interviews/{interview}/cancel', [AgencyInterviewController::class, 'cancel']);
+    Route::put('interviews/{interview}/complete', [AgencyInterviewController::class, 'complete']);
 
     // Agency long-term refund request management
     Route::get('jobs/long-term/{longTermJob}/refund-request', [AgencyLongTermJobRefundController::class, 'show']);

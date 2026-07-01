@@ -89,14 +89,17 @@ class ClientInterviewController extends Controller
 
         if ($filter === 'upcoming') {
             $query->where('scheduled_date', '>=', now()->toDateString())
-                ->where('status', 'scheduled');
+                ->whereIn('status', ['requested', 'scheduled']);
         } elseif ($filter === 'previous') {
             $query->where(function ($q) {
-                $q->where('scheduled_date', '<', now()->toDateString())
-                    ->orWhere('status', 'completed');
+                $q->where('status', 'completed')
+                    ->orWhere(function ($past) {
+                        $past->where('status', 'scheduled')
+                            ->where('scheduled_date', '<', now()->toDateString());
+                    });
             });
         } elseif ($filter === 'cancelled') {
-            $query->where('status', 'cancelled');
+            $query->whereIn('status', ['cancelled', 'declined']);
         }
 
         if ($view === 'calendar') {
@@ -129,7 +132,7 @@ class ClientInterviewController extends Controller
                     ->orWhere('client_id', $client->id);
             })
             ->where('scheduled_date', '>=', now()->toDateString())
-            ->where('status', 'scheduled')
+            ->whereIn('status', ['requested', 'scheduled'])
             ->orderBy('scheduled_date')
             ->orderBy('available_from')
             ->first();
@@ -180,21 +183,24 @@ class ClientInterviewController extends Controller
 
         $validated = $request->validated();
 
+        // A reschedule is a *request*: the proposed slot is stored separately so
+        // the confirmed meeting is untouched until the agency approves it.
         $interview->update([
-            'scheduled_date' => $validated['scheduled_date'],
-            'available_from' => $validated['available_from'],
-            'available_to' => $validated['available_to'],
+            'reschedule_date' => $validated['scheduled_date'],
+            'reschedule_from' => $validated['available_from'],
+            'reschedule_to' => $validated['available_to'],
             'reschedule_reason' => $validated['reason'],
+            'reschedule_requested_at' => now(),
         ]);
 
         $interview = $interview->fresh()->load(['job', 'candidate']);
 
         $body = sprintf(
-            '%s rescheduled the interview for "%s" to %s (%s).',
+            '%s requested to reschedule the interview for "%s" to %s (%s). Awaiting agency confirmation.',
             trim($client->first_name.' '.$client->last_name),
-            $interview->job?->title,
-            $interview->scheduled_date?->format('M d, Y'),
-            $this->formatTime($interview->available_from).' - '.$this->formatTime($interview->available_to)
+            $interview->displayTitle(),
+            $interview->reschedule_date?->format('M d, Y'),
+            $this->formatTime($interview->reschedule_from).' - '.$this->formatTime($interview->reschedule_to)
         );
         $meta = [
             'interview_id' => $interview->id,
@@ -202,12 +208,11 @@ class ClientInterviewController extends Controller
             'reason' => $validated['reason'],
         ];
 
-        $this->notifyAgencyAdmins($request->current_agency->id, 'interview_rescheduled', 'Interview Rescheduled', $body, null, $meta);
-        $this->notifyPortalUser($request->current_agency->id, $interview->candidate?->email, 'interview_rescheduled', 'Interview Rescheduled', $body, null, $meta);
+        $this->notifyAgencyAdmins($request->current_agency->id, 'interview_reschedule_requested', 'Interview Reschedule Requested', $body, null, $meta);
 
         return $this->sendResponse(
             $this->formatInterview($interview),
-            'Interview rescheduled successfully.',
+            'Reschedule request sent to the agency.',
             200
         );
     }
@@ -276,13 +281,15 @@ class ClientInterviewController extends Controller
         $job = $interview->job;
         $candidate = $interview->candidate;
         $description = $interview->description ?: $job?->description;
-        $canChange = $interview->status === 'scheduled' && ! $this->changeDeadlinePassed($interview);
+        $canChange = $interview->status === 'scheduled'
+            && ! $interview->hasPendingReschedule()
+            && ! $this->changeDeadlinePassed($interview);
 
         return [
             'id' => $interview->id,
             'job_id' => $interview->long_term_job_id,
             'application_id' => $interview->long_term_job_application_id,
-            'title' => $job?->title,
+            'title' => $interview->displayTitle(),
             'description' => $description,
             'description_preview' => $description ? Str::limit($description, 120) : null,
             'date' => $interview->scheduled_date?->toDateString(),
@@ -295,6 +302,14 @@ class ClientInterviewController extends Controller
             ],
             'status' => $interview->status,
             'period' => $this->resolvePeriod($interview),
+            'awaiting_agency' => $interview->isAwaitingAgency(),
+            'pending_reschedule' => $interview->hasPendingReschedule(),
+            'reschedule_request' => $interview->hasPendingReschedule() ? [
+                'date' => $interview->reschedule_date?->toDateString(),
+                'from' => $this->formatTime($interview->reschedule_from),
+                'to' => $this->formatTime($interview->reschedule_to),
+                'reason' => $interview->reschedule_reason,
+            ] : null,
             'meeting' => [
                 'type' => $interview->interview_type,
                 'link' => $interview->interview_link,
@@ -340,7 +355,7 @@ class ClientInterviewController extends Controller
 
     private function resolvePeriod(LongTermJobInterview $interview): string
     {
-        if ($interview->status === 'cancelled') {
+        if (in_array($interview->status, ['cancelled', 'declined'], true)) {
             return 'cancelled';
         }
 

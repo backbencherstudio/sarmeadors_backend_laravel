@@ -64,7 +64,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::delete('documents/additional/{candidateDocument}', [CandidateDocumentController::class, 'destroyAdditional']);
     Route::get('documents/files/{candidateDocument}/download', [CandidateDocumentController::class, 'downloadUploaded']);
 
-    // Interviews
+    // Interviews (read-only; the agency schedules and manages all interviews)
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
     Route::get('interviews/{interview}', [CandidateInterviewController::class, 'show']);
 

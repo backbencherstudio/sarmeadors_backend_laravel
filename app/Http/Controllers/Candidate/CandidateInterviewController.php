@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Candidate;
 
 use App\Http\Controllers\Controller;
-use App\Models\Candidate;
 use App\Models\LongTermJobInterview;
 use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
@@ -45,7 +44,10 @@ class CandidateInterviewController extends Controller
         $query = QueryBuilder::for(
             LongTermJobInterview::with(['job', 'job.client', 'client', 'application'])
                 ->where('candidate_id', $candidate->id)
-                ->where('agency_id', $request->current_agency->id),
+                ->where('agency_id', $request->current_agency->id)
+                // Requests still awaiting the agency are not shown to the candidate;
+                // they only see interviews once the agency has scheduled them.
+                ->where('status', '!=', 'requested'),
             $request
         )
             ->allowedFilters(
@@ -77,11 +79,14 @@ class CandidateInterviewController extends Controller
                 ->where('status', 'scheduled');
         } elseif ($filter === 'previous') {
             $query->where(function ($q) {
-                $q->where('scheduled_date', '<', now()->toDateString())
-                    ->orWhere('status', 'completed');
+                $q->where('status', 'completed')
+                    ->orWhere(function ($past) {
+                        $past->where('status', 'scheduled')
+                            ->where('scheduled_date', '<', now()->toDateString());
+                    });
             });
         } elseif ($filter === 'cancelled') {
-            $query->where('status', 'cancelled');
+            $query->whereIn('status', ['cancelled', 'declined']);
         }
 
         if ($view === 'calendar') {
@@ -153,7 +158,7 @@ class CandidateInterviewController extends Controller
             'id' => $interview->id,
             'job_id' => $interview->long_term_job_id,
             'application_id' => $interview->long_term_job_application_id,
-            'title' => $job?->title,
+            'title' => $interview->displayTitle(),
             'description' => $description,
             'description_preview' => $description ? Str::limit($description, 120) : null,
             'date' => $interview->scheduled_date?->toDateString(),
@@ -205,7 +210,7 @@ class CandidateInterviewController extends Controller
 
     private function resolvePeriod(LongTermJobInterview $interview): string
     {
-        if ($interview->status === 'cancelled') {
+        if (in_array($interview->status, ['cancelled', 'declined'], true)) {
             return 'cancelled';
         }
 
