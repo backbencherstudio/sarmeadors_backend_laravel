@@ -14,6 +14,7 @@ use App\Models\Location;
 use App\Models\Status;
 use App\Models\Tag;
 use App\Models\Type;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -122,7 +123,7 @@ class ClientController extends Controller
         $locationsById = Location::where('agency_id', $agencyId)->get()->keyBy('id');
 
         $rows = $clients->getCollection()->map(function ($client) use ($tableFields, $statusesById, $typesById, $locationsById) {
-            $row = ['id' => $client->id, 'image_url' => $client->image_url,];
+            $row = ['id' => $client->id, 'image_url' => $client->image_url];
 
             foreach ($tableFields as $field) {
                 $row[$field] = match ($field) {
@@ -429,8 +430,17 @@ class ClientController extends Controller
             $client->image = $request->file('image')->store('clients', 'public');
         }
 
+        $oldEmail = $client->email;
+
         $client->fill($request->only(['first_name', 'last_name', 'email', 'mobile', 'location_id']));
         $client->save();
+
+        $userUpdate = $request->only(['first_name', 'last_name', 'email', 'mobile']);
+        if ($userUpdate) {
+            User::where('email', $oldEmail)
+                ->where('agency_id', $agencyId)
+                ->update($userUpdate);
+        }
 
         return response()->json([
             'status' => true,
