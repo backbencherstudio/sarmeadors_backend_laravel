@@ -122,7 +122,7 @@ class CandidateController extends Controller
             ->keyBy('id');
 
         $rows = $candidates->getCollection()->map(function ($candidate) use ($tableFields, $statusesById) {
-            $row = ['id' => $candidate->id];
+            $row = ['id' => $candidate->id,'image_url' => $candidate->image_url,];
 
             foreach ($tableFields as $field) {
                 $row[$field] = match ($field) {

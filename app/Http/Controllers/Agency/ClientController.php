@@ -122,7 +122,7 @@ class ClientController extends Controller
         $locationsById = Location::where('agency_id', $agencyId)->get()->keyBy('id');
 
         $rows = $clients->getCollection()->map(function ($client) use ($tableFields, $statusesById, $typesById, $locationsById) {
-            $row = ['id' => $client->id];
+            $row = ['id' => $client->id, 'image_url' => $client->image_url,];
 
             foreach ($tableFields as $field) {
                 $row[$field] = match ($field) {
