@@ -62,6 +62,7 @@ class ClientPasswordController extends Controller
                 'password' => $data['password'],
             ]);
             $user->assignRole('client');
+            $client->update(['user_id' => $user->id]);
         }
 
         return response()->json([
@@ -107,6 +108,7 @@ class ClientPasswordController extends Controller
                 'password' => str()->random(24),
             ]);
             $primaryUser->assignRole('client');
+            $client->update(['user_id' => $primaryUser->id]);
         }
 
         $secondaryLogin = ClientSecondaryLogin::create([
