@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -126,7 +127,17 @@ class CandidateProfileController extends Controller
             unset($data['phone_number']);
         }
 
+        // Capture old email before the update so we can find the linked user
+        $oldEmail = $candidate->email;
+
         $candidate->update($data);
+
+        $userUpdate = array_intersect_key($data, array_flip(['first_name', 'last_name', 'email', 'mobile']));
+        if ($userUpdate) {
+            User::where('email', $oldEmail)
+                ->where('agency_id', $agencyId)
+                ->update($userUpdate);
+        }
 
         return response()->json([
             'status' => true,

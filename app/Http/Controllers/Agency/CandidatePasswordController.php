@@ -62,6 +62,7 @@ class CandidatePasswordController extends Controller
                 'password' => $data['password'],
             ]);
             $user->assignRole('candidate');
+            $candidate->update(['user_id' => $user->id]);
         }
 
         return response()->json([
@@ -107,6 +108,7 @@ class CandidatePasswordController extends Controller
                 'password' => str()->random(24),
             ]);
             $primaryUser->assignRole('candidate');
+            $candidate->update(['user_id' => $primaryUser->id]);
         }
 
         $secondaryLogin = CandidateSecondaryLogin::create([
