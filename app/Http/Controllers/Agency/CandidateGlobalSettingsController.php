@@ -51,11 +51,37 @@ class CandidateGlobalSettingsController extends Controller
         return $displayLabels;
     }
 
+    // public function getAvailableCandidateColumns()
+    // {
+    //     $columns = collect(self::availableColumns())
+    //         ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])
+    //         ->values();
+
+    //     return response()->json([
+    //         'status' => true,
+    //         'data' => $columns,
+    //     ]);
+    // }
+
     public function getAvailableCandidateColumns()
     {
-        $columns = collect(self::availableColumns())
-            ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])
-            ->values();
+        $agency_id = auth('api')->user()->agency_id;
+
+        $savedSettings = AgencyCandidateGlobalSetting::where('agency_id', $agency_id)->value('settings') ?? [];
+
+        $defaults = $this->defaultSettings();
+
+        $selectedFields = $savedSettings['dashboard']['table_fields'] ?? $defaults['dashboard']['table_fields'] ?? [];
+
+        $customLabels = $savedSettings['dashboard']['display_labels'] ?? [];
+
+        $columns = collect(self::availableColumns())->map(function ($label, $key) use ($selectedFields, $customLabels) {
+            return [
+                'key' => $key,
+                'label' => $customLabels[$key] ?? $label,
+                'is_selected' => in_array($key, (array) $selectedFields),
+            ];
+        })->values();
 
         return response()->json([
             'status' => true,
