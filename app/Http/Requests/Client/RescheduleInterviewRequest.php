@@ -20,7 +20,7 @@ class RescheduleInterviewRequest extends FormRequest
             'scheduled_date' => ['required', 'date', 'after_or_equal:today'],
             'available_from' => ['required', 'date_format:H:i'],
             'available_to' => ['required', 'date_format:H:i', 'after:available_from'],
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => ['required', 'string', 'max:2000'],
         ];
     }
 }
