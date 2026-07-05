@@ -228,7 +228,7 @@ class AgencyClientDashboardManagementTest extends TestCase
             ->assertJsonPath('data.0.location', 'Miami');
     }
 
-    public function test_status_reasons_are_synced_when_updated(): void
+    public function test_status_reason_is_set_via_status_update(): void
     {
         [$agency, $user] = $this->createAgencyScenario();
 
@@ -237,14 +237,13 @@ class AgencyClientDashboardManagementTest extends TestCase
             'agency_id' => $agency->id, 'name' => 'Inactive', 'color' => '#999999', 'serial' => 2, 'type' => 'client',
             'any_reason' => 1, 'reason' => 'Old reason',
         ]);
-        $active = Status::create(['agency_id' => $agency->id, 'name' => 'Active', 'color' => '#00ff00', 'serial' => 3, 'type' => 'client']);
 
-        // Select only "Rejected" as needing a reason; "Inactive" should be reset.
-        $response = $this->actingAsAgency($user)->postJson('/api/agency/status-reasons', [
-            'type' => 'client',
-            'statuses' => [
-                ['id' => $rejected->id, 'reason' => "Did not pass interview\nFailed background check"],
-            ],
+        // Enable a reason on "Rejected".
+        $response = $this->actingAsAgency($user)->putJson("/api/agency/status-update/{$rejected->id}", [
+            'name' => 'Rejected',
+            'color' => '#ff0000',
+            'any_reason' => true,
+            'reason' => "Did not pass interview\nFailed background check",
         ]);
 
         $response->assertOk();
@@ -254,14 +253,20 @@ class AgencyClientDashboardManagementTest extends TestCase
             'any_reason' => 1,
             'reason' => "Did not pass interview\nFailed background check",
         ]);
+
+        // Disable the reason on "Inactive".
+        $response = $this->actingAsAgency($user)->putJson("/api/agency/status-update/{$inactive->id}", [
+            'name' => 'Inactive',
+            'color' => '#999999',
+            'any_reason' => false,
+        ]);
+
+        $response->assertOk();
+
         $this->assertDatabaseHas('statuses', [
             'id' => $inactive->id,
             'any_reason' => 0,
             'reason' => null,
-        ]);
-        $this->assertDatabaseHas('statuses', [
-            'id' => $active->id,
-            'any_reason' => 0,
         ]);
     }
 

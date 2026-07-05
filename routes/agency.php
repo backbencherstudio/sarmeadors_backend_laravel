@@ -275,8 +275,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::put('/status-update/{id}', [StatusController::class, 'update']);
     Route::patch('/status-serial-update/{id}', [StatusController::class, 'serial']);
     Route::delete('/status-delete/{id}', [StatusController::class, 'destroy']);
-    // reasons
-    Route::post('/status-reasons', [StatusController::class, 'storeReasons']);
 
     // Dynamic form builder
     Route::get('/forms', [FormController::class, 'index']);

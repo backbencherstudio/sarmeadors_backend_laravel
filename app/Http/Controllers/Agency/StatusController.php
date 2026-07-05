@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Agency;
 use App\Http\Controllers\Controller;
 use App\Models\Status;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class StatusController extends Controller
 {
@@ -44,6 +44,8 @@ class StatusController extends Controller
                 }),
             ],
             'color' => 'required|string|max:50',
+            'any_reason' => 'nullable|boolean',
+            'reason' => 'required_if:any_reason,1|nullable|string|max:1000',
         ]);
 
         $lastSerial = Status::where('agency_id', $authUser->agency_id)
@@ -51,12 +53,16 @@ class StatusController extends Controller
 
         $nextSerial = $lastSerial ? $lastSerial + 1 : 1;
 
+        $anyReason = $request->boolean('any_reason');
+
         $status = Status::create([
             'agency_id' => $authUser->agency_id,
             'name' => $request->name,
             'color' => $request->color,
             'serial' => $nextSerial,
             'type' => $request->type,
+            'any_reason' => $anyReason,
+            'reason' => $anyReason ? $request->reason : null,
         ]);
 
         return response()->json([
@@ -104,9 +110,19 @@ class StatusController extends Controller
                 }),
             ],
             'color' => 'required|string|max:50',
+            'any_reason' => 'nullable|boolean',
+            'reason' => 'required_if:any_reason,1|nullable|string|max:1000',
         ]);
 
-        $status->update($request->only('name', 'color'));
+        $anyReason = $request->has('any_reason') ? $request->boolean('any_reason') : $status->any_reason;
+        $reason = $anyReason ? ($request->input('reason', $status->reason)) : null;
+
+        $status->update([
+            'name' => $request->name,
+            'color' => $request->color,
+            'any_reason' => $anyReason,
+            'reason' => $reason,
+        ]);
 
         return response()->json([
             'status' => true,
@@ -118,7 +134,6 @@ class StatusController extends Controller
     public function serial(Request $request, $id)
     {
         $authUser = auth('api')->user();
-
         $status = Status::findOrFail($id);
 
         if ($status->agency_id !== $authUser->agency_id) {
@@ -135,31 +150,82 @@ class StatusController extends Controller
             ],
         ]);
 
+        $oldSerial = $status->serial;
         $newSerial = $request->serial;
 
-        if ($status->serial == $newSerial) {
+        if ($oldSerial == $newSerial) {
             return response()->json([
                 'status' => true,
                 'message' => 'Serial already in this position.',
             ]);
         }
 
-        $otherStatus = Status::where('agency_id', $authUser->agency_id)
-            ->where('serial', $newSerial)
-            ->first();
+        DB::transaction(function () use ($authUser, $oldSerial, $newSerial, $status) {
+            if ($oldSerial < $newSerial) {
+                Status::where('agency_id', $authUser->agency_id)
+                    ->whereBetween('serial', [$oldSerial + 1, $newSerial])
+                    ->decrement('serial');
+            } else {
+                Status::where('agency_id', $authUser->agency_id)
+                    ->whereBetween('serial', [$newSerial, $oldSerial - 1])
+                    ->increment('serial');
+            }
 
-        if ($otherStatus) {
-            $otherStatus->update(['serial' => $status->serial]);
-        }
-
-        $status->update(['serial' => $newSerial]);
+            $status->update(['serial' => $newSerial]);
+        });
 
         return response()->json([
             'status' => true,
-            'message' => 'Client status serial updated successfully.',
+            'message' => 'Client status serial reordered successfully.',
             'serial' => $status->serial,
         ]);
     }
+
+    // public function serial(Request $request, $id)
+    // {
+    //     $authUser = auth('api')->user();
+
+    //     $status = Status::findOrFail($id);
+
+    //     if ($status->agency_id !== $authUser->agency_id) {
+    //         abort(403);
+    //     }
+
+    //     $request->validate([
+    //         'serial' => [
+    //             'required',
+    //             'integer',
+    //             Rule::exists('statuses', 'serial')->where(function ($query) use ($authUser) {
+    //                 $query->where('agency_id', $authUser->agency_id);
+    //             }),
+    //         ],
+    //     ]);
+
+    //     $newSerial = $request->serial;
+
+    //     if ($status->serial == $newSerial) {
+    //         return response()->json([
+    //             'status' => true,
+    //             'message' => 'Serial already in this position.',
+    //         ]);
+    //     }
+
+    //     $otherStatus = Status::where('agency_id', $authUser->agency_id)
+    //         ->where('serial', $newSerial)
+    //         ->first();
+
+    //     if ($otherStatus) {
+    //         $otherStatus->update(['serial' => $status->serial]);
+    //     }
+
+    //     $status->update(['serial' => $newSerial]);
+
+    //     return response()->json([
+    //         'status' => true,
+    //         'message' => 'Client status serial updated successfully.',
+    //         'serial' => $status->serial,
+    //     ]);
+    // }
 
     public function destroy($id)
     {
@@ -178,136 +244,4 @@ class StatusController extends Controller
             'message' => 'Client status deleted successfully.',
         ]);
     }
-
-    /**
-     * Sync which statuses require a reason when a client/candidate is changed to
-     * them. Statuses passed in `statuses` are flagged as requiring a reason with
-     * the given text; every other status of the same `type` for this agency is
-     * reset to not require one, mirroring the "Select statuses which need a
-     * reason..." multi-select in the table settings panel.
-     */
-
-    public function storeReasons(Request $request)
-    {
-        $authUser = auth('api')->user();
-
-        $request->validate([
-            'statuses' => 'required|array|min:1',
-            'statuses.*.id' => [
-                'required',
-                'integer',
-                Rule::exists('statuses', 'id')->where(function ($query) use ($authUser) {
-                    $query->where('agency_id', $authUser->agency_id);
-                }),
-            ],
-            'statuses.*.reason' => 'required|string|max:1000',
-        ]);
-
-        $agencyId = $authUser->agency_id;
-
-        $firstStatusId = $request->statuses[0]['id'];
-        $statusType = Status::where('id', $firstStatusId)->where('agency_id', $agencyId)->value('type');
-
-        if (!$statusType) {
-            return response()->json(['status' => false, 'message' => 'Invalid status ID'], 400);
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $selectedIds = collect($request->statuses)->pluck('id')->all();
-
-            foreach ($request->statuses as $statusData) {
-                Status::where('id', $statusData['id'])
-                    ->where('agency_id', $agencyId)
-                    ->update([
-                        'any_reason' => 1,
-                        'reason' => $statusData['reason'],
-                    ]);
-            }
-
-            Status::where('agency_id', $agencyId)
-                ->where('type', $statusType)
-                ->whereNotIn('id', $selectedIds)
-                ->update([
-                    'any_reason' => 0,
-                    'reason' => null
-                ]);
-
-            DB::commit();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Reasons stored successfully',
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => false,
-                'message' => 'Something went wrong',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-
-
-    // public function storeReasons(Request $request)
-    // {
-    //     $authUser = auth('api')->user();
-
-    //     $request->validate([
-    //         'type' => 'required|in:client,candidate',
-    //         'statuses' => 'required|array',
-    //         'statuses.*.id' => [
-    //             'required',
-    //             'integer',
-    //             Rule::exists('statuses', 'id')->where(function ($query) use ($authUser, $request) {
-    //                 $query->where('agency_id', $authUser->agency_id)->where('type', $request->type);
-    //             }),
-    //         ],
-    //         'statuses.*.reason' => 'required|string|max:1000',
-    //     ]);
-
-    //     $agencyId = $authUser->agency_id;
-
-    //     DB::beginTransaction();
-
-    //     try {
-
-    //         $selectedIds = collect($request->statuses)->pluck('id')->all();
-
-    //         foreach ($request->statuses as $statusData) {
-
-    //             Status::where('id', $statusData['id'])
-    //                 ->where('agency_id', $agencyId)
-    //                 ->update([
-    //                     'any_reason' => 1,
-    //                     'reason' => $statusData['reason'],
-    //                 ]);
-    //         }
-
-    //         Status::where('agency_id', $agencyId)
-    //             ->where('type', $request->type)
-    //             ->whereNotIn('id', $selectedIds)
-    //             ->update(['any_reason' => 0, 'reason' => null]);
-
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Reasons stored successfully',
-    //         ]);
-
-    //     } catch (\Throwable $e) {
-
-    //         DB::rollBack();
-
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Something went wrong',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
 }
