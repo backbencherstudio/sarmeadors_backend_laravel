@@ -99,10 +99,27 @@ class ClientSeeder extends Seeder
 
         $clients = [];
         foreach ($clientsData as $data) {
+            $user = User::firstOrCreate(
+                ['email' => $data['email']],
+                [
+                    'first_name' => $data['first_name'],
+                    'last_name' => $data['last_name'],
+                    'mobile' => $data['mobile'],
+                    'agency_id' => $agency->id,
+                    'is_owner' => 0,
+                    'password' => bcrypt('111111'),
+                ]
+            );
+
+            if ($role && ! $user->hasRole($role)) {
+                $user->assignRole($role);
+            }
+
             $client = Client::firstOrCreate(
                 ['email' => $data['email']],
                 [
                     'agency_id' => $agency->id,
+                    'user_id' => $user->id,
                     'first_name' => $data['first_name'],
                     'last_name' => $data['last_name'],
                     'mobile' => $data['mobile'],
@@ -117,22 +134,6 @@ class ClientSeeder extends Seeder
                         : [],
                 ]
             );
-
-            $user = User::firstOrCreate(
-                ['email' => $client->email],
-                [
-                    'first_name' => $client->first_name,
-                    'last_name' => $client->last_name,
-                    'mobile' => $client->mobile,
-                    'agency_id' => $agency->id,
-                    'is_owner' => 0,
-                    'password' => bcrypt('111111'),
-                ]
-            );
-
-            if ($role && ! $user->hasRole($role)) {
-                $user->assignRole($role);
-            }
 
             $clients[] = $client;
         }

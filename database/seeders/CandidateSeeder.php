@@ -222,17 +222,12 @@ class CandidateSeeder extends Seeder
             $data['type_id'] = [$candidateTypes[$index % $candidateTypes->count()]->id];
             $data['location_id'] = [$locations[$index % $locations->count()]->id];
 
-            $candidate = Candidate::firstOrCreate(
-                ['email' => $data['email']],
-                $data
-            );
-
             $user = User::firstOrCreate(
-                ['email' => $candidate->email],
+                ['email' => $data['email']],
                 [
-                    'first_name' => $candidate->first_name,
-                    'last_name' => $candidate->last_name,
-                    'mobile' => $candidate->mobile,
+                    'first_name' => $data['first_name'],
+                    'last_name' => $data['last_name'],
+                    'mobile' => $data['mobile'],
                     'agency_id' => $agency->id,
                     'is_owner' => 0,
                     'password' => bcrypt('111111'),
@@ -242,6 +237,13 @@ class CandidateSeeder extends Seeder
             if ($role && ! $user->hasRole($role)) {
                 $user->assignRole($role);
             }
+
+            $data['user_id'] = $user->id;
+
+            $candidate = Candidate::firstOrCreate(
+                ['email' => $data['email']],
+                $data
+            );
 
             $candidates[] = $candidate;
         }
