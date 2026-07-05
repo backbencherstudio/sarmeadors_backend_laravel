@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Permission\Models\Role;
 
 class Client extends Model
 {
+    public const DEFAULT_PASSWORD = '12345678';
+
     protected $fillable = [
         'agency_id',
         'user_id',
@@ -34,6 +37,38 @@ class Client extends Model
         'status_id' => 'array',
         'status_changed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Client $client) {
+            if ($client->user_id) {
+                return;
+            }
+
+            $user = User::where('email', $client->email)
+                ->where('agency_id', $client->agency_id)
+                ->first();
+
+            if (! $user) {
+                $user = User::create([
+                    'agency_id' => $client->agency_id,
+                    'first_name' => $client->first_name,
+                    'last_name' => $client->last_name,
+                    'email' => $client->email,
+                    'mobile' => $client->mobile,
+                    'password' => self::DEFAULT_PASSWORD,
+                ]);
+                $user->assignRole(Role::findOrCreate('client', 'api'));
+            }
+
+            $client->user_id = $user->id;
+        });
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function getImageUrlAttribute()
     {
