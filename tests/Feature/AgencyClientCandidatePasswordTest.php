@@ -17,20 +17,31 @@ class AgencyClientCandidatePasswordTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_show_reports_no_account_when_the_client_has_never_logged_in(): void
+    public function test_client_gets_a_default_password_portal_account_on_creation(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
 
-        $response = $this->actingAsAgency($admin)->getJson("/api/agency/clients/{$client->id}/password");
+        $user = $client->user;
+        $this->assertNotNull($user);
+        $this->assertTrue($user->hasRole('client'));
+        $this->assertTrue(Hash::check(Client::DEFAULT_PASSWORD, $user->password));
 
-        $response->assertOk()
-            ->assertJsonPath('data.has_account', false)
-            ->assertJsonPath('data.reset_link', null)
+        $this->actingAsAgency($admin)
+            ->getJson("/api/agency/clients/{$client->id}/password")
+            ->assertOk()
+            ->assertJsonPath('data.has_account', true)
             ->assertJsonCount(0, 'data.secondary_logins');
+
+        $loginResponse = $this->postJson('/api/login', [
+            'email' => $client->email,
+            'password' => Client::DEFAULT_PASSWORD,
+        ]);
+        $loginResponse->assertOk();
+        $this->assertSame($user->id, $loginResponse->json('user.id'));
     }
 
-    public function test_update_password_creates_a_portal_account_when_none_exists(): void
+    public function test_update_password_overwrites_the_default_password(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'last_name' => 'Candra', 'email' => 'pristia@example.com']);
@@ -39,24 +50,10 @@ class AgencyClientCandidatePasswordTest extends TestCase
             ->patchJson("/api/agency/clients/{$client->id}/password", ['password' => 'Secret123'])
             ->assertOk();
 
-        $user = User::where('email', $client->email)->first();
-        $this->assertNotNull($user);
+        $user = $client->user()->first();
         $this->assertTrue($user->hasRole('client'));
         $this->assertTrue(Hash::check('Secret123', $user->password));
-    }
-
-    public function test_update_password_resets_an_existing_portal_accounts_password(): void
-    {
-        [$agency, $admin] = $this->createAgencyScenario();
-        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
-        $portalUser = User::factory()->create(['agency_id' => $agency->id, 'email' => $client->email]);
-        $portalUser->assignRole('client');
-
-        $this->actingAsAgency($admin)
-            ->patchJson("/api/agency/clients/{$client->id}/password", ['password' => 'NewPassword1'])
-            ->assertOk();
-
-        $this->assertTrue(Hash::check('NewPassword1', $portalUser->fresh()->password));
+        $this->assertFalse(Hash::check(Client::DEFAULT_PASSWORD, $user->password));
     }
 
     public function test_update_password_rejects_a_weak_password(): void
@@ -67,19 +64,6 @@ class AgencyClientCandidatePasswordTest extends TestCase
         $this->actingAsAgency($admin)
             ->patchJson("/api/agency/clients/{$client->id}/password", ['password' => 'allletters'])
             ->assertStatus(422);
-    }
-
-    public function test_show_returns_has_account_true_when_the_client_has_a_portal_account(): void
-    {
-        [$agency, $admin] = $this->createAgencyScenario();
-        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
-        User::factory()->create(['agency_id' => $agency->id, 'email' => $client->email])->assignRole('client');
-
-        $this->actingAsAgency($admin)
-            ->getJson("/api/agency/clients/{$client->id}/password")
-            ->assertOk()
-            ->assertJsonPath('data.has_account', true)
-            ->assertJsonMissingPath('data.reset_link');
     }
 
     public function test_secondary_login_can_be_added_and_authenticates_as_the_same_primary_user(): void
@@ -132,7 +116,7 @@ class AgencyClientCandidatePasswordTest extends TestCase
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
-        $primaryUser = User::factory()->create(['agency_id' => $agency->id, 'email' => $client->email]);
+        $primaryUser = $client->user;
         ClientSecondaryLogin::create([
             'agency_id' => $agency->id,
             'client_id' => $client->id,
@@ -153,8 +137,7 @@ class AgencyClientCandidatePasswordTest extends TestCase
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
-        $primaryUser = User::factory()->create(['agency_id' => $agency->id, 'email' => $client->email]);
-        $primaryUser->assignRole('client');
+        $primaryUser = $client->user;
         $secondaryLogin = ClientSecondaryLogin::create([
             'agency_id' => $agency->id,
             'client_id' => $client->id,
