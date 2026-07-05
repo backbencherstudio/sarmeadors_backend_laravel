@@ -186,18 +186,18 @@ class StatusController extends Controller
      * reset to not require one, mirroring the "Select statuses which need a
      * reason..." multi-select in the table settings panel.
      */
+
     public function storeReasons(Request $request)
     {
         $authUser = auth('api')->user();
 
         $request->validate([
-            'type' => 'required|in:client,candidate',
-            'statuses' => 'required|array',
+            'statuses' => 'required|array|min:1',
             'statuses.*.id' => [
                 'required',
                 'integer',
-                Rule::exists('statuses', 'id')->where(function ($query) use ($authUser, $request) {
-                    $query->where('agency_id', $authUser->agency_id)->where('type', $request->type);
+                Rule::exists('statuses', 'id')->where(function ($query) use ($authUser) {
+                    $query->where('agency_id', $authUser->agency_id);
                 }),
             ],
             'statuses.*.reason' => 'required|string|max:1000',
@@ -205,14 +205,19 @@ class StatusController extends Controller
 
         $agencyId = $authUser->agency_id;
 
+        $firstStatusId = $request->statuses[0]['id'];
+        $statusType = Status::where('id', $firstStatusId)->where('agency_id', $agencyId)->value('type');
+
+        if (!$statusType) {
+            return response()->json(['status' => false, 'message' => 'Invalid status ID'], 400);
+        }
+
         DB::beginTransaction();
 
         try {
-
             $selectedIds = collect($request->statuses)->pluck('id')->all();
 
             foreach ($request->statuses as $statusData) {
-
                 Status::where('id', $statusData['id'])
                     ->where('agency_id', $agencyId)
                     ->update([
@@ -222,9 +227,12 @@ class StatusController extends Controller
             }
 
             Status::where('agency_id', $agencyId)
-                ->where('type', $request->type)
+                ->where('type', $statusType)
                 ->whereNotIn('id', $selectedIds)
-                ->update(['any_reason' => 0, 'reason' => null]);
+                ->update([
+                    'any_reason' => 0,
+                    'reason' => null
+                ]);
 
             DB::commit();
 
@@ -232,11 +240,8 @@ class StatusController extends Controller
                 'status' => true,
                 'message' => 'Reasons stored successfully',
             ]);
-
         } catch (\Throwable $e) {
-
             DB::rollBack();
-
             return response()->json([
                 'status' => false,
                 'message' => 'Something went wrong',
@@ -244,4 +249,65 @@ class StatusController extends Controller
             ], 500);
         }
     }
+
+
+
+    // public function storeReasons(Request $request)
+    // {
+    //     $authUser = auth('api')->user();
+
+    //     $request->validate([
+    //         'type' => 'required|in:client,candidate',
+    //         'statuses' => 'required|array',
+    //         'statuses.*.id' => [
+    //             'required',
+    //             'integer',
+    //             Rule::exists('statuses', 'id')->where(function ($query) use ($authUser, $request) {
+    //                 $query->where('agency_id', $authUser->agency_id)->where('type', $request->type);
+    //             }),
+    //         ],
+    //         'statuses.*.reason' => 'required|string|max:1000',
+    //     ]);
+
+    //     $agencyId = $authUser->agency_id;
+
+    //     DB::beginTransaction();
+
+    //     try {
+
+    //         $selectedIds = collect($request->statuses)->pluck('id')->all();
+
+    //         foreach ($request->statuses as $statusData) {
+
+    //             Status::where('id', $statusData['id'])
+    //                 ->where('agency_id', $agencyId)
+    //                 ->update([
+    //                     'any_reason' => 1,
+    //                     'reason' => $statusData['reason'],
+    //                 ]);
+    //         }
+
+    //         Status::where('agency_id', $agencyId)
+    //             ->where('type', $request->type)
+    //             ->whereNotIn('id', $selectedIds)
+    //             ->update(['any_reason' => 0, 'reason' => null]);
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'status' => true,
+    //             'message' => 'Reasons stored successfully',
+    //         ]);
+
+    //     } catch (\Throwable $e) {
+
+    //         DB::rollBack();
+
+    //         return response()->json([
+    //             'status' => false,
+    //             'message' => 'Something went wrong',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 }
