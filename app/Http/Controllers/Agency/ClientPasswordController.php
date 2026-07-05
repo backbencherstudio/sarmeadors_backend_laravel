@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Agency;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientSecondaryLogin;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -20,8 +19,6 @@ class ClientPasswordController extends Controller
 
         $client = Client::where('agency_id', $agencyId)->findOrFail($clientId);
 
-        $primaryUser = User::where('email', $client->email)->where('agency_id', $agencyId)->first();
-
         $secondaryLogins = ClientSecondaryLogin::where('client_id', $client->id)
             ->where('agency_id', $agencyId)
             ->get();
@@ -29,15 +26,16 @@ class ClientPasswordController extends Controller
         return response()->json([
             'status' => true,
             'data' => [
-                'has_account' => (bool) $primaryUser,
+                'has_account' => true,
                 'secondary_logins' => $secondaryLogins->map(fn (ClientSecondaryLogin $login) => $this->formatSecondaryLogin($login))->values(),
             ],
         ]);
     }
 
     /**
-     * Manually set the client's portal password — creates the portal
-     * account (using the client's existing email) if one doesn't exist yet.
+     * Manually set the client's portal password. Every client already has a
+     * portal account (auto-created with a default password when the client
+     * was created), so this simply overwrites that account's password.
      */
     // PATCH /agency/clients/{id}/password
     public function updatePassword(Request $request, $clientId)
@@ -48,22 +46,7 @@ class ClientPasswordController extends Controller
 
         $data = $request->validate(['password' => self::PASSWORD_RULES]);
 
-        $user = User::where('email', $client->email)->where('agency_id', $agencyId)->first();
-
-        if ($user) {
-            $user->update(['password' => $data['password']]);
-        } else {
-            $user = User::create([
-                'agency_id' => $agencyId,
-                'first_name' => $client->first_name,
-                'last_name' => $client->last_name,
-                'email' => $client->email,
-                'mobile' => $client->mobile,
-                'password' => $data['password'],
-            ]);
-            $user->assignRole('client');
-            $client->update(['user_id' => $user->id]);
-        }
+        $client->user->update(['password' => $data['password']]);
 
         return response()->json([
             'status' => true,
@@ -74,8 +57,8 @@ class ClientPasswordController extends Controller
     /**
      * Add a secondary email+password credential for this client.
      * No new User row is created — the credential points to the client's
-     * existing primary User (auto-created if absent) so that logging in
-     * with the secondary email still returns the primary user's JWT.
+     * existing primary User so that logging in with the secondary email
+     * still returns the primary user's JWT.
      */
     // POST /agency/clients/{id}/secondary-logins
     public function storeSecondaryLogin(Request $request, $clientId)
@@ -95,26 +78,10 @@ class ClientPasswordController extends Controller
             'password' => self::PASSWORD_RULES,
         ]);
 
-        // Ensure a primary portal User exists so user_id FK can be set.
-        $primaryUser = User::where('email', $client->email)->where('agency_id', $agencyId)->first();
-
-        if (! $primaryUser) {
-            $primaryUser = User::create([
-                'agency_id' => $agencyId,
-                'first_name' => $client->first_name,
-                'last_name' => $client->last_name,
-                'email' => $client->email,
-                'mobile' => $client->mobile,
-                'password' => str()->random(24),
-            ]);
-            $primaryUser->assignRole('client');
-            $client->update(['user_id' => $primaryUser->id]);
-        }
-
         $secondaryLogin = ClientSecondaryLogin::create([
             'agency_id' => $agencyId,
             'client_id' => $client->id,
-            'user_id' => $primaryUser->id,
+            'user_id' => $client->user_id,
             'email' => $data['email'],
             'password' => $data['password'],
         ]);

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Agency;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\CandidateSecondaryLogin;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -20,8 +19,6 @@ class CandidatePasswordController extends Controller
 
         $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($candidateId);
 
-        $primaryUser = User::where('email', $candidate->email)->where('agency_id', $agencyId)->first();
-
         $secondaryLogins = CandidateSecondaryLogin::where('candidate_id', $candidate->id)
             ->where('agency_id', $agencyId)
             ->get();
@@ -29,15 +26,16 @@ class CandidatePasswordController extends Controller
         return response()->json([
             'status' => true,
             'data' => [
-                'has_account' => (bool) $primaryUser,
+                'has_account' => true,
                 'secondary_logins' => $secondaryLogins->map(fn (CandidateSecondaryLogin $login) => $this->formatSecondaryLogin($login))->values(),
             ],
         ]);
     }
 
     /**
-     * Manually set the candidate's portal password — creates the portal
-     * account (using the candidate's existing email) if one doesn't exist yet.
+     * Manually set the candidate's portal password. Every candidate already has
+     * a portal account (auto-created with a default password when the
+     * candidate was created), so this simply overwrites that account's password.
      */
     // PATCH /agency/candidates/{id}/password
     public function updatePassword(Request $request, $candidateId)
@@ -48,22 +46,7 @@ class CandidatePasswordController extends Controller
 
         $data = $request->validate(['password' => self::PASSWORD_RULES]);
 
-        $user = User::where('email', $candidate->email)->where('agency_id', $agencyId)->first();
-
-        if ($user) {
-            $user->update(['password' => $data['password']]);
-        } else {
-            $user = User::create([
-                'agency_id' => $agencyId,
-                'first_name' => $candidate->first_name,
-                'last_name' => $candidate->last_name,
-                'email' => $candidate->email,
-                'mobile' => $candidate->mobile,
-                'password' => $data['password'],
-            ]);
-            $user->assignRole('candidate');
-            $candidate->update(['user_id' => $user->id]);
-        }
+        $candidate->user->update(['password' => $data['password']]);
 
         return response()->json([
             'status' => true,
@@ -74,8 +57,8 @@ class CandidatePasswordController extends Controller
     /**
      * Add a secondary email+password credential for this candidate.
      * No new User row is created — the credential points to the candidate's
-     * existing primary User (auto-created if absent) so that logging in
-     * with the secondary email still returns the primary user's JWT.
+     * existing primary User so that logging in with the secondary email
+     * still returns the primary user's JWT.
      */
     // POST /agency/candidates/{id}/secondary-logins
     public function storeSecondaryLogin(Request $request, $candidateId)
@@ -95,26 +78,10 @@ class CandidatePasswordController extends Controller
             'password' => self::PASSWORD_RULES,
         ]);
 
-        // Ensure a primary portal User exists so user_id FK can be set.
-        $primaryUser = User::where('email', $candidate->email)->where('agency_id', $agencyId)->first();
-
-        if (! $primaryUser) {
-            $primaryUser = User::create([
-                'agency_id' => $agencyId,
-                'first_name' => $candidate->first_name,
-                'last_name' => $candidate->last_name,
-                'email' => $candidate->email,
-                'mobile' => $candidate->mobile,
-                'password' => str()->random(24),
-            ]);
-            $primaryUser->assignRole('candidate');
-            $candidate->update(['user_id' => $primaryUser->id]);
-        }
-
         $secondaryLogin = CandidateSecondaryLogin::create([
             'agency_id' => $agencyId,
             'candidate_id' => $candidate->id,
-            'user_id' => $primaryUser->id,
+            'user_id' => $candidate->user_id,
             'email' => $data['email'],
             'password' => $data['password'],
         ]);
