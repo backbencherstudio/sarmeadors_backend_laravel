@@ -48,6 +48,7 @@
             "@php artisan migrate --force"
         ],
         "deploy": "php vendor/bin/envoy run deploy",
+        "deploy:fresh": "php vendor/bin/envoy run fresh-seed",
         "dev": [
             "@php artisan serve"
         ],

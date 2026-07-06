@@ -6,3 +6,9 @@
     php artisan migrate --force
     php artisan optimize:clear
 @endtask
+
+
+@task('fresh-seed', ['on' => 'web'])
+    cd htdocs/api.staffhaus.cloud/
+    php artisan migrate:fresh --seed --force
+@endtask
