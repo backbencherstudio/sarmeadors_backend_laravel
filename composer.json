@@ -47,6 +47,7 @@
             "@php artisan key:generate",
             "@php artisan migrate --force"
         ],
+        "deploy": "php vendor/bin/envoy run deploy",
         "dev": [
             "@php artisan serve"
         ],
