@@ -72,7 +72,7 @@ class ClientGlobalSettingsController extends Controller
             'email_address',
             'phone_number',
             'registration_date',
-            'status'
+            'status',
         ];
 
         $selectedFields = $settings['dashboard']['table_fields'] ?? $defaultSelectedFields;
