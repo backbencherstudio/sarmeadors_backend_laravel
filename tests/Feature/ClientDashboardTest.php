@@ -88,8 +88,12 @@ class ClientDashboardTest extends TestCase
             ->assertJsonPath('data.stats.applications', 1)
             ->assertJsonPath('data.current_jobs.0.id', $job->id)
             ->assertJsonPath('data.current_jobs.0.job_type', 'long_term')
+            ->assertJsonPath('data.current_jobs.0.job_type_label', 'Long-Term Job')
+            ->assertJsonPath('data.current_jobs.0.term_label', 'Long-term')
             ->assertJsonPath('data.current_jobs.0.title', 'Darlene Robertson')
             ->assertJsonPath('data.current_jobs.0.status_label', 'Pending')
+            ->assertJsonPath('data.current_jobs.0.services', ['Nanny'])
+            ->assertJsonPath('data.current_jobs.0.address.street_address', '26 Berkshire Ave.')
             ->assertJsonPath('data.current_jobs.0.compensation.label', '$34/hr')
             ->assertJsonPath('data.current_jobs.0.applicants.count', 1)
             ->assertJsonPath('data.current_jobs.0.actions.can_view_details', true);

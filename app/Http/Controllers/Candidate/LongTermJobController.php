@@ -40,7 +40,8 @@ class LongTermJobController extends Controller
             $query->where('status', $status);
         }
 
-        $jobs = $query->latest()->get();
+        $jobs = $query->latest()->get()
+            ->map(fn (LongTermJob $job): array => $this->formatAssignedJobCard($job));
 
         $counts = LongTermJob::where('candidate_id', $candidate->id)
             ->where('agency_id', $request->current_agency->id)
@@ -329,10 +330,5 @@ class LongTermJobController extends Controller
     private function isScheduledDate(LongTermJob $job, Carbon $date): bool
     {
         return $job->schedules->contains('day_of_week', $date->dayOfWeek);
-    }
-
-    private function formatDayName(int $day): string
-    {
-        return Carbon::now()->startOfWeek(Carbon::SUNDAY)->addDays($day)->format('l');
     }
 }

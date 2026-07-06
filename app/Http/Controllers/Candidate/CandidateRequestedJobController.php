@@ -229,26 +229,29 @@ class CandidateRequestedJobController extends Controller
     {
         $job = $this->resolveJob($jobRequest);
 
-        return [
+        $card = $job ? $this->formatJobCard($job) : [
+            'title' => null,
+            'cover_image_url' => null,
+            'description' => null,
+            'description_preview' => null,
+            'services' => [],
+            'location' => null,
+            'compensation' => null,
+        ];
+
+        return array_merge($card, [
             'id' => $jobRequest->id,
             'job_id' => $job?->id,
             'job_type' => $jobRequest->job_type,
-            'title' => $job?->title,
             'client_name' => $this->formatClientName($jobRequest),
-            'cover_image_url' => $job?->cover_image_url,
-            'description' => $job?->description,
-            'description_preview' => $job?->description ? Str::limit($job->description, 140) : null,
-            'services' => $job ? $this->formatServices($job) : [],
-            'location' => $job ? $this->formatLocation($job) : null,
             'schedule_summary' => $job ? $this->formatScheduleSummary($jobRequest, $job) : null,
-            'compensation' => $job ? $this->formatCompensation($job) : null,
             'request' => $this->formatRequestMeta($jobRequest),
             'actions' => [
                 'can_view_details' => true,
                 'can_approve' => $jobRequest->status === 'pending',
                 'can_reject' => $jobRequest->status === 'pending',
             ],
-        ];
+        ]);
     }
 
     private function formatRequestDetails(CandidateJobRequest $jobRequest): array

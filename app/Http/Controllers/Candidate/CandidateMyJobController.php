@@ -8,6 +8,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobAttendance;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobAttendance;
+use App\Traits\FormatsAssignedJob;
 use App\Traits\FormatsMoney;
 use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
@@ -23,6 +24,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CandidateMyJobController extends Controller
 {
+    use FormatsAssignedJob;
     use FormatsMoney;
     use FormatsTime;
     use ResolvesCandidate;
@@ -158,7 +160,7 @@ class CandidateMyJobController extends Controller
         Candidate $candidate,
     ): array {
         if ($view !== 'calendar') {
-            return ['client', 'latestAttendance'];
+            return ['client', 'children', 'latestAttendance'];
         }
 
         return [
@@ -285,7 +287,7 @@ class CandidateMyJobController extends Controller
                     )->betweenIncluded($start, $end),
                 )
                 ->map(
-                    fn ($date): array => $this->formatJobCard($type, $job, [
+                    fn ($date): array => $this->formatCalendarEvent($type, $job, [
                         'date' => Carbon::parse(
                             $date->booking_date,
                         )->toDateString(),
@@ -296,7 +298,7 @@ class CandidateMyJobController extends Controller
         }
 
         return $this->longTermOccurrences($job, $start, $end)->map(
-            fn (array $occurrence): array => $this->formatJobCard(
+            fn (array $occurrence): array => $this->formatCalendarEvent(
                 $type,
                 $job,
                 $occurrence,
@@ -351,7 +353,7 @@ class CandidateMyJobController extends Controller
             'title' => $this->formatStatusHeading($filters['status']),
             'jobs' => $jobs
                 ->map(
-                    fn (array $item): array => $this->formatListJobCard(
+                    fn (array $item): array => $this->formatAssignedJobCard(
                         $item['job'],
                     ),
                 )
@@ -360,45 +362,12 @@ class CandidateMyJobController extends Controller
     }
 
     /**
-     * Minimal job card for the list view, matching the candidate dashboard
-     * card shape so the frontend can render both feeds with one component.
+     * Per-date calendar event card (one entry per booking-date occurrence).
+     * Distinct from the shared list card built by formatJobCard().
      *
      * @return array<string, mixed>
      */
-    private function formatListJobCard(ShortTermJob|LongTermJob $job): array
-    {
-        $attendance = $job->latestAttendance;
-
-        return [
-            'id' => $job->id,
-            'job_type' => $job instanceof ShortTermJob ? 'short_term' : 'long_term',
-            'title' => $job->title,
-            'client_name' => $this->formatClientName($job),
-            'description' => $job->description,
-            'cover_image_url' => $job->cover_image_url,
-            'address' => [
-                'line' => $job->job_address,
-                'city' => $job->home_city,
-                'province' => $job->home_province,
-                'postal_code' => $job->home_postal_code,
-                'country' => $job->country,
-            ],
-            'compensation' => [
-                'amount' => $job->compensation_amount,
-                'currency' => $job->compensation_currency,
-                'type' => $job->compensation_type,
-            ],
-            'status' => $job->status,
-            'latest_attendance' => $attendance,
-            'can_check_in' => $job->status === 'running' &&
-                (! $attendance || ! $attendance->check_in),
-            'can_check_out' => $job->status === 'running' &&
-                $attendance?->check_in &&
-                ! $attendance?->check_out,
-        ];
-    }
-
-    private function formatJobCard(
+    private function formatCalendarEvent(
         string $type,
         ShortTermJob|LongTermJob $job,
         array $occurrence,
@@ -426,7 +395,7 @@ class CandidateMyJobController extends Controller
             'description_preview' => $job->description
                 ? Str::limit($job->description, 120)
                 : null,
-            'location' => $this->formatLocation($job),
+            'location' => $this->formatCalendarLocation($job),
             'date' => $occurrence['date'],
             'date_label' => Carbon::parse($occurrence['date'])->format(
                 'M d, Y',
@@ -576,7 +545,11 @@ class CandidateMyJobController extends Controller
             blank($attendance?->check_out);
     }
 
-    private function formatLocation(ShortTermJob|LongTermJob $job): array
+    /**
+     * Calendar events include the street address in the location label,
+     * unlike the shared job-card location.
+     */
+    private function formatCalendarLocation(ShortTermJob|LongTermJob $job): array
     {
         return [
             'label' => collect([
@@ -603,13 +576,6 @@ class CandidateMyJobController extends Controller
             'type' => $job->compensation_type,
             'label' => $this->formatHourlyRate($job->compensation_amount),
         ];
-    }
-
-    private function formatClientName(ShortTermJob|LongTermJob $job): ?string
-    {
-        return $job->client
-            ? trim($job->client->first_name.' '.$job->client->last_name)
-            : null;
     }
 
     private function formatDuration(int $minutes): string

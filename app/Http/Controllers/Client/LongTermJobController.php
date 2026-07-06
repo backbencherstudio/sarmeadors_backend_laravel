@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\LongTermJob;
+use App\Traits\FormatsJobPosting;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class LongTermJobController extends Controller
 {
+    use FormatsJobPosting;
+
     private function resolveClient(Request $request): ?Client
     {
         $user = $request->user();
@@ -34,7 +37,7 @@ class LongTermJobController extends Controller
 
             $status = $request->query('status');
 
-            $query = LongTermJob::with(['schedules', 'children', 'location', 'latestAttendance'])
+            $query = LongTermJob::with(['schedules', 'children', 'location', 'latestAttendance', 'candidate'])
                 ->withCount([
                     'applications',
                     'applications as interviewed_count' => fn ($q) => $q->where('status', 'interviewed'),
@@ -46,7 +49,15 @@ class LongTermJobController extends Controller
                 $query->where('status', $status);
             }
 
-            $jobs = $query->latest()->get();
+            $jobs = $query->latest()->get()
+                ->map(fn (LongTermJob $job): array => array_merge($this->formatJobCard($job), [
+                    'applicants' => [
+                        'count' => $job->applications_count,
+                        'interviewed' => $job->interviewed_count,
+                        'hired' => $job->hired_count,
+                    ],
+                    'assigned_candidate' => $this->formatAssignedCandidate($job),
+                ]));
 
             $counts = LongTermJob::where('client_id', $client->id)
                 ->selectRaw('status, count(*) as total')

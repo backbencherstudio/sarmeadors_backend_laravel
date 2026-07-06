@@ -74,7 +74,7 @@ class ShortTermJobApplicationController extends Controller
             );
 
         $jobs = $query->latest()->paginate(20);
-        $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatJobCard($job, $candidate));
+        $jobs->getCollection()->transform(fn (ShortTermJob $job): array => $this->formatMarketplaceCard($job, $candidate));
 
         return $this->sendResponse($jobs, 'Marketplace jobs retrieved.', 200);
     }
@@ -209,28 +209,23 @@ class ShortTermJobApplicationController extends Controller
         return $this->sendResponse([], 'Withdrawn successfully.', 200);
     }
 
-    private function formatJobCard(ShortTermJob $job, Candidate $candidate): array
+    /**
+     * Shared job card plus the marketplace context for this candidate.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatMarketplaceCard(ShortTermJob $job, Candidate $candidate): array
     {
-        return [
-            'id' => $job->id,
-            'job_type' => 'short_term',
-            'title' => $job->title,
+        return array_merge($this->formatJobCard($job), [
             'client_name' => $this->formatClientName($job->client),
-            'cover_image_url' => $job->cover_image_url,
-            'description' => $job->description,
-            'description_preview' => $job->description ? Str::limit($job->description, 140) : null,
-            'services' => $this->formatServices($job),
-            'location' => $this->formatLocation($job),
-            'compensation' => $this->formatCompensation($job),
-            'status' => $job->status,
             'has_applied' => $job->candidate_id === $candidate->id,
             'can_apply' => $job->status === 'marketplace' && is_null($job->candidate_id),
-        ];
+        ]);
     }
 
     private function formatAppliedJobCard(ShortTermJob $job, Candidate $candidate): array
     {
-        return array_merge($this->formatJobCard($job, $candidate), [
+        return array_merge($this->formatMarketplaceCard($job, $candidate), [
             'application' => [
                 'id' => $job->id,
                 'type' => 'short_term_assignment',
@@ -267,7 +262,7 @@ class ShortTermJobApplicationController extends Controller
     private function formatJobDetails(ShortTermJob $job, Candidate $candidate): array
     {
         return [
-            'job' => $this->formatJobCard($job, $candidate),
+            'job' => $this->formatMarketplaceCard($job, $candidate),
             'client' => [
                 'id' => $job->client?->id,
                 'name' => $this->formatClientName($job->client),

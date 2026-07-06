@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Candidate;
 
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
-use App\Models\Client;
 use App\Models\LongTermJob;
 use App\Models\ShortTermJob;
+use App\Traits\FormatsAssignedJob;
 use App\Traits\ResolvesCandidate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 
 class CandidateDashboardController extends Controller
 {
+    use FormatsAssignedJob;
     use ResolvesCandidate;
 
     // GET /candidate/dashboard
@@ -57,7 +58,7 @@ class CandidateDashboardController extends Controller
         $familyCount = $shortTermClientIds->merge($longTermClientIds)->unique()->count();
 
         // Running short-term job
-        $runningShortTermJobs = ShortTermJob::with(['client', 'dates', 'latestAttendance'])
+        $runningShortTermJobs = ShortTermJob::with(['client', 'children', 'dates', 'latestAttendance'])
             ->where('candidate_id', $candidate->id)
             ->where('agency_id', $agencyId)
             ->where('status', 'running')
@@ -66,7 +67,7 @@ class CandidateDashboardController extends Controller
             ->get();
 
         // Running long-term job
-        $runningLongTermJobs = LongTermJob::with(['client', 'schedules', 'latestAttendance'])
+        $runningLongTermJobs = LongTermJob::with(['client', 'children', 'schedules', 'latestAttendance'])
             ->where('candidate_id', $candidate->id)
             ->where('agency_id', $agencyId)
             ->where('status', 'running')
@@ -75,7 +76,7 @@ class CandidateDashboardController extends Controller
             ->get();
 
         // Available marketplace jobs (short-term)
-        $availableShortTermJobs = ShortTermJob::with(['dates', 'location', 'client', 'latestAttendance'])
+        $availableShortTermJobs = ShortTermJob::with(['children', 'dates', 'location', 'client', 'latestAttendance'])
             ->where('agency_id', $agencyId)
             ->where('status', 'marketplace')
             ->whereNull('candidate_id')
@@ -84,7 +85,7 @@ class CandidateDashboardController extends Controller
             ->get();
 
         // Available marketplace jobs (long-term)
-        $availableLongTermJobs = LongTermJob::with(['schedules', 'location', 'client', 'latestAttendance'])
+        $availableLongTermJobs = LongTermJob::with(['children', 'schedules', 'location', 'client', 'latestAttendance'])
             ->where('agency_id', $agencyId)
             ->where('status', 'marketplace')
             ->whereDoesntHave('applications', fn ($q) => $q->where('candidate_id', $candidate->id))
@@ -129,45 +130,7 @@ class CandidateDashboardController extends Controller
 
     private function formatDashboardJobs(Collection $jobs): Collection
     {
-        return $jobs->map(function (ShortTermJob|LongTermJob $job): array {
-            $isShortTerm = $job instanceof ShortTermJob;
-            $jobType = $isShortTerm ? 'short_term' : 'long_term';
-            $attendance = $job->latestAttendance;
-
-            return [
-                'id' => $job->id,
-                'job_type' => $jobType,
-                'title' => $job->title,
-                'client_name' => $this->formatClientName($job->client),
-                'description' => $job->description,
-                'cover_image_url' => $job->cover_image_url,
-                'address' => [
-                    'line' => $job->job_address,
-                    'city' => $job->home_city,
-                    'province' => $job->home_province,
-                    'postal_code' => $job->home_postal_code,
-                    'country' => $job->country,
-                ],
-                'compensation' => [
-                    'amount' => $job->compensation_amount,
-                    'currency' => $job->compensation_currency,
-                    'type' => $job->compensation_type,
-                ],
-                'status' => $job->status,
-                'latest_attendance' => $attendance,
-                'can_check_in' => $job->status === 'running' && (! $attendance || ! $attendance->check_in),
-                'can_check_out' => $job->status === 'running' && $attendance?->check_in && ! $attendance?->check_out,
-            ];
-        });
-    }
-
-    private function formatClientName(?Client $client): ?string
-    {
-        if (! $client) {
-            return null;
-        }
-
-        return trim($client->first_name.' '.$client->last_name);
+        return $jobs->map(fn (ShortTermJob|LongTermJob $job): array => $this->formatAssignedJobCard($job));
     }
 
     private function formatCandidateName(Candidate $candidate): string

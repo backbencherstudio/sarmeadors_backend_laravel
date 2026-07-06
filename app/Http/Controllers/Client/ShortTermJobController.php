@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Payment;
 use App\Models\ShortTermJob;
 use App\Services\StripeService;
+use App\Traits\FormatsJobPosting;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ShortTermJobController extends Controller
 {
+    use FormatsJobPosting;
+
     public function __construct(
         private StripeService $stripeService
     ) {}
@@ -55,13 +58,16 @@ class ShortTermJobController extends Controller
                 return $this->sendError('Client profile not found.', [], 404);
             }
 
-            $baseQuery = ShortTermJob::with(['dates', 'children', 'location'])
+            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'candidate'])
                 ->where('client_id', $client->id);
 
             $jobs = QueryBuilder::for($baseQuery, $this->jobFilterRequest($request))
                 ->allowedFilters(AllowedFilter::exact('status'))
                 ->latest()
-                ->get();
+                ->get()
+                ->map(fn (ShortTermJob $job): array => array_merge($this->formatJobCard($job), [
+                    'assigned_candidate' => $this->formatAssignedCandidate($job),
+                ]));
 
             $counts = ShortTermJob::where('client_id', $client->id)
                 ->selectRaw('status, count(*) as total')
@@ -195,7 +201,7 @@ class ShortTermJobController extends Controller
             if ($shortTermJob->status === 'running') {
                 $firstDate = $shortTermJob->dates()->orderBy('booking_date')->first();
                 if ($firstDate) {
-                    $startedAt = Carbon::parse($firstDate->booking_date . ' ' . $firstDate->start_time);
+                    $startedAt = Carbon::parse($firstDate->booking_date.' '.$firstDate->start_time);
                     $hoursSinceStart = now()->diffInHours($startedAt, false);
                     if ($hoursSinceStart > 8 && empty($validated['force_cancel'])) {
                         return $this->sendResponse([
@@ -357,7 +363,7 @@ class ShortTermJobController extends Controller
                 'compensation_type' => 'nullable|in:per_hour,per_day,per_week,flat',
 
                 // Payment — required only when agency has payment enabled
-                'payment_method_id' => ($paymentRequired ? 'required' : 'nullable') . '|string',
+                'payment_method_id' => ($paymentRequired ? 'required' : 'nullable').'|string',
             ]);
 
             // Process payment first — job is only created after payment succeeds
@@ -378,7 +384,7 @@ class ShortTermJobController extends Controller
                 );
 
                 if ($confirmed->status !== 'succeeded') {
-                    return $this->sendError('Payment failed. Status: ' . $confirmed->status, [], 422);
+                    return $this->sendError('Payment failed. Status: '.$confirmed->status, [], 422);
                 }
 
                 $stripePaymentIntentId = $confirmed->id;

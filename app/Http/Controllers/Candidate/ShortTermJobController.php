@@ -32,14 +32,15 @@ class ShortTermJobController extends Controller
 
         $status = $request->query('status');
 
-        $query = ShortTermJob::with(['dates', 'children', 'location', 'client'])
+        $query = ShortTermJob::with(['dates', 'children', 'location', 'client', 'latestAttendance'])
             ->where('candidate_id', $candidate->id);
 
         if ($status) {
             $query->where('status', $status);
         }
 
-        $jobs = $query->latest()->get();
+        $jobs = $query->latest()->get()
+            ->map(fn (ShortTermJob $job): array => $this->formatAssignedJobCard($job));
 
         $counts = ShortTermJob::where('candidate_id', $candidate->id)
             ->selectRaw('status, count(*) as total')

@@ -211,9 +211,13 @@ class CandidateMyJobsTest extends TestCase
             ->assertJsonPath('data.jobs.0.client_name', 'Arlene McCoy')
             ->assertJsonPath('data.jobs.0.address.city', 'Crownthorpe')
             ->assertJsonPath('data.jobs.0.compensation.type', 'per_hour')
+            ->assertJsonPath('data.jobs.0.compensation.label', '$35/hr')
+            ->assertJsonPath('data.jobs.0.job_type_label', 'Short-Term Job')
+            ->assertJsonPath('data.jobs.0.term_label', 'Short-term')
+            ->assertJsonPath('data.jobs.0.services.0', 'Nanny')
             ->assertJsonPath('data.jobs.0.can_check_in', false)
             ->assertJsonPath('data.jobs.0.can_check_out', false)
-            ->assertJsonMissingPath('data.jobs.0.actions')
+            ->assertJsonPath('data.jobs.0.actions.can_view_details', true)
             ->assertJsonMissingPath('data.jobs_by_date');
 
         $completedResponse = $this->actingAs($user, 'api')

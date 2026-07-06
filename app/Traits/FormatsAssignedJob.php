@@ -4,45 +4,33 @@ namespace App\Traits;
 
 use App\Models\LongTermJob;
 use App\Models\ShortTermJob;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
  * Shared presentation helpers for a candidate's assigned short/long-term jobs.
+ * Builds on the shared job-card helpers so assigned-job lists render the same
+ * card as every other job feed.
  */
 trait FormatsAssignedJob
 {
-    use FormatsMoney;
+    use FormatsJobPosting;
 
     /**
-     * @param  Collection<int, mixed>  $children
-     * @return Collection<int, array<string, mixed>>
-     */
-    protected function formatChildren(Collection $children): Collection
-    {
-        return $children->map(fn ($child): array => [
-            'id' => $child->id,
-            'name' => trim($child->first_name.' '.$child->last_name),
-            'date_of_birth' => $child->date_of_birth,
-            'gender' => $child->gender,
-            'interests' => $child->interests,
-            'allergies' => $child->allergies,
-        ]);
-    }
-
-    /**
+     * Shared job card plus the candidate's assignment context (client name
+     * and latest attendance state), matching the dashboard job feeds.
+     *
      * @return array<string, mixed>
      */
-    protected function formatAddress(ShortTermJob|LongTermJob $job): array
+    protected function formatAssignedJobCard(ShortTermJob|LongTermJob $job): array
     {
-        return [
-            'street_address' => $job->job_address,
-            'city' => $job->home_city,
-            'province' => $job->home_province,
-            'postal_code' => $job->home_postal_code,
-            'country' => $job->country,
-            'label' => collect([$job->job_address, $job->home_city, $job->home_province, $job->country])->filter()->implode(', '),
-        ];
+        $attendance = $job->latestAttendance;
+
+        return array_merge($this->formatJobCard($job), [
+            'client_name' => $this->formatClientName($job),
+            'latest_attendance' => $attendance,
+            'can_check_in' => $job->status === 'running' && (! $attendance || ! $attendance->check_in),
+            'can_check_out' => $job->status === 'running' && $attendance?->check_in && ! $attendance?->check_out,
+        ]);
     }
 
     protected function formatDuration(int $minutes): string

@@ -74,7 +74,7 @@ class LongTermJobApplicationController extends Controller
             );
 
         $jobs = $query->latest()->paginate(10);
-        $jobs->getCollection()->transform(fn (LongTermJob $job): array => $this->formatJobCard($job, $candidate));
+        $jobs->getCollection()->transform(fn (LongTermJob $job): array => $this->formatMarketplaceCard($job, $candidate));
 
         return $this->sendResponse($jobs, 'Marketplace jobs retrieved.', 200);
     }
@@ -223,27 +223,22 @@ class LongTermJobApplicationController extends Controller
         return $this->sendResponse([], 'Application withdrawn.', 200);
     }
 
-    private function formatJobCard(LongTermJob $job, Candidate $candidate): array
+    /**
+     * Shared job card plus the marketplace context for this candidate.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatMarketplaceCard(LongTermJob $job, Candidate $candidate): array
     {
         $hasApplied = LongTermJobApplication::where('long_term_job_id', $job->id)
             ->where('candidate_id', $candidate->id)
             ->exists();
 
-        return [
-            'id' => $job->id,
-            'job_type' => 'long_term',
-            'title' => $job->title,
+        return array_merge($this->formatJobCard($job), [
             'client_name' => $this->formatClientName($job->client),
-            'cover_image_url' => $job->cover_image_url,
-            'description' => $job->description,
-            'description_preview' => $job->description ? Str::limit($job->description, 140) : null,
-            'services' => $this->formatServices($job),
-            'location' => $this->formatLocation($job),
-            'compensation' => $this->formatCompensation($job),
-            'status' => $job->status,
             'has_applied' => $hasApplied,
             'can_apply' => $job->status === 'marketplace' && ! $hasApplied,
-        ];
+        ]);
     }
 
     private function formatApplicationCard(LongTermJobApplication $application, Candidate $candidate): array
@@ -257,7 +252,7 @@ class LongTermJobApplicationController extends Controller
             ];
         }
 
-        return array_merge($this->formatJobCard($job, $candidate), [
+        return array_merge($this->formatMarketplaceCard($job, $candidate), [
             'application_id' => $application->id,
             'application' => $this->formatApplicationMeta($application),
             'interview' => $this->formatInterviewSummary($application),
@@ -347,7 +342,7 @@ class LongTermJobApplicationController extends Controller
     private function formatJobDetails(LongTermJob $job, Candidate $candidate): array
     {
         return [
-            'job' => $this->formatJobCard($job, $candidate),
+            'job' => $this->formatMarketplaceCard($job, $candidate),
             'client' => [
                 'id' => $job->client?->id,
                 'name' => $this->formatClientName($job->client),
