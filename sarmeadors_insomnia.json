@@ -7471,7 +7471,7 @@
             ],
             "body": {
                 "mimeType": "application/json",
-                "text": "{\n    \"name\": \"sample\",\n    \"entity\": \"sample\"\n}"
+                "text": "{\n    \"name\": \"Client Registration Form\",\n    \"application_type\": \"registration\",\n    \"user_type\": \"client\",\n    \"schema\": {\n        \"blocks\": [\n            {\n                \"name\": \"Personal Information\",\n                \"description\": \"Basic details about the client\",\n                \"sections\": [\n                    {\n                        \"name\": \"Contact Info\",\n                        \"fields\": [\n                            { \"type\": \"text_box\", \"label\": \"First Name\", \"name\": \"first_name\", \"is_required\": true, \"width\": 6 },\n                            { \"type\": \"text_box\", \"label\": \"Last Name\", \"name\": \"last_name\", \"is_required\": false, \"width\": 6 },\n                            { \"type\": \"email\", \"label\": \"Email\", \"name\": \"email\", \"is_required\": true, \"width\": 6 },\n                            { \"type\": \"text_box\", \"label\": \"Phone Number\", \"name\": \"mobile\", \"is_required\": false, \"width\": 6 },\n                            { \"type\": \"text_area\", \"label\": \"How did you hear about us?\", \"name\": \"hear_about_us\", \"is_required\": false, \"width\": 12 }\n                        ]\n                    }\n                ]\n            }\n        ]\n    }\n}"
             }
         },
         {
@@ -7558,6 +7558,51 @@
             "body": []
         },
         {
+            "_id": "req_auto_155",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "Public Show Form",
+            "method": "GET",
+            "url": "{{ base_url }}/forms/{{ slug }}",
+            "headers": [
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": []
+        },
+        {
+            "_id": "req_auto_156",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "Public Submit Form",
+            "method": "POST",
+            "url": "{{ base_url }}/forms/{{ slug }}/submit",
+            "headers": [
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n    \"answers\": {\n        \"first_name\": \"Jane\",\n        \"last_name\": \"Doe\",\n        \"email\": \"jane@example.com\",\n        \"password\": \"Sup3rSecret\",\n        \"type_id\": [1],\n        \"location_id\": [1],\n        \"dob\": \"1996-10-10\",\n        \"nid\": \"1234567890\",\n        \"father_name\": \"John Doe\",\n        \"mother_name\": \"Mary Doe\",\n        \"state\": \"California\",\n        \"address\": \"123 Main Street\",\n        \"emergency_contact\": \"+1-555-0100\"\n    }\n}"
+            }
+        },
+        {
             "_id": "req_auto_109",
             "_type": "request",
             "parentId": "fld_g77",
@@ -7584,7 +7629,7 @@
             ],
             "body": {
                 "mimeType": "application/json",
-                "text": "{\n    \"agency_id\": \"sample\",\n    \"first_name\": \"sample\",\n    \"last_name\": \"sample\",\n    \"email\": \"user@example.com\",\n    \"mobile\": \"sample\",\n    \"type_id\": \"sample\",\n    \"location_id\": \"sample\",\n    \"checklist_id\": \"sample\",\n    \"tag_id\": \"sample\",\n    \"status_id\": \"sample\"\n}"
+                "text": "{\n    \"first_name\": \"sample\",\n    \"last_name\": \"sample\",\n    \"email\": \"user@example.com\",\n    \"mobile\": \"sample\",\n    \"hear_about_us\": \"sample\",\n    \"type_id\": [1, 2],\n    \"location_id\": [1],\n    \"checklist_id\": [1],\n    \"tag_id\": [1],\n    \"status_id\": [1]\n}"
             }
         },
         {
@@ -8599,6 +8644,141 @@
                 }
             ],
             "body": []
+        },
+        {
+            "_id": "req_auto_151",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "List Forms",
+            "method": "GET",
+            "url": "{{ base_url }}/agency/forms",
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "value": "Bearer {{ token }}"
+                },
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": [],
+            "parameters": [
+                {
+                    "name": "application_type",
+                    "value": "registration",
+                    "disabled": true
+                },
+                {
+                    "name": "user_type",
+                    "value": "client",
+                    "disabled": true
+                },
+                {
+                    "name": "entity",
+                    "value": "client",
+                    "disabled": true
+                },
+                {
+                    "name": "status",
+                    "value": "1",
+                    "disabled": true
+                }
+            ]
+        },
+        {
+            "_id": "req_auto_152",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "Update Form",
+            "method": "PUT",
+            "url": "{{ base_url }}/agency/forms/{{ id }}",
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "value": "Bearer {{ token }}"
+                },
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n    \"name\": \"Client Registration Form (Updated)\",\n    \"status\": true,\n    \"schema\": {\n        \"blocks\": [\n            {\n                \"name\": \"Personal Information\",\n                \"sections\": [\n                    {\n                        \"name\": \"Contact Info\",\n                        \"fields\": [\n                            { \"type\": \"text_box\", \"label\": \"First Name\", \"name\": \"first_name\", \"is_required\": true, \"width\": 6 },\n                            { \"type\": \"email\", \"label\": \"Email\", \"name\": \"email\", \"is_required\": true, \"width\": 6 }\n                        ]\n                    }\n                ]\n            }\n        ]\n    }\n}"
+            }
+        },
+        {
+            "_id": "req_auto_153",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "Toggle Form Status",
+            "method": "PATCH",
+            "url": "{{ base_url }}/agency/forms/{{ id }}/status",
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "value": "Bearer {{ token }}"
+                },
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n    \"status\": false\n}"
+            }
+        },
+        {
+            "_id": "req_auto_154",
+            "_type": "request",
+            "parentId": "fld_g75",
+            "name": "Submit Form",
+            "method": "POST",
+            "url": "{{ base_url }}/agency/forms/{{ slug }}/submit",
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "value": "Bearer {{ token }}"
+                },
+                {
+                    "name": "Accept",
+                    "value": "application/json"
+                },
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                },
+                {
+                    "name": "X-Subdomain",
+                    "value": "{{ subdomain }}"
+                }
+            ],
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n    \"answers\": {\n        \"first_name\": \"Jane\",\n        \"last_name\": \"Doe\",\n        \"email\": \"jane@example.com\",\n        \"mobile\": \"01700000000\",\n        \"hear_about_us\": \"Referral\"\n    }\n}"
+            }
         },
         {
             "_id": "fld_root",

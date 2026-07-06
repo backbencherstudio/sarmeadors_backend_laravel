@@ -50,6 +50,27 @@ class FormBuilderService
     ];
 
     /**
+     * The standard fields every entity's registration form collects in
+     * addition to whatever custom fields the agency added in the builder.
+     * These aren't part of the stored `schema` - they're always the same
+     * columns on the target model, so the frontend can render them without
+     * the agency having to define them.
+     *
+     * @var array<string, array<int, array<string, mixed>>>
+     */
+    private const BASE_FIELDS = [
+        'client' => [
+            ['name' => 'first_name', 'type' => 'text_box', 'label' => 'First Name', 'is_required' => true],
+            ['name' => 'last_name', 'type' => 'text_box', 'label' => 'Last Name', 'is_required' => false],
+            ['name' => 'email', 'type' => 'email', 'label' => 'Email', 'is_required' => true],
+            ['name' => 'password', 'type' => 'password', 'label' => 'Password', 'is_required' => false],
+            ['name' => 'image', 'type' => 'file_upload', 'label' => 'Profile Image', 'is_required' => false],
+            ['name' => 'type_id', 'type' => 'multi_select_checkbox', 'label' => 'User Type', 'is_required' => false],
+            ['name' => 'location_id', 'type' => 'multi_select_checkbox', 'label' => 'Location', 'is_required' => false],
+        ],
+    ];
+
+    /**
      * The list of field types the builder allows.
      *
      * @return array<int, string>
@@ -57,6 +78,16 @@ class FormBuilderService
     public function allowedFieldTypes(): array
     {
         return self::FIELD_TYPES;
+    }
+
+    /**
+     * The standard, always-present fields for an entity's registration form.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function baseFields(string $entity): array
+    {
+        return self::BASE_FIELDS[$entity] ?? [];
     }
 
     /**
