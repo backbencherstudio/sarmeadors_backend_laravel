@@ -44,9 +44,10 @@ class InterviewSeeder extends Seeder
 
         $jobInterviews = $this->seedJobInterviews($agency);
         $directInterviews = $this->seedDirectInterviews($agency, $clients, $candidates);
+        $calendarInterviews = $this->seedCandidateCalendarInterviews($agency, $clients, $candidates);
 
         $this->command->info('Interview seeder completed successfully!');
-        $this->command->info("Created/updated {$jobInterviews} job-tied and {$directInterviews} direct interviews.");
+        $this->command->info("Created/updated {$jobInterviews} job-tied, {$directInterviews} direct and {$calendarInterviews} calendar interviews.");
     }
 
     /**
@@ -126,6 +127,95 @@ class InterviewSeeder extends Seeder
             );
 
             $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Give every candidate a populated interview calendar for the current
+     * month: a same-day pair (morning + afternoon meetings with two different
+     * families) plus an earlier completed interview. This is what makes the
+     * candidate calendar view (GET /candidate/interviews?view=calendar) show
+     * dates carrying multiple interview cards.
+     *
+     * @param  Collection<int, Client>  $clients
+     * @param  Collection<int, Candidate>  $candidates
+     */
+    private function seedCandidateCalendarInterviews(Agency $agency, Collection $clients, Collection $candidates): int
+    {
+        $count = 0;
+        $monthStart = now()->startOfMonth();
+
+        foreach ($candidates as $index => $candidate) {
+            $client = $clients[$index % $clients->count()];
+            $otherClient = $clients[($index + 1) % $clients->count()];
+
+            // Two interviews on the same day prove the grouped calendar shape.
+            $pairDate = $monthStart->copy()->addDays(6 + ($index % 14))->format('Y-m-d');
+            $completedDate = $monthStart->copy()->addDays($index % 5)->format('Y-m-d');
+
+            $entries = [
+                [
+                    'client' => $client,
+                    'title' => 'Interview with the '.$client->last_name.' Family',
+                    'scheduled_date' => $pairDate,
+                    'available_from' => '10:00:00',
+                    'available_to' => '11:00:00',
+                    'interview_type' => 'zoom',
+                    'interview_link' => 'https://zoom.us/j/'.(7100000 + $index),
+                    'description' => 'Morning video interview to meet the family.',
+                    'status' => 'scheduled',
+                ],
+                [
+                    'client' => $otherClient,
+                    'title' => 'Interview with the '.$otherClient->last_name.' Family',
+                    'scheduled_date' => $pairDate,
+                    'available_from' => '15:00:00',
+                    'available_to' => '16:00:00',
+                    'interview_type' => 'google_meet',
+                    'interview_link' => 'https://meet.google.com/cal-'.(2000 + $index),
+                    'description' => 'Afternoon interview with a second family.',
+                    'status' => 'scheduled',
+                ],
+                [
+                    'client' => $client,
+                    'title' => 'Meet & Greet with the '.$client->last_name.' Family',
+                    'scheduled_date' => $completedDate,
+                    'available_from' => '09:00:00',
+                    'available_to' => '09:45:00',
+                    'interview_type' => 'in_person',
+                    'interview_link' => null,
+                    'description' => 'Completed meet-and-greet at the family home.',
+                    'status' => 'completed',
+                ],
+            ];
+
+            foreach ($entries as $entry) {
+                LongTermJobInterview::updateOrCreate(
+                    [
+                        'client_id' => $entry['client']->id,
+                        'candidate_id' => $candidate->id,
+                        'scheduled_date' => $entry['scheduled_date'],
+                        'available_from' => $entry['available_from'],
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'long_term_job_id' => null,
+                        'long_term_job_application_id' => null,
+                        'title' => $entry['title'],
+                        'available_to' => $entry['available_to'],
+                        'interview_type' => $entry['interview_type'],
+                        'interview_link' => $entry['interview_link'],
+                        'description' => $entry['description'],
+                        'special_note' => null,
+                        'reschedule_reason' => null,
+                        'status' => $entry['status'],
+                    ]
+                );
+
+                $count++;
+            }
         }
 
         return $count;

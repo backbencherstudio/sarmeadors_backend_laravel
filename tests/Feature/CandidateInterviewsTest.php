@@ -86,6 +86,16 @@ class CandidateInterviewsTest extends TestCase
             status: 'scheduled'
         );
 
+        // A second interview on the same day must land in the same date bucket
+        $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Afternoon Family Meeting',
+            scheduledDate: '2026-01-21',
+            status: 'scheduled'
+        );
+
         $this->createInterview(
             agency: $agency,
             candidate: $candidate,
@@ -106,6 +116,8 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.month', 1)
             ->assertJsonPath('data.year', 2026)
             ->assertJsonPath('data.interviews.2026-01-21.0.title', 'Newborn Caregiver')
+            ->assertJsonPath('data.interviews.2026-01-21.1.title', 'Afternoon Family Meeting')
+            ->assertJsonCount(2, 'data.interviews.2026-01-21')
             ->assertJsonMissingPath('data.interviews.2026-02-02');
     }
 
