@@ -20,6 +20,7 @@ use App\Models\LongTermJobReview;
 use App\Models\LongTermJobSchedule;
 use App\Models\Payment;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobApplication;
 use App\Models\ShortTermJobAttendance;
 use App\Models\ShortTermJobChild;
 use App\Models\ShortTermJobDate;
@@ -86,6 +87,7 @@ class JobSeeder extends Seeder
         $this->seedJobMessages($shortTermJobs, $longTermJobs);
         $this->seedApplicationsAndInterviews($agency, $longTermJobs);
         $this->seedLongTermApplications($agency, $longTermJobs);
+        $this->seedShortTermApplications($agency, $shortTermJobs);
         $this->seedCandidateJobRequests($agency, $shortTermJobs, $longTermJobs);
         $this->seedReports($agency, $shortTermJobs);
         $this->seedRefundRequests($agency, $longTermJobs);
@@ -650,6 +652,82 @@ class JobSeeder extends Seeder
                         'agency_id' => $agency->id,
                         'application_message' => $messages[$offset % count($messages)],
                         'status' => 'pending',
+                    ]
+                );
+            }
+        }
+    }
+
+    /**
+     * Seed applicants on the short-term postings: marketplace jobs collect
+     * pending applications (what the client sees in the Applicants tab and
+     * the card's applicant count), while placed jobs keep the hired
+     * candidate's application plus the rejected runners-up.
+     *
+     * @param  array<int, ShortTermJob>  $jobs
+     */
+    private function seedShortTermApplications(Agency $agency, array $jobs): void
+    {
+        $messages = [
+            'I am available for this booking and have great references from similar families.',
+            'I would love to help your family out. I have years of babysitting experience.',
+            'This schedule works perfectly for me. Happy to start right away.',
+            null,
+        ];
+
+        foreach ($jobs as $index => $job) {
+            if ($job->status === 'marketplace') {
+                foreach ([1, 2, 3, 4] as $offset) {
+                    $candidate = $this->candidate($index + $offset);
+
+                    ShortTermJobApplication::firstOrCreate(
+                        [
+                            'short_term_job_id' => $job->id,
+                            'candidate_id' => $candidate->id,
+                        ],
+                        [
+                            'agency_id' => $agency->id,
+                            'application_message' => $messages[$offset % count($messages)],
+                            'status' => 'pending',
+                        ]
+                    );
+                }
+
+                continue;
+            }
+
+            if (! $job->candidate_id || ! in_array($job->status, ['running', 'completed'], true)) {
+                continue;
+            }
+
+            ShortTermJobApplication::firstOrCreate(
+                [
+                    'short_term_job_id' => $job->id,
+                    'candidate_id' => $job->candidate_id,
+                ],
+                [
+                    'agency_id' => $agency->id,
+                    'application_message' => 'I am available for this booking and would love to work with your family.',
+                    'status' => 'hired',
+                ]
+            );
+
+            foreach ([1, 2] as $offset) {
+                $candidate = $this->candidate($index + $offset);
+
+                if ($candidate->id === $job->candidate_id) {
+                    continue;
+                }
+
+                ShortTermJobApplication::firstOrCreate(
+                    [
+                        'short_term_job_id' => $job->id,
+                        'candidate_id' => $candidate->id,
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'application_message' => $messages[$offset % count($messages)],
+                        'status' => 'rejected',
                     ]
                 );
             }
