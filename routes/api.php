@@ -10,12 +10,16 @@ use Illuminate\Support\Facades\Route;
 | Public / shared authentication routes (not tied to a single role)
 |--------------------------------------------------------------------------
 */
+
 Route::get('/login', function () {
     return response()->json([
         'success' => false,
         'message' => 'Please login to continue',
     ], 401);
 })->name('api.login');
+
+
+// Refresh token route
 
 Route::post('/refresh', [AuthController::class, 'refresh']);
 
@@ -39,7 +43,7 @@ Route::middleware('auth:api')->group(function () {
 | Role-scoped route files
 |--------------------------------------------------------------------------
 */
-require __DIR__.'/superadmin.php';
-require __DIR__.'/agency.php';
-require __DIR__.'/client.php';
-require __DIR__.'/candidate.php';
+require __DIR__ . '/superadmin.php';
+require __DIR__ . '/agency.php';
+require __DIR__ . '/client.php';
+require __DIR__ . '/candidate.php';
