@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Candidate;
 
 use App\Http\Controllers\Controller;
+use App\Models\LongTermJob;
 use App\Models\LongTermJobInterview;
 use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
@@ -93,19 +94,21 @@ class CandidateInterviewController extends Controller
             $month = $request->query('month', now()->month);
             $year = $request->query('year', now()->year);
 
-            $interviews = $query->whereMonth('scheduled_date', $month)
+            $events = $query->whereMonth('scheduled_date', $month)
                 ->whereYear('scheduled_date', $year)
-                ->get();
-
-            $grouped = $interviews
-                ->map(fn (LongTermJobInterview $interview): array => $this->formatInterview($interview))
-                ->groupBy('date');
+                ->get()
+                ->map(fn (LongTermJobInterview $interview): array => $this->formatCalendarEvent($interview))
+                ->values();
 
             return $this->sendResponse([
                 'view' => 'calendar',
                 'month' => (int) $month,
                 'year' => (int) $year,
-                'interviews' => $grouped,
+                'filters' => [
+                    'period' => $filter,
+                    'search' => $queryBuilderFilters['search'] ?? null,
+                ],
+                'interviews' => $events,
             ], 'Interviews retrieved successfully.', 200);
         }
 
@@ -197,6 +200,103 @@ class CandidateInterviewController extends Controller
             ],
             'special_note' => $interview->special_note,
         ];
+    }
+
+    private function formatCalendarEvent(LongTermJobInterview $interview): array
+    {
+        $job = $interview->job;
+        $client = $job?->client ?? $interview->client;
+        $date = $interview->scheduled_date;
+        $description = $interview->description ?: $job?->description;
+        $clientName = $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : null;
+        $canJoin = $interview->status === 'scheduled' && filled($interview->interview_link);
+
+        return [
+            'id' => 'interview_'.$interview->id.'_'.($date?->toDateString() ?? 'unscheduled'),
+            'interview_id' => $interview->id,
+            'job_id' => $interview->long_term_job_id,
+            'application_id' => $interview->long_term_job_application_id,
+            'job_type' => 'long_term',
+            'job_type_label' => 'Long-term',
+            'title' => $interview->displayTitle(),
+            'client' => [
+                'id' => $client?->id,
+                'name' => $clientName,
+                'email' => $client?->email,
+                'mobile' => $client?->mobile,
+                'image_url' => $client?->image_url,
+            ],
+            'cover_image_url' => $job?->cover_image_url,
+            'description' => $description,
+            'description_preview' => $description ? Str::limit($description, 120) : null,
+            'location' => $this->formatLocation($job),
+            'date' => $date?->toDateString(),
+            'date_label' => $date?->format('M d, Y'),
+            'day' => $date?->format('d'),
+            'month' => $date?->format('M'),
+            'time' => [
+                'from' => $this->formatTime($interview->available_from),
+                'to' => $this->formatTime($interview->available_to),
+                'range' => $this->formatTimeRange($interview->available_from, $interview->available_to),
+            ],
+            'compensation' => $this->formatCompensation($job),
+            'status' => $interview->status,
+            'status_label' => $this->formatStatusLabel($interview->status),
+            'period' => $this->resolvePeriod($interview),
+            'meeting' => [
+                'type' => $interview->interview_type,
+                'link' => $interview->interview_link,
+                'can_join' => $canJoin,
+            ],
+            'special_note' => $interview->special_note,
+            'modal' => [
+                'title' => $interview->displayTitle(),
+                'subtitle' => $clientName,
+                'date' => $date?->format('d M, D'),
+                'time_range' => $this->formatTimeRange($interview->available_from, $interview->available_to),
+                'can_join' => $canJoin,
+            ],
+        ];
+    }
+
+    private function formatLocation(?LongTermJob $job): array
+    {
+        return [
+            'label' => collect([
+                $job?->job_address,
+                $job?->home_city,
+                $job?->home_province,
+                $job?->country,
+            ])->filter()->implode(', ') ?: null,
+            'street_address' => $job?->job_address,
+            'city' => $job?->home_city,
+            'province' => $job?->home_province,
+            'postal_code' => $job?->home_postal_code,
+            'country' => $job?->country,
+        ];
+    }
+
+    private function formatCompensation(?LongTermJob $job): array
+    {
+        return [
+            'amount' => $job?->compensation_amount,
+            'currency' => $job?->compensation_currency,
+            'type' => $job?->compensation_type,
+            'label' => $job?->compensation_amount !== null
+                ? '$'.number_format($job->compensation_amount, 2).'/hr'
+                : null,
+        ];
+    }
+
+    private function formatStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'scheduled' => 'Scheduled',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+            'declined' => 'Declined',
+            default => Str::headline($status),
+        };
     }
 
     private function formatTimeRange(?string $from, ?string $to): ?string

@@ -115,10 +115,15 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.view', 'calendar')
             ->assertJsonPath('data.month', 1)
             ->assertJsonPath('data.year', 2026)
-            ->assertJsonPath('data.interviews.2026-01-21.0.title', 'Newborn Caregiver')
-            ->assertJsonPath('data.interviews.2026-01-21.1.title', 'Afternoon Family Meeting')
-            ->assertJsonCount(2, 'data.interviews.2026-01-21')
-            ->assertJsonMissingPath('data.interviews.2026-02-02');
+            ->assertJsonPath('data.filters.period', 'all')
+            ->assertJsonCount(2, 'data.interviews')
+            ->assertJsonPath('data.interviews.0.title', 'Newborn Caregiver')
+            ->assertJsonPath('data.interviews.1.title', 'Afternoon Family Meeting')
+            ->assertJsonPath('data.interviews.0.job_type', 'long_term')
+            ->assertJsonPath('data.interviews.0.status_label', 'Scheduled')
+            ->assertJsonPath('data.interviews.0.client.name', 'Charlotte Hamlin')
+            ->assertJsonPath('data.interviews.0.date', '2026-01-21')
+            ->assertJsonPath('data.interviews.0.time.range', '10:00 AM - 11:00 AM');
     }
 
     public function test_candidate_can_view_owned_interview_details(): void
