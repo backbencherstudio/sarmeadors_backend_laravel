@@ -18,9 +18,6 @@ Route::get('/login', function () {
     ], 401);
 })->name('api.login');
 
-
-// Refresh token route
-
 Route::post('/refresh', [AuthController::class, 'refresh']);
 
 Route::middleware('subdomain')->group(function () {
