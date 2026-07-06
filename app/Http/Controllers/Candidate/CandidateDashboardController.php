@@ -80,6 +80,7 @@ class CandidateDashboardController extends Controller
             ->where('agency_id', $agencyId)
             ->where('status', 'marketplace')
             ->whereNull('candidate_id')
+            ->whereDoesntHave('applications', fn ($q) => $q->where('candidate_id', $candidate->id))
             ->latest()
             ->limit(4)
             ->get();

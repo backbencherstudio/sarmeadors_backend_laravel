@@ -66,6 +66,11 @@ class ShortTermJob extends Model
         return $this->hasMany(ShortTermJobChild::class);
     }
 
+    public function applications()
+    {
+        return $this->hasMany(ShortTermJobApplication::class);
+    }
+
     public function payment()
     {
         return $this->hasOne(Payment::class);

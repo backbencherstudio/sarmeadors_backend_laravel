@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Models\LongTermJob;
 use App\Models\ShortTermJob;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
 trait FormatsJobPosting
 {
     use FormatsMoney;
+    use FormatsTime;
 
     /**
      * Shared "job card" shape rendered by both the client dashboard (My Job)
@@ -120,6 +122,72 @@ trait FormatsJobPosting
             'country' => $job->country,
             'label' => collect([$job->job_address, $job->home_city, $job->home_province, $job->country])->filter()->implode(', '),
         ];
+    }
+
+    /**
+     * Applicant summary for a job card: totals plus a short strip of
+     * candidate avatars. Counts fall back to the loaded relation when the
+     * query did not use withCount.
+     *
+     * @return array<string, mixed>
+     */
+    protected function formatApplicants(ShortTermJob|LongTermJob $job): array
+    {
+        $applications = $job->relationLoaded('applications') ? $job->applications : collect();
+
+        $avatars = $applications
+            ->map(fn ($application): ?string => $application->candidate?->image_url)
+            ->filter()
+            ->take(5)
+            ->values();
+
+        return [
+            'count' => $job->applications_count ?? $applications->count(),
+            'interviewed' => $job->interviewed_count
+                ?? $applications->where('status', 'interviewed')->count(),
+            'hired' => $job->hired_count
+                ?? $applications->where('status', 'hired')->count(),
+            'avatars' => $avatars,
+        ];
+    }
+
+    /**
+     * All booking dates of a short-term job with screen-ready time ranges.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function formatBookingDates(ShortTermJob $job): Collection
+    {
+        return $job->dates
+            ->sortBy(['booking_date', 'start_time'])
+            ->values()
+            ->map(fn ($date): array => [
+                'id' => $date->id,
+                'date' => Carbon::parse($date->booking_date)->toDateString(),
+                'date_label' => Carbon::parse($date->booking_date)->format('d M, D'),
+                'start_time' => $this->formatTime($date->start_time),
+                'end_time' => $this->formatTime($date->end_time),
+                'time_range' => $this->formatTime($date->start_time).' - '.$this->formatTime($date->end_time),
+            ]);
+    }
+
+    /**
+     * The next upcoming booking date (or the first one when all have passed),
+     * used as the card's headline date/time like "18 Jan, Sun · 10:00 AM - 11:00 AM".
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function formatScheduleSummary(ShortTermJob $job): ?array
+    {
+        $dates = $this->formatBookingDates($job);
+
+        if ($dates->isEmpty()) {
+            return null;
+        }
+
+        return $dates->first(
+            fn (array $date): bool => $date['date'] >= now()->toDateString(),
+        ) ?? $dates->first();
     }
 
     /**

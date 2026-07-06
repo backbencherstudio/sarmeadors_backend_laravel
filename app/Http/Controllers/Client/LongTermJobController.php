@@ -37,7 +37,7 @@ class LongTermJobController extends Controller
 
             $status = $request->query('status');
 
-            $query = LongTermJob::with(['schedules', 'children', 'location', 'latestAttendance', 'candidate'])
+            $query = LongTermJob::with(['schedules', 'children', 'location', 'latestAttendance', 'candidate', 'applications.candidate'])
                 ->withCount([
                     'applications',
                     'applications as interviewed_count' => fn ($q) => $q->where('status', 'interviewed'),
@@ -51,11 +51,7 @@ class LongTermJobController extends Controller
 
             $jobs = $query->latest()->get()
                 ->map(fn (LongTermJob $job): array => array_merge($this->formatJobCard($job), [
-                    'applicants' => [
-                        'count' => $job->applications_count,
-                        'interviewed' => $job->interviewed_count,
-                        'hired' => $job->hired_count,
-                    ],
+                    'applicants' => $this->formatApplicants($job),
                     'assigned_candidate' => $this->formatAssignedCandidate($job),
                 ]));
 

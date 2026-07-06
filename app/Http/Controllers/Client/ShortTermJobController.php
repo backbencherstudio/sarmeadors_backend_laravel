@@ -58,7 +58,12 @@ class ShortTermJobController extends Controller
                 return $this->sendError('Client profile not found.', [], 404);
             }
 
-            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'candidate'])
+            $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'candidate', 'applications.candidate'])
+                ->withCount([
+                    'applications',
+                    'applications as interviewed_count' => fn ($q) => $q->where('status', 'interviewed'),
+                    'applications as hired_count' => fn ($q) => $q->where('status', 'hired'),
+                ])
                 ->where('client_id', $client->id);
 
             $jobs = QueryBuilder::for($baseQuery, $this->jobFilterRequest($request))
@@ -66,7 +71,10 @@ class ShortTermJobController extends Controller
                 ->latest()
                 ->get()
                 ->map(fn (ShortTermJob $job): array => array_merge($this->formatJobCard($job), [
+                    'applicants' => $this->formatApplicants($job),
                     'assigned_candidate' => $this->formatAssignedCandidate($job),
+                    'schedule_summary' => $this->formatScheduleSummary($job),
+                    'booking_dates' => $this->formatBookingDates($job),
                 ]));
 
             $counts = ShortTermJob::where('client_id', $client->id)
@@ -92,9 +100,26 @@ class ShortTermJobController extends Controller
                 return $this->sendError('Not found', [], 404);
             }
 
-            $shortTermJob->load(['dates', 'children', 'location']);
+            $shortTermJob
+                ->load(['dates', 'children', 'location', 'candidate', 'applications.candidate'])
+                ->loadCount([
+                    'applications',
+                    'applications as interviewed_count' => fn ($q) => $q->where('status', 'interviewed'),
+                    'applications as hired_count' => fn ($q) => $q->where('status', 'hired'),
+                ]);
 
-            return $this->sendResponse($shortTermJob, 'Job retrieved successfully', 200);
+            $applicants = $this->formatApplicants($shortTermJob);
+
+            // Applicant details stay behind the applicants endpoints; the
+            // details payload only carries the summary block.
+            $shortTermJob->unsetRelation('applications');
+
+            return $this->sendResponse(array_merge($shortTermJob->toArray(), [
+                'applicants' => $applicants,
+                'assigned_candidate' => $this->formatAssignedCandidate($shortTermJob),
+                'schedule_summary' => $this->formatScheduleSummary($shortTermJob),
+                'booking_dates' => $this->formatBookingDates($shortTermJob),
+            ]), 'Job retrieved successfully', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }

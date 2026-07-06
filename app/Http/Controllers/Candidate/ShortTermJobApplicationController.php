@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Candidate;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobApplication;
 use App\Traits\FormatsJobPosting;
 use App\Traits\FormatsMoney;
 use App\Traits\FormatsTime;
@@ -45,7 +46,8 @@ class ShortTermJobApplicationController extends Controller
         $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
             ->where('agency_id', $request->current_agency->id)
             ->where('status', 'marketplace')
-            ->whereNull('candidate_id');
+            ->whereNull('candidate_id')
+            ->whereDoesntHave('applications', fn ($q) => $q->where('candidate_id', $candidate->id));
 
         if ($request->has('location_id')) {
             $baseQuery->where('location_id', $request->query('location_id'));
@@ -109,9 +111,18 @@ class ShortTermJobApplicationController extends Controller
 
         $this->mergeSearchFilter($request);
 
-        $baseQuery = ShortTermJob::with(['dates', 'children', 'location', 'client'])
+        $baseQuery = ShortTermJob::with([
+            'dates',
+            'children',
+            'location',
+            'client',
+            'applications' => fn ($q) => $q->where('candidate_id', $candidate->id),
+        ])
             ->where('agency_id', $request->current_agency->id)
-            ->where('candidate_id', $candidate->id);
+            ->where(function ($query) use ($candidate) {
+                $query->where('candidate_id', $candidate->id)
+                    ->orWhereHas('applications', fn ($q) => $q->where('candidate_id', $candidate->id));
+            });
 
         $query = QueryBuilder::for($baseQuery, $request)
             ->allowedFilters(
@@ -155,11 +166,21 @@ class ShortTermJobApplicationController extends Controller
             return $this->sendError('Candidate profile not found.', [], 404);
         }
 
-        if ($shortTermJob->agency_id !== $request->current_agency->id || $shortTermJob->candidate_id !== $candidate->id) {
+        $hasApplication = ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+            ->where('candidate_id', $candidate->id)
+            ->exists();
+
+        if ($shortTermJob->agency_id !== $request->current_agency->id
+            || ($shortTermJob->candidate_id !== $candidate->id && ! $hasApplication)) {
             return $this->sendError('Applied job not found.', [], 404);
         }
 
-        $shortTermJob->load(['client', 'children', 'dates']);
+        $shortTermJob->load([
+            'client',
+            'children',
+            'dates',
+            'applications' => fn ($q) => $q->where('candidate_id', $candidate->id),
+        ]);
 
         return $this->sendResponse($this->formatAppliedJobDetails($shortTermJob, $candidate), 'Applied short-term job retrieved.', 200);
     }
@@ -181,10 +202,26 @@ class ShortTermJobApplicationController extends Controller
             return $this->sendError('This job already has a hired candidate.', [], 422);
         }
 
-        // For short-term jobs, expressing interest sets the candidate as the pending hire
-        $shortTermJob->update(['candidate_id' => $candidate->id]);
+        $existing = ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+            ->where('candidate_id', $candidate->id)
+            ->first();
 
-        return $this->sendResponse($shortTermJob->fresh()->load(['dates', 'client']), 'Interest submitted. Awaiting client/agency confirmation.', 200);
+        if ($existing) {
+            return $this->sendError('You have already applied to this job.', [], 422);
+        }
+
+        $validated = $request->validate([
+            'application_message' => 'nullable|string|max:2000',
+        ]);
+
+        $application = ShortTermJobApplication::create([
+            'short_term_job_id' => $shortTermJob->id,
+            'candidate_id' => $candidate->id,
+            'agency_id' => $shortTermJob->agency_id,
+            'application_message' => $validated['application_message'] ?? null,
+        ]);
+
+        return $this->sendResponse($application, 'Application submitted successfully.', 201);
     }
 
     // DELETE /candidate/jobs/short-term/{shortTermJob}/apply
@@ -196,8 +233,20 @@ class ShortTermJobApplicationController extends Controller
             return $this->sendError('Candidate profile not found.', [], 404);
         }
 
+        $application = ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+            ->where('candidate_id', $candidate->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($application) {
+            $application->delete();
+
+            return $this->sendResponse([], 'Application withdrawn.', 200);
+        }
+
+        // Legacy claim flow: the candidate was set directly as the pending hire
         if ($shortTermJob->candidate_id !== $candidate->id) {
-            return $this->sendError('You are not the selected candidate for this job.', [], 404);
+            return $this->sendError('No pending application found.', [], 404);
         }
 
         if (! in_array($shortTermJob->status, ['marketplace', 'pending_approval'])) {
@@ -216,23 +265,22 @@ class ShortTermJobApplicationController extends Controller
      */
     private function formatMarketplaceCard(ShortTermJob $job, Candidate $candidate): array
     {
+        $hasApplied = $job->candidate_id === $candidate->id
+            || ShortTermJobApplication::where('short_term_job_id', $job->id)
+                ->where('candidate_id', $candidate->id)
+                ->exists();
+
         return array_merge($this->formatJobCard($job), [
             'client_name' => $this->formatClientName($job->client),
-            'has_applied' => $job->candidate_id === $candidate->id,
-            'can_apply' => $job->status === 'marketplace' && is_null($job->candidate_id),
+            'has_applied' => $hasApplied,
+            'can_apply' => $job->status === 'marketplace' && is_null($job->candidate_id) && ! $hasApplied,
         ]);
     }
 
     private function formatAppliedJobCard(ShortTermJob $job, Candidate $candidate): array
     {
         return array_merge($this->formatMarketplaceCard($job, $candidate), [
-            'application' => [
-                'id' => $job->id,
-                'type' => 'short_term_assignment',
-                'status' => $job->status,
-                'status_label' => $this->formatStatusLabel($job->status),
-                'applied_at' => $job->updated_at?->toISOString(),
-            ],
+            'application' => $this->formatApplicationMeta($job, $candidate),
             'interview' => null,
             'actions' => [
                 'can_view_details' => true,
@@ -244,19 +292,50 @@ class ShortTermJobApplicationController extends Controller
     private function formatAppliedJobDetails(ShortTermJob $job, Candidate $candidate): array
     {
         return array_merge($this->formatJobDetails($job, $candidate), [
-            'application' => [
-                'id' => $job->id,
-                'type' => 'short_term_assignment',
-                'status' => $job->status,
-                'status_label' => $this->formatStatusLabel($job->status),
-                'applied_at' => $job->updated_at?->toISOString(),
-            ],
+            'application' => $this->formatApplicationMeta($job, $candidate),
             'interview' => null,
             'actions' => [
                 'can_view_details' => true,
                 'can_open_interview' => false,
             ],
         ]);
+    }
+
+    /**
+     * Application meta from the candidate's application row when one exists,
+     * falling back to the legacy direct-assignment shape (candidate_id set on
+     * the job without an application record).
+     *
+     * @return array<string, mixed>
+     */
+    private function formatApplicationMeta(ShortTermJob $job, Candidate $candidate): array
+    {
+        $application = $job->relationLoaded('applications')
+            ? $job->applications->firstWhere('candidate_id', $candidate->id)
+            : ShortTermJobApplication::where('short_term_job_id', $job->id)
+                ->where('candidate_id', $candidate->id)
+                ->first();
+
+        if (! $application) {
+            return [
+                'id' => $job->id,
+                'type' => 'short_term_assignment',
+                'status' => $job->status,
+                'status_label' => $this->formatStatusLabel($job->status),
+                'applied_at' => $job->updated_at?->toISOString(),
+            ];
+        }
+
+        return [
+            'id' => $application->id,
+            'type' => 'short_term_application',
+            'message' => $application->application_message,
+            'status' => $application->status,
+            'status_label' => $this->formatStatusLabel($application->status),
+            'job_status' => $job->status,
+            'job_status_label' => $this->formatStatusLabel($job->status),
+            'applied_at' => $application->created_at?->toISOString(),
+        ];
     }
 
     private function formatJobDetails(ShortTermJob $job, Candidate $candidate): array

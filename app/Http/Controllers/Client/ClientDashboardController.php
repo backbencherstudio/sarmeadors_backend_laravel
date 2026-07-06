@@ -10,6 +10,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
 use App\Models\LongTermJobInterview;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobApplication;
 use App\Traits\FormatsJobPosting;
 use App\Traits\ResolvesClient;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +37,8 @@ class ClientDashboardController extends Controller
 
         $stats = [
             'total_job_posts' => $longTermJobIds->count() + $shortTermJobIds->count(),
-            'applications' => LongTermJobApplication::whereIn('long_term_job_id', $longTermJobIds)->count(),
+            'applications' => LongTermJobApplication::whereIn('long_term_job_id', $longTermJobIds)->count()
+                + ShortTermJobApplication::whereIn('short_term_job_id', $shortTermJobIds)->count(),
             'messages' => JobMessage::where(function ($query) use ($longTermJobIds, $shortTermJobIds) {
                 $query->whereIn('long_term_job_id', $longTermJobIds)
                     ->orWhereIn('short_term_job_id', $shortTermJobIds);
@@ -50,7 +52,8 @@ class ClientDashboardController extends Controller
             ->whereNotIn('status', ['cancelled', 'completed'])
             ->get();
 
-        $shortTermJobs = ShortTermJob::with(['candidate', 'children', 'dates'])
+        $shortTermJobs = ShortTermJob::with(['candidate', 'children', 'dates', 'applications.candidate'])
+            ->withCount('applications')
             ->where('client_id', $client->id)
             ->whereNotIn('status', ['cancelled', 'completed'])
             ->get();
@@ -92,27 +95,6 @@ class ClientDashboardController extends Controller
             'applicants' => $this->formatApplicants($job),
             'assigned_candidate' => $this->formatAssignedCandidate($job),
         ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function formatApplicants(ShortTermJob|LongTermJob $job): array
-    {
-        if (! $job instanceof LongTermJob) {
-            return ['count' => 0, 'avatars' => []];
-        }
-
-        $avatars = $job->applications
-            ->map(fn (LongTermJobApplication $application): ?string => $application->candidate?->image_url)
-            ->filter()
-            ->take(5)
-            ->values();
-
-        return [
-            'count' => $job->applications_count ?? $job->applications->count(),
-            'avatars' => $avatars,
-        ];
     }
 
     /**

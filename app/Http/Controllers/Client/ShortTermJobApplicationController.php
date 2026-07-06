@@ -7,12 +7,16 @@ use App\Models\Candidate;
 use App\Models\CandidateJobRequest;
 use App\Models\Client;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobApplication;
 use App\Models\ShortTermJobReview;
+use App\Traits\SendsNotifications;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ShortTermJobApplicationController extends Controller
 {
+    use SendsNotifications;
+
     private function resolveClient(Request $request): ?Client
     {
         return Client::where('email', $request->user()->email)
@@ -38,9 +42,20 @@ class ShortTermJobApplicationController extends Controller
                 $candidate->append(['image_url', 'average_rating', 'reviews_count']);
             }
 
+            $applications = ShortTermJobApplication::with(['candidate.reviews'])
+                ->where('short_term_job_id', $shortTermJob->id)
+                ->latest()
+                ->paginate(10);
+
+            $applications->getCollection()->each(
+                fn (ShortTermJobApplication $application) => $application->candidate
+                    ?->append(['image_url', 'average_rating', 'reviews_count']),
+            );
+
             return $this->sendResponse([
                 'hired_candidate' => $candidate,
                 'status' => $shortTermJob->status,
+                'applications' => $applications,
             ], 'Applicants retrieved.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
@@ -95,6 +110,8 @@ class ShortTermJobApplicationController extends Controller
     }
 
     // POST /client/jobs/short-term/{shortTermJob}/applicants/{applicationId}/hire
+    // Hiring an applicant assigns them and starts the job; only one candidate
+    // can be hired per short-term job.
     public function hire(Request $request, ShortTermJob $shortTermJob, int $applicationId): JsonResponse
     {
         try {
@@ -115,24 +132,79 @@ class ShortTermJobApplicationController extends Controller
                 return $this->sendError('Candidate not found.', [], 404);
             }
 
-            $shortTermJob->update(['candidate_id' => $candidate->id]);
+            if ($shortTermJob->candidate_id && $shortTermJob->candidate_id !== $candidate->id) {
+                return $this->sendError('This job already has a hired candidate.', [], 422);
+            }
 
-            CandidateJobRequest::updateOrCreate(
-                [
-                    'agency_id' => $request->current_agency->id,
-                    'client_id' => $client->id,
-                    'candidate_id' => $candidate->id,
-                    'short_term_job_id' => $shortTermJob->id,
-                    'job_type' => 'short_term',
-                ],
-                [
-                    'status' => 'pending',
-                    'message' => $request->input('message'),
-                    'responded_at' => null,
-                ]
+            $hasApplied = ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+                ->where('candidate_id', $candidate->id)
+                ->exists();
+
+            // A candidate who never applied (hired directly from browsing) must
+            // still confirm through the requested-jobs flow before work starts.
+            if (! $hasApplied && $shortTermJob->candidate_id !== $candidate->id) {
+                $shortTermJob->update(['candidate_id' => $candidate->id]);
+
+                CandidateJobRequest::updateOrCreate(
+                    [
+                        'agency_id' => $request->current_agency->id,
+                        'client_id' => $client->id,
+                        'candidate_id' => $candidate->id,
+                        'short_term_job_id' => $shortTermJob->id,
+                        'job_type' => 'short_term',
+                    ],
+                    [
+                        'status' => 'pending',
+                        'message' => $request->input('message'),
+                        'responded_at' => null,
+                    ]
+                );
+
+                return $this->sendResponse([], 'Hire request forwarded to the candidate for confirmation.', 200);
+            }
+
+            // The candidate applied (or already accepted the job), so hiring
+            // starts the job immediately.
+            $shortTermJob->update([
+                'candidate_id' => $candidate->id,
+                'status' => 'running',
+            ]);
+
+            ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+                ->where('candidate_id', $candidate->id)
+                ->update(['status' => 'hired']);
+
+            ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
+                ->where('candidate_id', '!=', $candidate->id)
+                ->where('status', 'pending')
+                ->update(['status' => 'rejected']);
+
+            $meta = [
+                'short_term_job_id' => $shortTermJob->id,
+                'candidate_id' => $candidate->id,
+            ];
+            $body = trim($candidate->first_name.' '.$candidate->last_name)." has been hired for \"{$shortTermJob->title}\".";
+
+            $this->notifyPortalUser(
+                $request->current_agency->id,
+                $candidate->email,
+                'short_term_job_hired',
+                'You Have Been Hired',
+                "You have been hired for \"{$shortTermJob->title}\". The job is now running.",
+                null,
+                $meta,
             );
+            $this->notifyAgencyAdmins($request->current_agency->id, 'short_term_job_hired', 'Candidate Hired', $body, null, $meta);
 
-            return $this->sendResponse([], 'Hire request forwarded to agency for confirmation.', 200);
+            return $this->sendResponse([
+                'job_id' => $shortTermJob->id,
+                'status' => 'running',
+                'hired_candidate' => [
+                    'id' => $candidate->id,
+                    'name' => trim($candidate->first_name.' '.$candidate->last_name),
+                    'image_url' => $candidate->image_url,
+                ],
+            ], 'Candidate hired. The job is now running.', 200);
         } catch (\Exception $e) {
             return $this->sendError('Something went wrong', $e->getMessage(), 500);
         }
