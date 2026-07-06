@@ -108,13 +108,13 @@ class ClientInterviewsTest extends TestCase
             ->assertJsonCount(0, 'data.interviews.data');
     }
 
-    public function test_client_interviews_calendar_groups_by_date(): void
+    public function test_client_interviews_calendar_returns_flat_events_for_month(): void
     {
         Carbon::setTestNow('2026-01-10 09:00:00');
 
         [$agency, $user, $client, $candidate] = $this->createClientScenario();
 
-        $this->createInterview(
+        $januaryInterview = $this->createInterview(
             agency: $agency,
             client: $client,
             candidate: $candidate,
@@ -142,8 +142,31 @@ class ClientInterviewsTest extends TestCase
             ->assertJsonPath('data.view', 'calendar')
             ->assertJsonPath('data.month', 1)
             ->assertJsonPath('data.year', 2026)
-            ->assertJsonPath('data.interviews.2026-01-21.0.title', 'Newborn Caregiver')
-            ->assertJsonMissingPath('data.interviews.2026-02-02');
+            ->assertJsonPath('data.filters.period', 'all')
+            ->assertJsonCount(1, 'data.events')
+            ->assertJsonPath('data.events.0.id', "interview_{$januaryInterview->id}_2026-01-21")
+            ->assertJsonPath('data.events.0.interview_id', $januaryInterview->id)
+            ->assertJsonPath('data.events.0.job_type', 'long_term')
+            ->assertJsonPath('data.events.0.job_type_label', 'Long-term')
+            ->assertJsonPath('data.events.0.title', 'Newborn Caregiver')
+            ->assertJsonPath('data.events.0.candidate.name', 'Darlene Robertson')
+            ->assertJsonPath('data.events.0.date', '2026-01-21')
+            ->assertJsonPath('data.events.0.date_label', 'Jan 21, 2026')
+            ->assertJsonPath('data.events.0.location.label', '26 Berkshire Ave., Atlantic City, NJ, USA')
+            ->assertJsonPath('data.events.0.location.city', 'Atlantic City')
+            ->assertJsonPath('data.events.0.compensation.amount', '35.00')
+            ->assertJsonPath('data.events.0.compensation.label', '$35/hr')
+            ->assertJsonPath('data.events.0.status', 'scheduled')
+            ->assertJsonPath('data.events.0.status_label', 'Scheduled')
+            ->assertJsonMissingPath('data.events.0.job')
+            ->assertJsonMissingPath('data.events.0.attendance')
+            ->assertJsonPath('data.events.0.actions.view_details_url', "/api/client/interviews/{$januaryInterview->id}")
+            ->assertJsonPath('data.events.0.actions.reschedule_url', "/api/client/interviews/{$januaryInterview->id}/reschedule")
+            ->assertJsonPath('data.events.0.modal.title', 'Newborn Caregiver')
+            ->assertJsonPath('data.events.0.modal.subtitle', 'Darlene Robertson')
+            ->assertJsonPath('data.events.0.modal.date', '21 Jan, Wed')
+            ->assertJsonPath('data.events.0.modal.time_range', '10:00 AM - 11:00 AM')
+            ->assertJsonMissingPath('data.interviews');
     }
 
     public function test_client_can_view_owned_interview_details(): void
