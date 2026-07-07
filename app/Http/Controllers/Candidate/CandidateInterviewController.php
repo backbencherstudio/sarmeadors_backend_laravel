@@ -33,10 +33,10 @@ class CandidateInterviewController extends Controller
 
         $requestFilter = $request->query('filter', []);
         $queryBuilderFilters = is_array($requestFilter) ? $requestFilter : [];
-        $filter = $request->query('period', is_string($requestFilter) ? $requestFilter : ($queryBuilderFilters['period'] ?? 'all'));
+        $filter = $request->query('status', is_string($requestFilter) ? $requestFilter : ($queryBuilderFilters['status'] ?? 'all'));
         $view = $request->query('view', 'list');
 
-        unset($queryBuilderFilters['period']);
+        unset($queryBuilderFilters['status']);
 
         if ($request->filled('search') && ! isset($queryBuilderFilters['search'])) {
             $queryBuilderFilters['search'] = $request->query('search');
@@ -116,7 +116,7 @@ class CandidateInterviewController extends Controller
                 'month' => (int) $month,
                 'year' => (int) $year,
                 'filters' => [
-                    'period' => $filter,
+                    'status' => $filter,
                     'search' => $queryBuilderFilters['search'] ?? null,
                 ],
                 'interviews' => $events,

@@ -55,7 +55,7 @@ class CandidateInterviewsTest extends TestCase
         $response = $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/interviews?view=list&period=scheduled&filter[search]=After');
+            ->getJson('/api/candidate/interviews?view=list&status=scheduled&filter[search]=After');
 
         $response
             ->assertOk()
@@ -115,7 +115,7 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.view', 'calendar')
             ->assertJsonPath('data.month', 1)
             ->assertJsonPath('data.year', 2026)
-            ->assertJsonPath('data.filters.period', 'all')
+            ->assertJsonPath('data.filters.status', 'all')
             ->assertJsonCount(2, 'data.interviews')
             ->assertJsonPath('data.interviews.0.title', 'Newborn Caregiver')
             ->assertJsonPath('data.interviews.1.title', 'Afternoon Family Meeting')
@@ -264,7 +264,7 @@ class CandidateInterviewsTest extends TestCase
         $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/interviews?view=list&period=missed')
+            ->getJson('/api/candidate/interviews?view=list&status=missed')
             ->assertOk()
             ->assertJsonCount(1, 'data.interviews.data')
             ->assertJsonPath('data.interviews.data.0.id', $missed->id)
@@ -299,7 +299,7 @@ class CandidateInterviewsTest extends TestCase
         $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/interviews?view=list&period=completed')
+            ->getJson('/api/candidate/interviews?view=list&status=completed')
             ->assertOk()
             ->assertJsonCount(1, 'data.interviews.data')
             ->assertJsonPath('data.interviews.data.0.id', $completed->id)
