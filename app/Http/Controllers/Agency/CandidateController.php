@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\AgencyCandidateGlobalSetting;
 use App\Models\Candidate;
 use App\Models\CheckList;
@@ -122,7 +123,7 @@ class CandidateController extends Controller
             ->keyBy('id');
 
         $rows = $candidates->getCollection()->map(function ($candidate) use ($tableFields, $statusesById) {
-            $row = ['id' => $candidate->id,'image_url' => $candidate->image_url,];
+            $row = ['id' => $candidate->id, 'image_url' => $candidate->image_url];
 
             foreach ($tableFields as $field) {
                 $row[$field] = match ($field) {
@@ -266,30 +267,74 @@ class CandidateController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $form = Form::where('id', $request->form_id)
-            ->where('agency_id', $agencyId)
-            ->firstOrFail();
+        $request->validate([
+            'form_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('forms', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+        ]);
 
-        $formFields = FormField::where('form_id', $form->id)
-            ->where('status', 1)
-            ->get();
+        $form = null;
+        $formFields = collect();
+
+        if ($request->filled('form_id')) {
+
+            $form = Form::where('id', $request->form_id)
+                ->where('agency_id', $agencyId)
+                ->firstOrFail();
+
+            $formFields = FormField::where('form_id', $form->id)
+                ->where('status', 1)
+                ->get();
+        }
 
         $rules = [
             'first_name' => 'required|string|max:255',
             'email' => 'required|email|unique:candidates,email',
             'mobile' => 'nullable|string|max:20',
+
+            'type_id' => 'nullable|array',
+            'type_id.*' => [
+                'integer',
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+            ],
+            'checklist_id' => 'nullable|array',
+            'checklist_id.*' => [
+                'integer',
+                Rule::exists('check_lists', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+            ],
+            'location_id' => 'nullable|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+            'tag_id' => 'nullable|array',
+            'tag_id.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+            ],
+            'status_id' => 'nullable|array',
+            'status_id.*' => [
+                'integer',
+                Rule::exists('statuses', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+            ],
         ];
 
         foreach ($formFields as $field) {
 
-            if ($field->validation_rules) {
-
-                $rules["fields.$field->id"] = $field->validation_rules;
-            }
+            $fieldRules = [];
 
             if ($field->is_required) {
+                $fieldRules[] = 'required';
+            }
 
-                $rules["fields.$field->id"] = 'required';
+            if ($field->validation_rules) {
+                $fieldRules[] = $field->validation_rules;
+            }
+
+            if ($fieldRules) {
+                $rules["fields.$field->id"] = implode('|', $fieldRules);
             }
         }
 
@@ -298,6 +343,17 @@ class CandidateController extends Controller
         DB::beginTransaction();
 
         try {
+
+            $agency = Agency::where('id', $agencyId)->lockForUpdate()->first();
+
+            if ($agency && $agency->total_candidates >= $agency->max_candidates) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Candidate limit exceeded for this agency.',
+                ], 403);
+            }
 
             $candidate = Candidate::create([
                 'agency_id' => $agencyId,
@@ -313,33 +369,40 @@ class CandidateController extends Controller
                 'status_changed_at' => $request->status_id ? now() : null,
             ]);
 
-            $submission = FormSubmission::create([
-                'form_id' => $form->id,
-                'entity_id' => $candidate->id,
-            ]);
-
-            $allowedFields = $formFields->pluck('id')->toArray();
-
-            $insertData = [];
-
-            foreach ($request->fields ?? [] as $fieldId => $value) {
-
-                if (! in_array($fieldId, $allowedFields)) {
-                    continue;
-                }
-
-                $insertData[] = [
-                    'submission_id' => $submission->id,
-                    'form_field_id' => $fieldId,
-                    'value' => $value,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+            if ($agency) {
+                $agency->increment('total_candidates');
             }
 
-            if (! empty($insertData)) {
+            if ($form) {
 
-                FormFieldValue::insert($insertData);
+                $submission = FormSubmission::create([
+                    'form_id' => $form->id,
+                    'entity_id' => $candidate->id,
+                ]);
+
+                $allowedFields = $formFields->pluck('id')->toArray();
+
+                $insertData = [];
+
+                foreach ($request->fields ?? [] as $fieldId => $value) {
+
+                    if (! in_array($fieldId, $allowedFields)) {
+                        continue;
+                    }
+
+                    $insertData[] = [
+                        'submission_id' => $submission->id,
+                        'form_field_id' => $fieldId,
+                        'value' => $value,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+
+                if (! empty($insertData)) {
+
+                    FormFieldValue::insert($insertData);
+                }
             }
 
             DB::commit();
