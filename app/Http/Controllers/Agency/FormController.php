@@ -185,6 +185,40 @@ class FormController extends Controller
     }
 
     /**
+     * Move a schema field to a new position (1-based `serial`) within its
+     * own section, renumbering the rest of that section to match. Fields
+     * are identified by their `key` since they aren't separate rows.
+     */
+    public function reorderField(Request $request, $id, $key)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        $request->validate([
+            'serial' => 'required|integer|min:1',
+        ]);
+
+        $schema = $this->builder->moveField($form->schema ?? ['blocks' => []], $key, (int) $request->serial);
+
+        if ($schema === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Field not found in this form',
+            ], 404);
+        }
+
+        $form->schema = $schema;
+        $form->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Field reordered successfully',
+            'data' => $form,
+        ]);
+    }
+
+    /**
      * Enable or disable a form. Sends the desired `status`, or toggles when omitted.
      * A disabled form stops accepting submissions.
      */

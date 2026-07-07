@@ -46,6 +46,105 @@ class AgencyFormBuilderTest extends TestCase
         ]);
     }
 
+    public function test_agency_can_move_a_field_to_a_later_position_in_its_section(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createForm($user)->json('data');
+        $firstNameKey = $form['schema']['blocks'][0]['sections'][0]['fields'][0]['key'];
+
+        // "first_name" (serial 1) -> serial 3, so it lands after "email" and
+        // "favorite_color", which both shift up by one.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/fields/{$firstNameKey}/serial", [
+                'serial' => 3,
+            ]);
+
+        $response->assertOk();
+
+        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $this->assertSame(['email', 'favorite_color', 'first_name'], array_column($fields, 'name'));
+        $this->assertSame([1, 2, 3], array_column($fields, 'serial'));
+    }
+
+    public function test_agency_can_move_a_field_to_an_earlier_position_in_its_section(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createForm($user)->json('data');
+        $favoriteColorKey = $form['schema']['blocks'][0]['sections'][0]['fields'][2]['key'];
+
+        // "favorite_color" (serial 3) -> serial 1.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/fields/{$favoriteColorKey}/serial", [
+                'serial' => 1,
+            ]);
+
+        $response->assertOk();
+
+        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $this->assertSame(['favorite_color', 'first_name', 'email'], array_column($fields, 'name'));
+    }
+
+    public function test_reorder_field_clamps_a_serial_beyond_the_section_size(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createForm($user)->json('data');
+        $firstNameKey = $form['schema']['blocks'][0]['sections'][0]['fields'][0]['key'];
+
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/fields/{$firstNameKey}/serial", [
+                'serial' => 999,
+            ]);
+
+        $response->assertOk();
+
+        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $this->assertSame(['email', 'favorite_color', 'first_name'], array_column($fields, 'name'));
+    }
+
+    public function test_reorder_field_rejects_an_unknown_field_key(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createForm($user)->json('data');
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/fields/not-a-real-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
+    public function test_reorder_field_is_scoped_to_the_authenticated_agency(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $otherAgency = Agency::create([
+            'name' => 'Other Agency',
+            'subdomain' => 'other-reorder.test',
+            'subdomain_prefix' => 'other-reorder',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $foreignForm = Form::create([
+            'agency_id' => $otherAgency->id,
+            'name' => 'Foreign Form',
+            'slug' => 'foreign-reorder-form',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'schema' => $this->registrationSchema(),
+        ]);
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$foreignForm->id}/fields/any-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
     public function test_rejects_unsupported_short_term_job_posting(): void
     {
         [, $user] = $this->createAgencyScenario();

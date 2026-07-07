@@ -282,6 +282,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/forms/{slug}', [FormController::class, 'show']);
     Route::put('/forms/{id}', [FormController::class, 'update']);
     Route::patch('/forms/{id}/status', [FormController::class, 'toggleStatus']);
+    Route::patch('/forms/{id}/fields/{key}/serial', [FormController::class, 'reorderField']);
     Route::post('/forms/{slug}/submit', [FormController::class, 'submit']);
 
     // Legacy flat form fields
