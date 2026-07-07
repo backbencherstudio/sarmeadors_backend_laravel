@@ -237,6 +237,51 @@ class AgencyFormBuilderTest extends TestCase
             ->assertJsonStructure(['data' => ['client_id']]);
     }
 
+    public function test_long_term_job_submission_rejects_client_id_from_another_agency(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $otherAgency = Agency::create([
+            'name' => 'Other Agency',
+            'subdomain' => 'other-job.test',
+            'subdomain_prefix' => 'other-job',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $foreignClient = Client::create([
+            'agency_id' => $otherAgency->id,
+            'first_name' => 'Foreign',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $slug = $this->actingAsAgency($user)
+            ->postJson('/api/agency/forms', [
+                'name' => 'Post Long-term Job',
+                'application_type' => 'job_posting',
+                'job_type' => 'long_term',
+                'schema' => [
+                    'blocks' => [[
+                        'name' => 'Job Details',
+                        'sections' => [[
+                            'name' => 'Untitled Section',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'Title', 'name' => 'title', 'is_required' => true],
+                            ],
+                        ]],
+                    ]],
+                ],
+            ])
+            ->json('data.slug');
+
+        $this->actingAsAgency($user)
+            ->postJson("/api/agency/forms/{$slug}/submit", [
+                'client_id' => $foreignClient->id,
+                'answers' => ['title' => 'Live-in Nanny'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['data' => ['client_id']]);
+    }
+
     public function test_agency_cannot_access_or_submit_another_agencys_form(): void
     {
         [, $user] = $this->createAgencyScenario();

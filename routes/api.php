@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,11 @@ Route::middleware('subdomain')->group(function () {
     Route::post('/send-otp', [ForgotPasswordController::class, 'sendOtp'])->name('api.send.otp');
     Route::post('/verify-otp', [ForgotPasswordController::class, 'verifyOtp'])->name('api.verify.otp');
     Route::post('/password-reset', [ForgotPasswordController::class, 'resetPassword'])->name('api.password.reset');
+
+    // Public application forms: an unauthenticated visitor (prospective client/
+    // candidate) views an enabled form's schema, then self-registers with it.
+    Route::get('/forms/{slug}', [FormController::class, 'publicShow']);
+    Route::post('/forms/{slug}/submit', [FormController::class, 'submit']);
 });
 
 Route::middleware('auth:api')->group(function () {

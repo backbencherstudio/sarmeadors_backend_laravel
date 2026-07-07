@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\AgencyClientGlobalSetting;
 use App\Models\CheckList;
 use App\Models\Client;
@@ -297,30 +298,75 @@ class ClientController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $form = Form::where('id', $request->form_id)
-            ->where('agency_id', $agencyId)
-            ->firstOrFail();
+        $request->validate([
+            'form_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('forms', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+        ]);
 
-        $formFields = FormField::where('form_id', $form->id)
-            ->where('status', 1)
-            ->get();
+        $form = null;
+        $formFields = collect();
+
+        if ($request->filled('form_id')) {
+
+            $form = Form::where('id', $request->form_id)
+                ->where('agency_id', $agencyId)
+                ->firstOrFail();
+
+            $formFields = FormField::where('form_id', $form->id)
+                ->where('status', 1)
+                ->get();
+        }
 
         $rules = [
             'first_name' => 'required|string|max:255',
             'email' => 'required|email|unique:clients,email',
             'mobile' => 'nullable|string|max:20',
+            'hear_about_us' => 'nullable|string|max:255',
+
+            'type_id' => 'nullable|array',
+            'type_id.*' => [
+                'integer',
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'checklist_id' => 'nullable|array',
+            'checklist_id.*' => [
+                'integer',
+                Rule::exists('check_lists', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'location_id' => 'nullable|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+            'tag_id' => 'nullable|array',
+            'tag_id.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'status_id' => 'nullable|array',
+            'status_id.*' => [
+                'integer',
+                Rule::exists('statuses', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
         ];
 
         foreach ($formFields as $field) {
 
-            if ($field->validation_rules) {
-
-                $rules["fields.$field->id"] = $field->validation_rules;
-            }
+            $fieldRules = [];
 
             if ($field->is_required) {
+                $fieldRules[] = 'required';
+            }
 
-                $rules["fields.$field->id"] = 'required';
+            if ($field->validation_rules) {
+                $fieldRules[] = $field->validation_rules;
+            }
+
+            if ($fieldRules) {
+                $rules["fields.$field->id"] = implode('|', $fieldRules);
             }
         }
 
@@ -330,12 +376,24 @@ class ClientController extends Controller
 
         try {
 
+            $agency = Agency::where('id', $agencyId)->lockForUpdate()->first();
+
+            if ($agency && $agency->total_clients >= $agency->max_clients) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Client limit exceeded for this agency.',
+                ], 403);
+            }
+
             $client = Client::create([
                 'agency_id' => $agencyId,
                 'first_name' => $request->first_name,
                 'last_name' => $request->last_name,
                 'email' => $request->email,
                 'mobile' => $request->mobile,
+                'hear_about_us' => $request->hear_about_us,
                 'type_id' => $request->type_id,
                 'location_id' => $request->location_id,
                 'checklist_id' => $request->checklist_id,
@@ -344,33 +402,40 @@ class ClientController extends Controller
                 'status_changed_at' => $request->status_id ? now() : null,
             ]);
 
-            $submission = FormSubmission::create([
-                'form_id' => $form->id,
-                'entity_id' => $client->id,
-            ]);
+            if ($form) {
 
-            $allowedFields = $formFields->pluck('id')->toArray();
+                $submission = FormSubmission::create([
+                    'form_id' => $form->id,
+                    'entity_id' => $client->id,
+                ]);
 
-            $insertData = [];
+                $allowedFields = $formFields->pluck('id')->toArray();
 
-            foreach ($request->fields ?? [] as $fieldId => $value) {
+                $insertData = [];
 
-                if (! in_array($fieldId, $allowedFields)) {
-                    continue;
+                foreach ($request->fields ?? [] as $fieldId => $value) {
+
+                    if (! in_array($fieldId, $allowedFields)) {
+                        continue;
+                    }
+
+                    $insertData[] = [
+                        'submission_id' => $submission->id,
+                        'form_field_id' => $fieldId,
+                        'value' => $value,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 }
 
-                $insertData[] = [
-                    'submission_id' => $submission->id,
-                    'form_field_id' => $fieldId,
-                    'value' => $value,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                if (! empty($insertData)) {
+
+                    FormFieldValue::insert($insertData);
+                }
             }
 
-            if (! empty($insertData)) {
-
-                FormFieldValue::insert($insertData);
+            if ($agency) {
+                $agency->increment('total_clients');
             }
 
             DB::commit();

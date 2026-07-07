@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use App\Services\FormBuilderService;
@@ -13,6 +14,18 @@ use Illuminate\Validation\Rule;
 
 class FormController extends Controller
 {
+    /**
+     * Entities that self-register with their own linked user account and are
+     * subject to an agency-wide capacity limit, mapped to the `agencies`
+     * columns tracking that limit.
+     *
+     * @var array<string, array{max: string, total: string}>
+     */
+    private const AGENCY_CAPACITY_COLUMNS = [
+        'client' => ['max' => 'max_clients', 'total' => 'total_clients'],
+        'candidate' => ['max' => 'max_candidates', 'total' => 'total_candidates'],
+    ];
+
     public function __construct(private FormBuilderService $builder) {}
 
     /**
@@ -97,6 +110,28 @@ class FormController extends Controller
     }
 
     /**
+     * Public: fetch an enabled builder form's schema by slug, scoped by the
+     * `X-Subdomain` agency, so an unauthenticated visitor (client/candidate
+     * applying on their own) can see what fields to fill in before submitting.
+     */
+    public function publicShow(Request $request, $slug)
+    {
+        $form = Form::where('slug', $slug)
+            ->where('agency_id', $request->current_agency->id)
+            ->where('status', true)
+            ->firstOrFail();
+
+        $data = $form->toArray();
+        $data['base_fields'] = $this->builder->baseFields($form->entity);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Form retrieved successfully',
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * Update an existing builder form's name, schema or status.
      */
     public function update(Request $request, $id)
@@ -166,7 +201,7 @@ class FormController extends Controller
      */
     public function submit(Request $request, $slug)
     {
-        $agencyId = auth('api')->user()->agency_id;
+        $agencyId = $request->current_agency->id;
 
         $form = Form::where('slug', $slug)
             ->where('agency_id', $agencyId)
@@ -192,7 +227,7 @@ class FormController extends Controller
         $schema = $form->schema ?? ['blocks' => []];
 
         $rules = $this->builder->validationRules($schema);
-        $rules = array_merge($rules, $this->baseRules($entity));
+        $rules = array_merge($rules, $this->baseRules($entity, $agencyId));
 
         $request->validate($rules);
 
@@ -201,9 +236,25 @@ class FormController extends Controller
         DB::beginTransaction();
 
         try {
+            $agency = null;
+            $capacityColumns = self::AGENCY_CAPACITY_COLUMNS[$entity] ?? null;
+
+            if ($capacityColumns) {
+                $agency = Agency::where('id', $agencyId)->lockForUpdate()->first();
+
+                if ($agency && $agency->{$capacityColumns['total']} >= $agency->{$capacityColumns['max']}) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'status' => false,
+                        'message' => ucfirst($entity).' limit exceeded for this agency.',
+                    ], 403);
+                }
+            }
+
             $attributes = array_merge(
                 $this->builder->requiredColumnDefaults($entity),
-                $this->builder->mapAnswersToColumns($modelClass, $answers),
+                $this->builder->mapAnswersToColumns($modelClass, $entity, $schema, $answers),
             );
 
             $attributes['agency_id'] = $agencyId;
@@ -214,11 +265,23 @@ class FormController extends Controller
 
             $record = $modelClass::create($attributes);
 
+            if ($capacityColumns) {
+                if ($agency) {
+                    $agency->increment($capacityColumns['total']);
+                }
+
+                if (! empty($answers['password'])) {
+                    $record->user?->update(['password' => $answers['password']]);
+                }
+            }
+
+            $baseFieldNames = collect($this->builder->baseFields($entity))->pluck('name');
+
             $submission = FormSubmission::create([
                 'form_id' => $form->id,
                 'entity_id' => $record->id,
                 'entity_type' => $entity,
-                'data' => $answers,
+                'data' => collect($answers)->except($baseFieldNames)->all(),
             ]);
 
             DB::commit();
@@ -248,19 +311,44 @@ class FormController extends Controller
      *
      * @return array<string, string>
      */
-    private function baseRules(string $entity): array
+    private function baseRules(string $entity, int $agencyId): array
     {
         return match ($entity) {
             'client' => [
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:clients,email',
+                'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.type_id' => 'nullable|array',
+                'answers.type_id.*' => [
+                    'integer',
+                    Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+                ],
+                'answers.location_id' => 'nullable|array',
+                'answers.location_id.*' => [
+                    'integer',
+                    Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+                ],
             ],
             'candidate' => [
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:candidates,email',
+                'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.type_id' => 'nullable|array',
+                'answers.type_id.*' => [
+                    'integer',
+                    Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+                ],
+                'answers.location_id' => 'nullable|array',
+                'answers.location_id.*' => [
+                    'integer',
+                    Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+                ],
             ],
             'long_term_job' => [
-                'client_id' => 'required|exists:clients,id',
+                'client_id' => [
+                    'required',
+                    Rule::exists('clients', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+                ],
                 'answers.title' => 'required|string|max:255',
             ],
             default => [],
