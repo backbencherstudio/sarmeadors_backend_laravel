@@ -298,15 +298,6 @@ class ClientController extends Controller
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $agency = Agency::find($agencyId);
-
-        if ($agency && $agency->total_clients >= $agency->max_clients) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Client limit exceeded for this agency.',
-            ], 403);
-        }
-
         $request->validate([
             'form_id' => [
                 'nullable',
@@ -334,18 +325,48 @@ class ClientController extends Controller
             'email' => 'required|email|unique:clients,email',
             'mobile' => 'nullable|string|max:20',
             'hear_about_us' => 'nullable|string|max:255',
+
+            'type_id' => 'nullable|array',
+            'type_id.*' => [
+                'integer',
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'checklist_id' => 'nullable|array',
+            'checklist_id.*' => [
+                'integer',
+                Rule::exists('check_lists', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'location_id' => 'nullable|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
+            'tag_id' => 'nullable|array',
+            'tag_id.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
+            'status_id' => 'nullable|array',
+            'status_id.*' => [
+                'integer',
+                Rule::exists('statuses', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
+            ],
         ];
 
         foreach ($formFields as $field) {
 
-            if ($field->validation_rules) {
-
-                $rules["fields.$field->id"] = $field->validation_rules;
-            }
+            $fieldRules = [];
 
             if ($field->is_required) {
+                $fieldRules[] = 'required';
+            }
 
-                $rules["fields.$field->id"] = 'required';
+            if ($field->validation_rules) {
+                $fieldRules[] = $field->validation_rules;
+            }
+
+            if ($fieldRules) {
+                $rules["fields.$field->id"] = implode('|', $fieldRules);
             }
         }
 
@@ -354,6 +375,17 @@ class ClientController extends Controller
         DB::beginTransaction();
 
         try {
+
+            $agency = Agency::where('id', $agencyId)->lockForUpdate()->first();
+
+            if ($agency && $agency->total_clients >= $agency->max_clients) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Client limit exceeded for this agency.',
+                ], 403);
+            }
 
             $client = Client::create([
                 'agency_id' => $agencyId,
