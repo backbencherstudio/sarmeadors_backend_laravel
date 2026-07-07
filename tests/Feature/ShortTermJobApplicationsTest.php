@@ -179,6 +179,54 @@ class ShortTermJobApplicationsTest extends TestCase
             ->assertJsonPath('data.total', 1);
     }
 
+    public function test_client_can_view_short_term_applicant_detail(): void
+    {
+        Carbon::setTestNow('2026-01-10 09:00:00');
+
+        [$agency, $clientUser, $client] = $this->createClientScenario();
+        [$candidateUser, $candidate] = $this->createCandidate($agency, 'Emily', 'Stone');
+
+        $job = $this->createMarketplaceJob($agency, $client);
+
+        $this->actingAs($candidateUser, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/jobs/short-term/{$job->id}/apply", [
+                'application_message' => 'I am available for this booking.',
+            ])
+            ->assertCreated();
+
+        $this->actingAs($clientUser, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/client/jobs/short-term/{$job->id}/applicants/{$candidate->id}")
+            ->assertOk()
+            ->assertJsonPath('data.candidate.header.id', $candidate->id)
+            ->assertJsonPath('data.candidate.header.name', 'Emily Stone')
+            ->assertJsonPath('data.candidate.personal_information.first_name', 'Emily')
+            ->assertJsonStructure([
+                'data' => [
+                    'candidate' => [
+                        'header',
+                        'personal_information',
+                        'professional_information',
+                        'reference',
+                        'additional_information',
+                        'documents',
+                    ],
+                    'reviews' => ['average', 'count', 'my_review', 'items'],
+                    'application' => ['id', 'status', 'message', 'applied_at', 'job' => ['id', 'title'], 'interview'],
+                    'link',
+                    'actions' => ['can_review', 'can_hire_request'],
+                ],
+            ])
+            ->assertJsonPath('data.application.status', 'pending')
+            ->assertJsonPath('data.application.message', 'I am available for this booking.')
+            ->assertJsonPath('data.application.job.id', $job->id)
+            ->assertJsonPath('data.application.interview', null)
+            ->assertJsonPath('data.actions.can_hire_request', true)
+            ->assertJsonPath('data.actions.can_review', false)
+            ->assertJsonPath('data.link', null);
+    }
+
     /**
      * @return array{0: Agency, 1: User, 2: Client}
      */

@@ -55,7 +55,7 @@ class CandidateInterviewsTest extends TestCase
         $response = $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/interviews?view=list&period=upcoming&filter[search]=After');
+            ->getJson('/api/candidate/interviews?view=list&period=scheduled&filter[search]=After');
 
         $response
             ->assertOk()
@@ -66,7 +66,7 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.interviews.data.0.client.name', 'Charlotte Hamlin')
             ->assertJsonPath('data.interviews.data.0.date', '2026-01-18')
             ->assertJsonPath('data.interviews.data.0.time.range', '10:00 AM - 11:00 AM')
-            ->assertJsonPath('data.interviews.data.0.period', 'upcoming')
+            ->assertJsonPath('data.interviews.data.0.period', 'scheduled')
             ->assertJsonPath('data.interviews.data.0.meeting.type', 'google_meet')
             ->assertJsonPath('data.interviews.data.0.meeting.can_join', true);
     }
@@ -155,6 +155,155 @@ class CandidateInterviewsTest extends TestCase
             ->assertJsonPath('data.client.email', 'charlotte@example.com')
             ->assertJsonPath('data.job.city', 'Atlantic City')
             ->assertJsonPath('data.meeting.link', 'https://zoom.us/j/demo-link');
+    }
+
+    public function test_candidate_joining_meeting_auto_completes_interview_and_returns_link(): void
+    {
+        Carbon::setTestNow('2026-01-18 10:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $interview = $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'After School Nanny',
+            scheduledDate: '2026-01-18',
+            status: 'scheduled',
+            interviewType: 'zoom',
+            interviewLink: 'https://zoom.us/j/demo-link'
+        );
+
+        $response = $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/interviews/{$interview->id}/join");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.meeting_link', 'https://zoom.us/j/demo-link')
+            ->assertJsonPath('data.interview.status', 'completed')
+            ->assertJsonPath('data.interview.period', 'completed');
+
+        $this->assertSame('completed', $interview->fresh()->status);
+    }
+
+    public function test_candidate_cannot_join_interview_without_a_meeting_link(): void
+    {
+        Carbon::setTestNow('2026-01-18 10:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $interview = $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'In Person Meeting',
+            scheduledDate: '2026-01-18',
+            status: 'scheduled'
+        );
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/interviews/{$interview->id}/join")
+            ->assertStatus(422);
+
+        $this->assertSame('scheduled', $interview->fresh()->status);
+    }
+
+    public function test_candidate_cannot_join_an_interview_that_is_not_scheduled(): void
+    {
+        Carbon::setTestNow('2026-01-18 10:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $interview = $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Already Completed',
+            scheduledDate: '2026-01-10',
+            status: 'completed',
+            interviewType: 'zoom',
+            interviewLink: 'https://zoom.us/j/demo-link'
+        );
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/candidate/interviews/{$interview->id}/join")
+            ->assertStatus(422);
+    }
+
+    public function test_candidate_missed_period_returns_past_scheduled_interviews(): void
+    {
+        Carbon::setTestNow('2026-01-20 09:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $missed = $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Missed Meeting',
+            scheduledDate: '2026-01-15',
+            status: 'scheduled'
+        );
+
+        // A completed interview must not show under "missed".
+        $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Completed Meeting',
+            scheduledDate: '2026-01-14',
+            status: 'completed'
+        );
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/interviews?view=list&period=missed')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.interviews.data')
+            ->assertJsonPath('data.interviews.data.0.id', $missed->id)
+            ->assertJsonPath('data.interviews.data.0.period', 'missed');
+    }
+
+    public function test_candidate_completed_period_returns_only_completed_interviews(): void
+    {
+        Carbon::setTestNow('2026-01-20 09:00:00');
+
+        [$agency, $user, $candidate, $client] = $this->createCandidateScenario();
+
+        $completed = $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Completed Meeting',
+            scheduledDate: '2026-01-14',
+            status: 'completed'
+        );
+
+        // A past scheduled (missed) interview must not show under "completed".
+        $this->createInterview(
+            agency: $agency,
+            candidate: $candidate,
+            client: $client,
+            title: 'Missed Meeting',
+            scheduledDate: '2026-01-15',
+            status: 'scheduled'
+        );
+
+        $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson('/api/candidate/interviews?view=list&period=completed')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.interviews.data')
+            ->assertJsonPath('data.interviews.data.0.id', $completed->id)
+            ->assertJsonPath('data.interviews.data.0.period', 'completed');
     }
 
     public function test_candidate_does_not_see_requests_still_awaiting_the_agency(): void

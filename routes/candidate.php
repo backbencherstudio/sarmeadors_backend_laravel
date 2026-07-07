@@ -64,9 +64,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:candidate'])->prefix('candidat
     Route::delete('documents/additional/{candidateDocument}', [CandidateDocumentController::class, 'destroyAdditional']);
     Route::get('documents/files/{candidateDocument}/download', [CandidateDocumentController::class, 'downloadUploaded']);
 
-    // Interviews (read-only; the agency schedules and manages all interviews)
+    // Interviews (the agency schedules and manages all interviews; the candidate
+    // can only view and join — joining auto-completes the interview).
     Route::get('interviews', [CandidateInterviewController::class, 'index']);
     Route::get('interviews/{interview}', [CandidateInterviewController::class, 'show']);
+    Route::post('interviews/{interview}/join', [CandidateInterviewController::class, 'join']);
 
     // Requested jobs from clients
     Route::get('jobs/requested', [CandidateRequestedJobController::class, 'index']);

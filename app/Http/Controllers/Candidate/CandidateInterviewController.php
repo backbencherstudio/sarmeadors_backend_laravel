@@ -7,6 +7,7 @@ use App\Models\LongTermJob;
 use App\Models\LongTermJobInterview;
 use App\Traits\FormatsTime;
 use App\Traits\ResolvesCandidate;
+use App\Traits\SendsNotifications;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class CandidateInterviewController extends Controller
 {
     use FormatsTime;
     use ResolvesCandidate;
+    use SendsNotifications;
 
     // GET /candidate/interviews
     // view=list | view=calendar
@@ -75,10 +77,19 @@ class CandidateInterviewController extends Controller
             ->orderBy('scheduled_date')
             ->orderBy('available_from');
 
-        if ($filter === 'upcoming') {
+        if ($filter === 'scheduled' || $filter === 'upcoming') {
+            // "upcoming" is kept as a backwards-compatible alias for "scheduled".
             $query->where('scheduled_date', '>=', now()->toDateString())
                 ->where('status', 'scheduled');
+        } elseif ($filter === 'completed') {
+            // The candidate joined the meeting, which auto-completes the interview.
+            $query->where('status', 'completed');
+        } elseif ($filter === 'missed') {
+            // Still scheduled but the day has passed — the candidate never joined.
+            $query->where('status', 'scheduled')
+                ->where('scheduled_date', '<', now()->toDateString());
         } elseif ($filter === 'previous') {
+            // Backwards-compatible alias covering both completed and missed.
             $query->where(function ($q) {
                 $q->where('status', 'completed')
                     ->orWhere(function ($past) {
@@ -151,6 +162,47 @@ class CandidateInterviewController extends Controller
         );
     }
 
+    // POST /candidate/interviews/{interview}/join
+    // Joining the meeting auto-completes the interview and returns the link.
+    public function join(Request $request, LongTermJobInterview $interview): JsonResponse
+    {
+        $candidate = $this->resolveCandidate($request);
+
+        if (! $candidate) {
+            return $this->sendError('Candidate profile not found.', [], 404);
+        }
+
+        if ($interview->candidate_id !== $candidate->id || $interview->agency_id !== $request->current_agency->id) {
+            return $this->sendError('Not found.', [], 404);
+        }
+
+        if ($interview->status !== 'scheduled') {
+            return $this->sendError('This interview is not open to join.', [], 422);
+        }
+
+        if (blank($interview->interview_link)) {
+            return $this->sendError('No meeting link is available for this interview yet.', [], 422);
+        }
+
+        $interview->update(['status' => 'completed']);
+
+        $title = $interview->displayTitle();
+        $this->notifyAgencyAdmins(
+            $interview->agency_id,
+            'interview_completed',
+            'Interview Completed',
+            trim($candidate->first_name.' '.$candidate->last_name).' joined the interview'
+                .($title ? ' for "'.$title.'"' : '').', now marked as completed.',
+            null,
+            ['interview_id' => $interview->id, 'job_id' => $interview->long_term_job_id],
+        );
+
+        return $this->sendResponse([
+            'meeting_link' => $interview->interview_link,
+            'interview' => $this->formatInterview($interview->fresh()->load(['job', 'job.client', 'client', 'application'])),
+        ], 'Interview joined. It has been marked as completed.', 200);
+    }
+
     private function formatInterview(LongTermJobInterview $interview): array
     {
         $job = $interview->job;
@@ -178,6 +230,7 @@ class CandidateInterviewController extends Controller
                 'type' => $interview->interview_type,
                 'link' => $interview->interview_link,
                 'can_join' => $interview->status === 'scheduled' && filled($interview->interview_link),
+                'join_url' => '/api/candidate/interviews/'.$interview->id.'/join',
             ],
             'client' => [
                 'id' => $client?->id,
@@ -247,6 +300,7 @@ class CandidateInterviewController extends Controller
                 'type' => $interview->interview_type,
                 'link' => $interview->interview_link,
                 'can_join' => $canJoin,
+                'join_url' => '/api/candidate/interviews/'.$interview->id.'/join',
             ],
             'special_note' => $interview->special_note,
             'modal' => [
@@ -314,10 +368,15 @@ class CandidateInterviewController extends Controller
             return 'cancelled';
         }
 
-        if ($interview->status === 'completed' || $interview->scheduled_date?->isBefore(now()->startOfDay())) {
-            return 'previous';
+        if ($interview->status === 'completed') {
+            return 'completed';
         }
 
-        return 'upcoming';
+        // Still scheduled but the day has passed: the candidate never joined.
+        if ($interview->scheduled_date?->isBefore(now()->startOfDay())) {
+            return 'missed';
+        }
+
+        return 'scheduled';
     }
 }
