@@ -68,6 +68,15 @@ class FormBuilderService
             ['name' => 'type_id', 'type' => 'multi_select_checkbox', 'label' => 'User Type', 'is_required' => false],
             ['name' => 'location_id', 'type' => 'multi_select_checkbox', 'label' => 'Location', 'is_required' => false],
         ],
+        'candidate' => [
+            ['name' => 'first_name', 'type' => 'text_box', 'label' => 'First Name', 'is_required' => true],
+            ['name' => 'last_name', 'type' => 'text_box', 'label' => 'Last Name', 'is_required' => false],
+            ['name' => 'email', 'type' => 'email', 'label' => 'Email', 'is_required' => true],
+            ['name' => 'password', 'type' => 'password', 'label' => 'Password', 'is_required' => false],
+            ['name' => 'image', 'type' => 'file_upload', 'label' => 'Profile Image', 'is_required' => false],
+            ['name' => 'type_id', 'type' => 'multi_select_checkbox', 'label' => 'Candidate Type', 'is_required' => false],
+            ['name' => 'location_id', 'type' => 'multi_select_checkbox', 'label' => 'Location', 'is_required' => false],
+        ],
     ];
 
     /**
@@ -248,17 +257,43 @@ class FormBuilderService
     }
 
     /**
-     * Keep only the answers whose keys map to fillable columns of the target model.
+     * Columns a form submission must never set directly, regardless of the
+     * target model's $fillable or how a field happens to be named in the
+     * agency's schema — ownership, workflow and billing state are assigned
+     * by the agency/system, never by whoever is filling out the form.
+     *
+     * @var array<int, string>
+     */
+    private const PROTECTED_COLUMNS = [
+        'id', 'agency_id', 'user_id', 'client_id', 'candidate_id',
+        'status_id', 'tag_id', 'checklist_id', 'payment_status', 'stripe_customer_id',
+        'created_at', 'updated_at',
+    ];
+
+    /**
+     * Keep only the answers whose keys are both a fillable column of the
+     * target model AND actually part of this form's definition (its base
+     * fields or its configured schema fields) - never an arbitrary fillable
+     * column a submitter names that the form never asked for, and never a
+     * protected/ownership column no matter what it's named.
      *
      * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $schema
      * @param  array<string, mixed>  $answers
      * @return array<string, mixed>
      */
-    public function mapAnswersToColumns(string $modelClass, array $answers): array
+    public function mapAnswersToColumns(string $modelClass, string $entity, array $schema, array $answers): array
     {
-        $fillable = (new $modelClass)->getFillable();
+        $fillable = array_diff((new $modelClass)->getFillable(), self::PROTECTED_COLUMNS);
 
-        return array_intersect_key($answers, array_flip($fillable));
+        $formFieldNames = collect($this->baseFields($entity))->pluck('name')
+            ->merge(collect($this->flattenFields($schema))->pluck('name'))
+            ->filter()
+            ->unique();
+
+        $allowedKeys = array_intersect($fillable, $formFieldNames->all());
+
+        return array_intersect_key($answers, array_flip($allowedKeys));
     }
 
     /**

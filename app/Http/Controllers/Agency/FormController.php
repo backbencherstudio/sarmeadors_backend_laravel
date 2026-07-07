@@ -14,6 +14,18 @@ use Illuminate\Validation\Rule;
 
 class FormController extends Controller
 {
+    /**
+     * Entities that self-register with their own linked user account and are
+     * subject to an agency-wide capacity limit, mapped to the `agencies`
+     * columns tracking that limit.
+     *
+     * @var array<string, array{max: string, total: string}>
+     */
+    private const AGENCY_CAPACITY_COLUMNS = [
+        'client' => ['max' => 'max_clients', 'total' => 'total_clients'],
+        'candidate' => ['max' => 'max_candidates', 'total' => 'total_candidates'],
+    ];
+
     public function __construct(private FormBuilderService $builder) {}
 
     /**
@@ -212,19 +224,6 @@ class FormController extends Controller
             ], 422);
         }
 
-        $agency = null;
-
-        if ($entity === 'client') {
-            $agency = Agency::find($agencyId);
-
-            if ($agency && $agency->total_clients >= $agency->max_clients) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Client limit exceeded for this agency.',
-                ], 403);
-            }
-        }
-
         $schema = $form->schema ?? ['blocks' => []];
 
         $rules = $this->builder->validationRules($schema);
@@ -237,9 +236,25 @@ class FormController extends Controller
         DB::beginTransaction();
 
         try {
+            $agency = null;
+            $capacityColumns = self::AGENCY_CAPACITY_COLUMNS[$entity] ?? null;
+
+            if ($capacityColumns) {
+                $agency = Agency::where('id', $agencyId)->lockForUpdate()->first();
+
+                if ($agency && $agency->{$capacityColumns['total']} >= $agency->{$capacityColumns['max']}) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'status' => false,
+                        'message' => ucfirst($entity).' limit exceeded for this agency.',
+                    ], 403);
+                }
+            }
+
             $attributes = array_merge(
                 $this->builder->requiredColumnDefaults($entity),
-                $this->builder->mapAnswersToColumns($modelClass, $answers),
+                $this->builder->mapAnswersToColumns($modelClass, $entity, $schema, $answers),
             );
 
             $attributes['agency_id'] = $agencyId;
@@ -250,9 +265,9 @@ class FormController extends Controller
 
             $record = $modelClass::create($attributes);
 
-            if ($entity === 'client') {
+            if ($capacityColumns) {
                 if ($agency) {
-                    $agency->increment('total_clients');
+                    $agency->increment($capacityColumns['total']);
                 }
 
                 if (! empty($answers['password'])) {
@@ -317,9 +332,23 @@ class FormController extends Controller
             'candidate' => [
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:candidates,email',
+                'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.type_id' => 'nullable|array',
+                'answers.type_id.*' => [
+                    'integer',
+                    Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+                ],
+                'answers.location_id' => 'nullable|array',
+                'answers.location_id.*' => [
+                    'integer',
+                    Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+                ],
             ],
             'long_term_job' => [
-                'client_id' => 'required|exists:clients,id',
+                'client_id' => [
+                    'required',
+                    Rule::exists('clients', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+                ],
                 'answers.title' => 'required|string|max:255',
             ],
             default => [],
