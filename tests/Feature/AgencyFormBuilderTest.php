@@ -145,6 +145,115 @@ class AgencyFormBuilderTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_agency_can_move_a_section_to_a_later_position_in_its_block(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiSectionForm($user)->json('data');
+        $contactKey = $form['schema']['blocks'][0]['sections'][0]['key'];
+
+        // "Contact and Personal Info" (serial 1) -> serial 3, so it lands
+        // after "Professional Info" and "Additional Info", which both shift
+        // up by one.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/sections/{$contactKey}/serial", [
+                'serial' => 3,
+            ]);
+
+        $response->assertOk();
+
+        $sections = $response->json('data.schema.blocks.0.sections');
+        $this->assertSame(
+            ['Professional Info', 'Additional Info', 'Contact and Personal Info'],
+            array_column($sections, 'name')
+        );
+        $this->assertSame([1, 2, 3], array_column($sections, 'serial'));
+    }
+
+    public function test_agency_can_move_a_section_to_an_earlier_position_in_its_block(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiSectionForm($user)->json('data');
+        $additionalKey = $form['schema']['blocks'][0]['sections'][2]['key'];
+
+        // "Additional Info" (serial 3) -> serial 1.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/sections/{$additionalKey}/serial", [
+                'serial' => 1,
+            ]);
+
+        $response->assertOk();
+
+        $sections = $response->json('data.schema.blocks.0.sections');
+        $this->assertSame(
+            ['Additional Info', 'Contact and Personal Info', 'Professional Info'],
+            array_column($sections, 'name')
+        );
+    }
+
+    public function test_reorder_section_clamps_a_serial_beyond_the_block_size(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiSectionForm($user)->json('data');
+        $contactKey = $form['schema']['blocks'][0]['sections'][0]['key'];
+
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/sections/{$contactKey}/serial", [
+                'serial' => 999,
+            ]);
+
+        $response->assertOk();
+
+        $sections = $response->json('data.schema.blocks.0.sections');
+        $this->assertSame(
+            ['Professional Info', 'Additional Info', 'Contact and Personal Info'],
+            array_column($sections, 'name')
+        );
+    }
+
+    public function test_reorder_section_rejects_an_unknown_section_key(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiSectionForm($user)->json('data');
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/sections/not-a-real-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
+    public function test_reorder_section_is_scoped_to_the_authenticated_agency(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $otherAgency = Agency::create([
+            'name' => 'Other Agency',
+            'subdomain' => 'other-section-reorder.test',
+            'subdomain_prefix' => 'other-section-reorder',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $foreignForm = Form::create([
+            'agency_id' => $otherAgency->id,
+            'name' => 'Foreign Form',
+            'slug' => 'foreign-section-reorder-form',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'schema' => $this->registrationSchema(),
+        ]);
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$foreignForm->id}/sections/any-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
     public function test_rejects_unsupported_short_term_job_posting(): void
     {
         [, $user] = $this->createAgencyScenario();
@@ -625,6 +734,40 @@ class AgencyFormBuilderTest extends TestCase
                 ]],
             ]],
         ];
+    }
+
+    private function createMultiSectionForm(User $user)
+    {
+        return $this->actingAsAgency($user)->postJson('/api/agency/forms', [
+            'name' => 'Client Registration',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Personal Information',
+                    'sections' => [
+                        [
+                            'name' => 'Contact and Personal Info',
+                            'fields' => [
+                                ['type' => 'date_picker', 'label' => 'Date of Birth', 'name' => 'dob', 'is_required' => true],
+                            ],
+                        ],
+                        [
+                            'name' => 'Professional Info',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'Reference Name', 'name' => 'referrer_name'],
+                            ],
+                        ],
+                        [
+                            'name' => 'Additional Info',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'NID', 'name' => 'nid'],
+                            ],
+                        ],
+                    ],
+                ]],
+            ],
+        ]);
     }
 
     private function createAgencyScenario(): array

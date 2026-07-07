@@ -228,6 +228,48 @@ class FormBuilderService
     }
 
     /**
+     * Move the section with the given key to 1-based position
+     * $targetSerial within its own block, shifting the sections in between
+     * and renumbering the whole schema to match. Out-of-range positions
+     * clamp to the start/end of the block instead of failing.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>|null null if no section with that key exists in the schema
+     */
+    public function moveSection(array $schema, string $sectionKey, int $targetSerial): ?array
+    {
+        foreach ($schema['blocks'] ?? [] as $blockIndex => $block) {
+            $sections = array_values($block['sections'] ?? []);
+
+            $currentIndex = null;
+
+            foreach ($sections as $i => $section) {
+                if (($section['key'] ?? null) === $sectionKey) {
+                    $currentIndex = $i;
+                    break;
+                }
+            }
+
+            if ($currentIndex === null) {
+                continue;
+            }
+
+            $section = $sections[$currentIndex];
+            unset($sections[$currentIndex]);
+            $sections = array_values($sections);
+
+            $insertAt = max(0, min($targetSerial - 1, count($sections)));
+            array_splice($sections, $insertAt, 0, [$section]);
+
+            $schema['blocks'][$blockIndex]['sections'] = $sections;
+
+            return $this->normalizeSchema($schema);
+        }
+
+        return null;
+    }
+
+    /**
      * Flatten every field across the blocks/sections tree.
      *
      * @param  array<string, mixed>  $schema
