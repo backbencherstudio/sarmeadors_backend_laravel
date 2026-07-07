@@ -60,6 +60,12 @@ class CandidateMyJobStatusSeeder extends Seeder
      * Short-term covers every value in the status enum:
      * draft | pending_payment | pending_approval | marketplace | running | completed | cancelled | rejected
      *
+     * Only statuses reached after a hire (running, completed, cancelled) get the
+     * showcase candidate on candidate_id — earlier statuses (draft, pending_payment,
+     * pending_approval, marketplace) and rejected postings never had anyone hired,
+     * so leaving candidate_id set there falsely surfaces a "hired candidate" to
+     * clients for jobs no one was ever hired on.
+     *
      * @return array<int, ShortTermJob>
      */
     private function seedShortTermJobs(Agency $agency, Candidate $candidate, Client $client, ?Location $location): array
@@ -75,6 +81,8 @@ class CandidateMyJobStatusSeeder extends Seeder
             ['status' => 'rejected',         'title' => 'Status Showcase — Rejected (Short-Term)'],
         ];
 
+        $hiredStatuses = ['running', 'completed', 'cancelled'];
+
         $jobs = [];
         foreach ($configs as $config) {
             $jobs[] = ShortTermJob::firstOrCreate(
@@ -84,7 +92,7 @@ class CandidateMyJobStatusSeeder extends Seeder
                     'title' => $config['title'],
                 ],
                 [
-                    'candidate_id' => $candidate->id,
+                    'candidate_id' => in_array($config['status'], $hiredStatuses, true) ? $candidate->id : null,
                     'location_id' => $location?->id,
                     'description' => 'Candidate My Jobs status showcase ('.$config['status'].').',
                     'job_address' => '123 Status Lane',
@@ -114,6 +122,9 @@ class CandidateMyJobStatusSeeder extends Seeder
      * Long-term covers every value in the status enum:
      * pending_approval | marketplace | running | completed | cancelled | rejected
      *
+     * Only statuses reached after a hire (running, completed, cancelled) get the
+     * showcase candidate on candidate_id — see seedShortTermJobs() for why.
+     *
      * @return array<int, LongTermJob>
      */
     private function seedLongTermJobs(Agency $agency, Candidate $candidate, Client $client, ?Location $location): array
@@ -127,6 +138,8 @@ class CandidateMyJobStatusSeeder extends Seeder
             ['status' => 'rejected',         'title' => 'Status Showcase — Rejected (Long-Term)',          'start' => '+20 days',   'end' => '+300 days'],
         ];
 
+        $hiredStatuses = ['running', 'completed', 'cancelled'];
+
         $jobs = [];
         foreach ($configs as $config) {
             $jobs[] = LongTermJob::firstOrCreate(
@@ -136,7 +149,7 @@ class CandidateMyJobStatusSeeder extends Seeder
                     'title' => $config['title'],
                 ],
                 [
-                    'candidate_id' => $candidate->id,
+                    'candidate_id' => in_array($config['status'], $hiredStatuses, true) ? $candidate->id : null,
                     'location_id' => $location?->id,
                     'description' => 'Candidate My Jobs status showcase ('.$config['status'].').',
                     'job_address' => '456 Status Dr',
