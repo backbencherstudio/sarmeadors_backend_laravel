@@ -264,11 +264,11 @@ class CandidateInterviewsTest extends TestCase
         $this
             ->actingAs($user, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/candidate/interviews?view=list&status=missed')
+            ->getJson('/api/candidate/interviews?view=list&status=scheduled_missed')
             ->assertOk()
             ->assertJsonCount(1, 'data.interviews.data')
             ->assertJsonPath('data.interviews.data.0.id', $missed->id)
-            ->assertJsonPath('data.interviews.data.0.period', 'missed');
+            ->assertJsonPath('data.interviews.data.0.period', 'scheduled_missed');
     }
 
     public function test_candidate_completed_period_returns_only_completed_interviews(): void

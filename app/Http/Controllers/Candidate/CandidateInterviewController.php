@@ -84,7 +84,7 @@ class CandidateInterviewController extends Controller
         } elseif ($filter === 'completed') {
             // The candidate joined the meeting, which auto-completes the interview.
             $query->where('status', 'completed');
-        } elseif ($filter === 'missed') {
+        } elseif ($filter === 'scheduled_missed') {
             // Still scheduled but the day has passed — the candidate never joined.
             $query->where('status', 'scheduled')
                 ->where('scheduled_date', '<', now()->toDateString());
@@ -374,7 +374,7 @@ class CandidateInterviewController extends Controller
 
         // Still scheduled but the day has passed: the candidate never joined.
         if ($interview->scheduled_date?->isBefore(now()->startOfDay())) {
-            return 'missed';
+            return 'scheduled_missed';
         }
 
         return 'scheduled';
