@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Form;
 use App\Models\FormSubmission;
+use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -121,8 +122,23 @@ class FormController extends Controller
             ->where('status', true)
             ->firstOrFail();
 
+        $agency = $request->current_agency;
+
+        $admin = User::where('agency_id', $agency->id)
+            ->where('is_owner', 1)
+            ->first();
+
         $data = $form->toArray();
         $data['base_fields'] = $this->builder->baseFields($form->entity);
+        $data['agency'] = [
+            'id' => $agency->id,
+            'name' => $agency->name,
+            'logo' => $agency->logo,
+            'email' => $agency->email,
+            'mobile' => $agency->mobile,
+            'website' => $agency->website,
+            'admin_name' => $admin ? trim($admin->first_name.' '.$admin->last_name) : null,
+        ];
 
         return response()->json([
             'status' => true,
