@@ -9,7 +9,6 @@ use App\Models\Candidate;
 use App\Models\CandidateJobRequest;
 use App\Models\Client;
 use App\Models\ClientCandidate;
-use App\Models\LongTermJobReview;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobApplication;
 use App\Models\ShortTermJobReview;
@@ -79,23 +78,30 @@ class ShortTermJobApplicationController extends Controller
                 return $this->sendError('Not found.', [], 404);
             }
 
-            $candidate = Candidate::with('reviews')
-                ->where('agency_id', $request->current_agency->id)
+            $candidate = Candidate::where('agency_id', $request->current_agency->id)
                 ->find($applicationId);
 
             if (! $candidate) {
                 return $this->sendError('Candidate not found.', [], 404);
             }
 
-            $candidate->append(['image_url', 'average_rating', 'reviews_count']);
-
-            $reviews = LongTermJobReview::with('client')
+            // Short-term applicant context, so both the reviews block and the
+            // header rating reflect the candidate's short-term reviews (matching
+            // the candidate-reviews sub-route) rather than their long-term history.
+            $reviews = ShortTermJobReview::with('client')
                 ->where('candidate_id', $candidate->id)
                 ->where('agency_id', $request->current_agency->id)
                 ->latest()
                 ->get();
 
+            $averageRating = round((float) $reviews->avg('rating'), 1) ?: null;
             $myReview = $reviews->firstWhere('client_id', $client->id);
+
+            $candidateData = (new CandidateDetailResource($candidate))->toArray($request);
+            $candidateData['header']['rating'] = [
+                'average' => $averageRating,
+                'count' => $reviews->count(),
+            ];
 
             $application = ShortTermJobApplication::where('short_term_job_id', $shortTermJob->id)
                 ->where('candidate_id', $candidate->id)
@@ -111,9 +117,9 @@ class ShortTermJobApplicationController extends Controller
                 ->exists();
 
             return $this->sendResponse([
-                'candidate' => new CandidateDetailResource($candidate),
+                'candidate' => $candidateData,
                 'reviews' => [
-                    'average' => $candidate->average_rating,
+                    'average' => $averageRating,
                     'count' => $reviews->count(),
                     'my_review' => $myReview ? new CandidateReviewResource($myReview) : null,
                     'items' => CandidateReviewResource::collection($reviews),

@@ -7,6 +7,7 @@ use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\ShortTermJob;
 use App\Models\ShortTermJobDate;
+use App\Models\ShortTermJobReview;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -195,12 +196,27 @@ class ShortTermJobApplicationsTest extends TestCase
             ])
             ->assertCreated();
 
+        // A short-term review from this client must surface in the reviews block
+        // and drive the header rating (short-term context, not long-term).
+        ShortTermJobReview::create([
+            'short_term_job_id' => $job->id,
+            'candidate_id' => $candidate->id,
+            'client_id' => $client->id,
+            'agency_id' => $agency->id,
+            'rating' => 4,
+            'review' => 'Great with the kids.',
+        ]);
+
         $this->actingAs($clientUser, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')
             ->getJson("/api/client/jobs/short-term/{$job->id}/applicants/{$candidate->id}")
             ->assertOk()
             ->assertJsonPath('data.candidate.header.id', $candidate->id)
             ->assertJsonPath('data.candidate.header.name', 'Emily Stone')
+            ->assertJsonPath('data.candidate.header.rating.count', 1)
+            ->assertJsonPath('data.reviews.count', 1)
+            ->assertJsonPath('data.reviews.items.0.rating', 4)
+            ->assertJsonPath('data.reviews.my_review.rating', 4)
             ->assertJsonPath('data.candidate.personal_information.first_name', 'Emily')
             ->assertJsonStructure([
                 'data' => [
