@@ -7,9 +7,11 @@ use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\Location;
 use App\Models\LongTermJob;
+use App\Models\LongTermJobApplication;
 use App\Models\LongTermJobChild;
 use App\Models\LongTermJobSchedule;
 use App\Models\ShortTermJob;
+use App\Models\ShortTermJobApplication;
 use App\Models\ShortTermJobChild;
 use App\Models\ShortTermJobDate;
 use Illuminate\Database\Seeder;
@@ -48,6 +50,7 @@ class CandidateMyJobStatusSeeder extends Seeder
 
         $this->seedShortTermDatesAndChildren($shortTermJobs);
         $this->seedLongTermChildrenAndSchedules($longTermJobs);
+        $this->seedMarketplaceApplicants($agency, $shortTermJobs, $longTermJobs, $candidate);
 
         $this->command->info('CandidateMyJobStatus seeder completed.');
         $this->command->info(
@@ -234,6 +237,65 @@ class CandidateMyJobStatusSeeder extends Seeder
                         'end_time' => '18:00:00',
                     ]);
                 }
+            }
+        }
+    }
+
+    /**
+     * The marketplace showcase jobs have no hired candidate yet, so give them
+     * a few pending applicants — otherwise the client's Applicants tab has
+     * nothing to show for the one status where applicants actually matter.
+     *
+     * @param  array<int, ShortTermJob>  $shortTermJobs
+     * @param  array<int, LongTermJob>  $longTermJobs
+     */
+    private function seedMarketplaceApplicants(Agency $agency, array $shortTermJobs, array $longTermJobs, Candidate $excludeCandidate): void
+    {
+        $messages = [
+            'I am available for this booking and have great references from similar families.',
+            'I would love to help your family out. I have years of babysitting experience.',
+            'This schedule works perfectly for me. Happy to start right away.',
+        ];
+
+        $applicants = Candidate::where('agency_id', $agency->id)
+            ->where('id', '!=', $excludeCandidate->id)
+            ->orderBy('id')
+            ->take(3)
+            ->get();
+
+        $shortTermMarketplaceJob = collect($shortTermJobs)->firstWhere('status', 'marketplace');
+
+        if ($shortTermMarketplaceJob) {
+            foreach ($applicants as $index => $applicant) {
+                ShortTermJobApplication::firstOrCreate(
+                    [
+                        'short_term_job_id' => $shortTermMarketplaceJob->id,
+                        'candidate_id' => $applicant->id,
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'application_message' => $messages[$index % count($messages)],
+                        'status' => 'pending',
+                    ]
+                );
+            }
+        }
+
+        $longTermMarketplaceJob = collect($longTermJobs)->firstWhere('status', 'marketplace');
+
+        if ($longTermMarketplaceJob) {
+            foreach ($applicants as $index => $applicant) {
+                LongTermJobApplication::firstOrCreate(
+                    [
+                        'long_term_job_id' => $longTermMarketplaceJob->id,
+                        'candidate_id' => $applicant->id,
+                    ],
+                    [
+                        'agency_id' => $agency->id,
+                        'application_message' => $messages[$index % count($messages)],
+                        'status' => 'pending',
+                    ]
+                );
             }
         }
     }
