@@ -8,10 +8,20 @@ use App\Models\FormSubmission;
 use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CandidateProfileController extends Controller
 {
+    /**
+     * Base field keys handled as direct `candidates` table columns rather
+     * than dynamic schema answers - kept in sync with
+     * FormBuilderService::baseFields('candidate'), minus `password`.
+     *
+     * @var array<int, string>
+     */
+    private const BASIC_INFORMATION_KEYS = ['first_name', 'last_name', 'email', 'image', 'type_id', 'location_id'];
+
     public function __construct(private FormBuilderService $builder) {}
 
     // GET /agency/candidates/{id}/profile
@@ -21,16 +31,9 @@ class CandidateProfileController extends Controller
 
         $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = FormSubmission::where('entity_type', 'candidate')
-            ->where('entity_id', $candidate->id)
-            ->whereHas('form', fn ($q) => $q->where('agency_id', $agencyId)
-                ->where('application_type', 'registration')
-                ->where('user_type', 'candidate'))
-            ->with('form')
-            ->latest()
-            ->first();
+        $submission = $this->registrationSubmission($candidate, $agencyId);
 
-        $answers = (array) ($submission->data ?? []);
+        $answers = (array) ($submission?->data ?? []);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
         $basicInformationFields = collect($this->builder->baseFields('candidate'))
@@ -40,7 +43,7 @@ class CandidateProfileController extends Controller
                 'label' => $field['label'],
                 'type' => $field['type'],
                 'is_required' => $field['is_required'],
-                'value' => $candidate->{$field['name']},
+                'value' => $field['name'] === 'image' ? $candidate->image_url : $candidate->{$field['name']},
             ])
             ->values();
 
@@ -94,64 +97,64 @@ class CandidateProfileController extends Controller
 
         $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
 
-        $data = $request->validate([
-            // Personal information
+        $submission = $this->registrationSubmission($candidate, $agencyId);
+        $schema = $submission?->form?->schema ?? ['blocks' => []];
+
+        $basicRules = [
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|nullable|string|max:255',
             'email' => ['sometimes', 'required', 'email', Rule::unique('candidates', 'email')->ignore($candidate->id)],
-            'date_of_birth' => 'sometimes|nullable|date',
-            'nationality' => 'sometimes|nullable|string|max:100',
-            'phone_number' => 'sometimes|nullable|string|max:20',
+            'image' => 'sometimes|nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
+            'type_id' => 'sometimes|nullable|array',
+            'type_id.*' => [
+                'integer',
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+            ],
+            'location_id' => 'sometimes|nullable|array',
+            'location_id.*' => [
+                'integer',
+                Rule::exists('locations', 'id')->where('agency_id', $agencyId),
+            ],
+        ];
 
-            // Address
-            'street_address' => 'sometimes|nullable|string|max:255',
-            'city' => 'sometimes|nullable|string|max:100',
-            'province' => 'sometimes|nullable|string|max:100',
-            'postal_code' => 'sometimes|nullable|string|max:20',
-            'country' => 'sometimes|nullable|string|max:100',
+        $dynamicRules = $this->dynamicValidationRules($schema);
 
-            // Professional information
-            'hours_per_week' => 'sometimes|nullable|string|max:100',
-            'bilingual' => 'sometimes|nullable|string|max:100',
-            'pay_range_per_hour' => 'sometimes|nullable|string|max:100',
-            'start_date' => 'sometimes|nullable|date',
-            'last_position_end_reason' => 'sometimes|nullable|string',
+        // Hard-coded basic-information rules win if a schema field happens
+        // to reuse one of those reserved names.
+        $data = $request->validate(array_merge($dynamicRules, $basicRules));
 
-            // Reference
-            'reference_first_name' => 'sometimes|nullable|string|max:255',
-            'reference_last_name' => 'sometimes|nullable|string|max:255',
-            'reference_phone' => 'sometimes|nullable|string|max:20',
-            'reference_email' => 'sometimes|nullable|email|max:255',
-            'reference_relation' => 'sometimes|nullable|string|max:100',
-            'reference_description' => 'sometimes|nullable|string',
+        $basicData = array_intersect_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
+        $dynamicData = array_diff_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
 
-            // Additional information
-            'interested_in_iowa' => 'sometimes|nullable|boolean',
-            'years_of_experience' => ['sometimes', 'nullable', Rule::in(['2-5', '5-10', '10+'])],
-            'commitment' => ['sometimes', 'nullable', Rule::in(['long_term', 'short_term', 'temporary'])],
-            'available_for' => 'sometimes|nullable|array',
-            'drivers_license' => ['sometimes', 'nullable', Rule::in(['dl_and_car', 'dl_only', 'neither'])],
-            'cpr_first_aid' => ['sometimes', 'nullable', Rule::in(['yes', 'willing', 'no'])],
-            'vaccinations' => ['sometimes', 'nullable', Rule::in(['yes', 'willing', 'no'])],
-            'ok_with_pets' => ['sometimes', 'nullable', Rule::in(['dog', 'cat', 'neither'])],
-            'ok_with_travel' => ['sometimes', 'nullable', Rule::in(['domestic', 'international', 'no_travel'])],
-            'work_legally_in_us' => 'sometimes|nullable|boolean',
-            'comfortable_paid_legally' => 'sometimes|nullable|boolean',
-            'has_ssn' => 'sometimes|nullable|boolean',
-        ]);
+        if ($request->hasFile('image')) {
+            if ($candidate->image) {
+                Storage::disk('public')->delete($candidate->image);
+            }
 
-        // phone_number in the request maps to mobile on the model
-        if (array_key_exists('phone_number', $data)) {
-            $data['mobile'] = $data['phone_number'];
-            unset($data['phone_number']);
+            $basicData['image'] = $request->file('image')->store('candidates', 'public');
+        } else {
+            unset($basicData['image']);
         }
 
         // Capture old email before the update so we can find the linked user
         $oldEmail = $candidate->email;
 
-        $candidate->update($data);
+        if ($basicData) {
+            $candidate->update($basicData);
+        }
 
-        $userUpdate = array_intersect_key($data, array_flip(['first_name', 'last_name', 'email', 'mobile']));
+        if ($submission && $dynamicData) {
+            $submission->data = array_merge((array) $submission->data, $dynamicData);
+            $submission->save();
+
+            $columnUpdates = $this->builder->mapAnswersToColumns(Candidate::class, 'candidate', $schema, $dynamicData);
+
+            if ($columnUpdates) {
+                $candidate->update($columnUpdates);
+            }
+        }
+
+        $userUpdate = array_intersect_key($basicData, array_flip(['first_name', 'last_name', 'email']));
         if ($userUpdate) {
             User::where('email', $oldEmail)
                 ->where('agency_id', $agencyId)
@@ -162,5 +165,73 @@ class CandidateProfileController extends Controller
             'status' => true,
             'message' => 'Profile updated successfully',
         ]);
+    }
+
+    /**
+     * The candidate's most recent registration-form submission, whose
+     * schema and answers drive both the profile display and its updates.
+     */
+    private function registrationSubmission(Candidate $candidate, int $agencyId): ?FormSubmission
+    {
+        return FormSubmission::where('entity_type', 'candidate')
+            ->where('entity_id', $candidate->id)
+            ->whereHas('form', fn ($q) => $q->where('agency_id', $agencyId)
+                ->where('application_type', 'registration')
+                ->where('user_type', 'candidate'))
+            ->with('form')
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Validation rules for a partial update of the schema's dynamic answers:
+     * "sometimes" so unmentioned fields are left alone, but a required
+     * field can't be blanked out once it is mentioned.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, string>
+     */
+    private function dynamicValidationRules(array $schema): array
+    {
+        $rules = [];
+
+        foreach ($this->builder->flattenFields($schema) as $field) {
+            $name = $field['name'] ?? null;
+
+            if (! $name) {
+                continue;
+            }
+
+            $fieldRules = [($field['is_required'] ?? false) ? 'required' : 'nullable'];
+
+            switch ($field['type'] ?? null) {
+                case 'email':
+                    $fieldRules[] = 'email';
+                    break;
+                case 'date_picker':
+                case 'month_picker':
+                case 'year_picker':
+                    $fieldRules[] = 'date';
+                    break;
+                case 'salary_range':
+                case 'multi_select_checkbox':
+                case 'checkbox_table':
+                case 'radio_table':
+                    $fieldRules[] = 'array';
+                    break;
+            }
+
+            $custom = $field['validation_rules'] ?? null;
+
+            if (is_string($custom) && $custom !== '') {
+                $fieldRules = array_merge($fieldRules, explode('|', $custom));
+            } elseif (is_array($custom)) {
+                $fieldRules = array_merge($fieldRules, $custom);
+            }
+
+            $rules[$name] = 'sometimes|'.implode('|', array_values(array_unique($fieldRules)));
+        }
+
+        return $rules;
     }
 }

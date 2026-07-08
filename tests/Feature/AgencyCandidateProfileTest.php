@@ -6,8 +6,12 @@ use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\Form;
 use App\Models\FormSubmission;
+use App\Models\Location;
+use App\Models\Type;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -24,6 +28,7 @@ class AgencyCandidateProfileTest extends TestCase
             'first_name' => 'Jamie',
             'last_name' => 'Lee',
             'email' => 'jamie@example.com',
+            'image' => 'candidates/avatar.jpg',
         ]);
 
         $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}/profile");
@@ -35,9 +40,13 @@ class AgencyCandidateProfileTest extends TestCase
             ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jamie')
             ->assertJsonCount(1, 'data.blocks');
 
+        // The image field returns the full public URL, not the raw storage path.
+        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
+        $this->assertSame($candidate->image_url, $fields['image']['value']);
+        $this->assertStringContainsString('candidates/avatar.jpg', $fields['image']['value']);
+
         // The password base field must never be exposed.
-        $keys = collect($response->json('data.blocks.0.sections.0.fields'))->pluck('key');
-        $this->assertNotContains('password', $keys);
+        $this->assertNotContains('password', $fields->keys());
     }
 
     public function test_show_returns_section_wise_registration_form_answers(): void
@@ -95,78 +104,135 @@ class AgencyCandidateProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
     }
 
-    public function test_update_personal_information(): void
+    public function test_update_changes_basic_information_fields(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
+        $type = Type::create(['agency_id' => $agency->id, 'name' => 'Nanny', 'type' => 'candidate']);
+        $location = Location::create(['agency_id' => $agency->id, 'location' => 'Chicago', 'status' => 1]);
         $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $linkedUser = User::where('agency_id', $agency->id)->where('email', 'jamie@example.com')->firstOrFail();
 
         $this->actingAsAgency($admin)->patchJson("/api/agency/candidates/{$candidate->id}/profile", [
             'first_name' => 'Kristin',
             'last_name' => 'Ben',
-            'phone_number' => '+14842918883',
-            'nationality' => 'American',
-            'street_address' => '26 Berkshire Ave.',
-            'city' => 'Atlantic City',
-            'province' => 'NJ',
-            'postal_code' => '08401',
-            'country' => 'USA',
+            'type_id' => [$type->id],
+            'location_id' => [$location->id],
         ])->assertOk();
 
         $candidate->refresh();
         $this->assertSame('Kristin', $candidate->first_name);
         $this->assertSame('Ben', $candidate->last_name);
-        $this->assertSame('+14842918883', $candidate->mobile);
-        $this->assertSame('Atlantic City', $candidate->city);
+        $this->assertSame([$type->id], $candidate->type_id);
+        $this->assertSame([$location->id], $candidate->location_id);
+        $this->assertSame('Kristin', $linkedUser->fresh()->first_name);
     }
 
-    public function test_update_professional_information_and_reference(): void
+    public function test_update_profile_picture_can_be_changed(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $file = UploadedFile::fake()->image('avatar.jpg');
+
+        // Real clients must POST (not PATCH) when uploading a file: PHP only
+        // parses multipart/form-data into $_FILES for POST requests, so a
+        // genuine PATCH silently drops the file even though this test's HTTP
+        // client wouldn't catch that (it injects files without going through
+        // PHP's request parsing).
+        $this->actingAsAgency($admin)
+            ->post("/api/agency/candidates/{$candidate->id}/profile", ['image' => $file], ['Content-Type' => 'multipart/form-data'])
+            ->assertOk();
+
+        $path = $candidate->fresh()->image;
+        $this->assertNotNull($path);
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_update_writes_dynamic_answers_into_the_registration_submission(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Professional Information',
+                    'sections' => [[
+                        'name' => 'Professional Information',
+                        'fields' => [
+                            // Reuses a real `candidates` column name, so it should also land on the model.
+                            ['type' => 'text_box', 'label' => 'Hours per Week', 'name' => 'hours_per_week'],
+                            // A purely agency-defined field with no matching column.
+                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['hours_per_week' => '30', 'position' => 'Nanny'],
+        ]);
+
         $this->actingAsAgency($admin)->patchJson("/api/agency/candidates/{$candidate->id}/profile", [
-            'hours_per_week' => '35',
-            'bilingual' => 'French',
-            'pay_range_per_hour' => '$18-$22',
-            'last_position_end_reason' => 'Contract ended',
-            'reference_first_name' => 'Jane',
-            'reference_last_name' => 'Smith',
-            'reference_phone' => '+15559876543',
-            'reference_email' => 'jane@example.com',
-            'reference_relation' => 'Supervisor',
-            'reference_description' => 'Highly recommended',
+            'hours_per_week' => '40',
+            'position' => 'Housekeeper',
         ])->assertOk();
 
-        $candidate->refresh();
-        $this->assertSame('35', $candidate->hours_per_week);
-        $this->assertSame('French', $candidate->bilingual);
-        $this->assertSame('Jane', $candidate->reference_first_name);
-        $this->assertSame('jane@example.com', $candidate->reference_email);
+        $submission->refresh();
+        $this->assertSame('40', $submission->data['hours_per_week']);
+        $this->assertSame('Housekeeper', $submission->data['position']);
+        $this->assertSame('40', $candidate->fresh()->hours_per_week);
     }
 
-    public function test_update_additional_information(): void
+    public function test_update_rejects_blanking_a_required_dynamic_field(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
         $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
-        $this->actingAsAgency($admin)->patchJson("/api/agency/candidates/{$candidate->id}/profile", [
-            'years_of_experience' => '5-10',
-            'commitment' => 'long_term',
-            'drivers_license' => 'dl_and_car',
-            'cpr_first_aid' => 'yes',
-            'vaccinations' => 'willing',
-            'ok_with_pets' => 'dog',
-            'ok_with_travel' => 'domestic',
-            'work_legally_in_us' => true,
-            'comfortable_paid_legally' => true,
-            'has_ssn' => true,
-        ])->assertOk();
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Professional Information',
+                    'sections' => [[
+                        'name' => 'Professional Information',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
 
-        $candidate->refresh();
-        $this->assertSame('5-10', $candidate->years_of_experience);
-        $this->assertSame('long_term', $candidate->commitment);
-        $this->assertTrue($candidate->work_legally_in_us);
-        $this->assertTrue($candidate->has_ssn);
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['position' => 'Nanny'],
+        ]);
+
+        $this->actingAsAgency($admin)
+            ->patchJson("/api/agency/candidates/{$candidate->id}/profile", ['position' => null])
+            ->assertStatus(422);
     }
 
     public function test_update_rejects_duplicate_email(): void
