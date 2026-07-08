@@ -111,6 +111,18 @@ class ShortTermJobApplicationsTest extends TestCase
         $this->assertSame($candidateOne->id, $job->candidate_id);
         $this->assertSame('running', $job->status);
 
+        // Job details now present the assigned candidate as a structured block
+        $this->actingAs($clientUser, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/client/jobs/short-term/{$job->id}")
+            ->assertOk()
+            ->assertJsonPath('data.candidate.header.id', $candidateOne->id)
+            ->assertJsonPath('data.candidate.header.name', 'Emily Stone')
+            ->assertJsonPath('data.candidate.personal_information.first_name', 'Emily')
+            ->assertJsonPath('data.candidate.personal_information.last_name', 'Stone')
+            ->assertJsonMissingPath('data.candidate.user_id')
+            ->assertJsonPath('data.assigned_candidate.id', $candidateOne->id);
+
         // Only one candidate can be hired per job
         $this->actingAs($clientUser, 'api')
             ->withHeader('X-Subdomain', 'sarmeadors')

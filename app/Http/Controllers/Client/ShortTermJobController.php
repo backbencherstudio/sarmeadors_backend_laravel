@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Client\CandidateDetailResource;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\ShortTermJob;
@@ -114,7 +115,14 @@ class ShortTermJobController extends Controller
             // details payload only carries the summary block.
             $shortTermJob->unsetRelation('applications');
 
-            return $this->sendResponse(array_merge($shortTermJob->toArray(), [
+            $jobData = $shortTermJob->toArray();
+            // Present the assigned candidate as the structured detail block
+            // instead of the raw model dump.
+            $jobData['candidate'] = $shortTermJob->candidate
+                ? (new CandidateDetailResource($shortTermJob->candidate))->toArray($request)
+                : null;
+
+            return $this->sendResponse(array_merge($jobData, [
                 'applicants' => $applicants,
                 'assigned_candidate' => $this->formatAssignedCandidate($shortTermJob),
                 'schedule_summary' => $this->formatScheduleSummary($shortTermJob),
