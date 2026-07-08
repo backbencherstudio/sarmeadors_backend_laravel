@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\FormSubmissionResource;
 use App\Models\Agency;
 use App\Models\AgencyCandidateGlobalSetting;
 use App\Models\Candidate;
@@ -434,7 +435,7 @@ class CandidateController extends Controller
         $agencyId = auth('api')->user()->agency_id;
 
         $candidate = Candidate::where('agency_id', $agencyId)
-            ->with(['submissions.values.field'])
+            ->with(['submissions.values.field', 'submissions.form'])
             ->findOrFail($id);
 
         $status = Status::where('agency_id', $agencyId)
@@ -460,7 +461,7 @@ class CandidateController extends Controller
                 ] : null,
                 'status_changed_at' => $statusSince,
                 'status_duration_label' => $this->formatStatusDuration($statusSince),
-                'submissions' => $candidate->submissions,
+                'submissions' => FormSubmissionResource::collection($candidate->submissions),
             ],
         ]);
     }
