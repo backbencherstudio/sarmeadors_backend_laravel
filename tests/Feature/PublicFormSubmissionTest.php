@@ -36,6 +36,36 @@ class PublicFormSubmissionTest extends TestCase
             ->assertJsonPath('data.base_fields.6.name', 'location_id');
     }
 
+    public function test_public_form_schema_includes_agency_and_admin_details(): void
+    {
+        [$agency, $form] = $this->createAgencyAndForm();
+
+        $owner = User::factory()->create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Alice',
+            'last_name' => 'Owner',
+            'email' => fake()->unique()->safeEmail(),
+            'is_owner' => 1,
+        ]);
+
+        // A non-owner staff member must not be picked as the admin.
+        User::factory()->create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Bob',
+            'last_name' => 'Staff',
+            'email' => fake()->unique()->safeEmail(),
+            'is_owner' => 0,
+        ]);
+
+        $this->withHeader('X-Subdomain', 'sarmeadors')
+            ->getJson("/api/forms/{$form->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.agency.id', $agency->id)
+            ->assertJsonPath('data.agency.name', $agency->name)
+            ->assertJsonPath('data.agency.email', $agency->email)
+            ->assertJsonPath('data.agency.admin_name', 'Alice Owner');
+    }
+
     public function test_visitor_cannot_view_a_disabled_forms_schema(): void
     {
         [, $form] = $this->createAgencyAndForm(status: false);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Form;
 use App\Models\FormSubmission;
+use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -121,8 +122,23 @@ class FormController extends Controller
             ->where('status', true)
             ->firstOrFail();
 
+        $agency = $request->current_agency;
+
+        $admin = User::where('agency_id', $agency->id)
+            ->where('is_owner', 1)
+            ->first();
+
         $data = $form->toArray();
         $data['base_fields'] = $this->builder->baseFields($form->entity);
+        $data['agency'] = [
+            'id' => $agency->id,
+            'name' => $agency->name,
+            'logo' => $agency->logo,
+            'email' => $agency->email,
+            'mobile' => $agency->mobile,
+            'website' => $agency->website,
+            'admin_name' => $admin ? trim($admin->first_name.' '.$admin->last_name) : null,
+        ];
 
         return response()->json([
             'status' => true,
@@ -164,6 +180,74 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Form updated successfully',
+            'data' => $form,
+        ]);
+    }
+
+    /**
+     * Move a schema field to a new position (1-based `serial`) within its
+     * own section, renumbering the rest of that section to match. Fields
+     * are identified by their `key` since they aren't separate rows.
+     */
+    public function reorderField(Request $request, $id, $key)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        $request->validate([
+            'serial' => 'required|integer|min:1',
+        ]);
+
+        $schema = $this->builder->moveField($form->schema ?? ['blocks' => []], $key, (int) $request->serial);
+
+        if ($schema === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Field not found in this form',
+            ], 404);
+        }
+
+        $form->schema = $schema;
+        $form->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Field reordered successfully',
+            'data' => $form,
+        ]);
+    }
+
+    /**
+     * Move a schema section to a new position (1-based `serial`) within its
+     * own block, renumbering the rest of that block to match. Sections are
+     * identified by their `key` since they aren't separate rows.
+     */
+    public function reorderSection(Request $request, $id, $key)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        $request->validate([
+            'serial' => 'required|integer|min:1',
+        ]);
+
+        $schema = $this->builder->moveSection($form->schema ?? ['blocks' => []], $key, (int) $request->serial);
+
+        if ($schema === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Section not found in this form',
+            ], 404);
+        }
+
+        $form->schema = $schema;
+        $form->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Section reordered successfully',
             'data' => $form,
         ]);
     }
