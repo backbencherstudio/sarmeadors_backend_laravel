@@ -185,6 +185,40 @@ class FormController extends Controller
     }
 
     /**
+     * Move a schema block to a new position (1-based `serial`) within the
+     * form, renumbering the rest of the schema to match. Blocks are
+     * identified by their `key` since they aren't separate rows.
+     */
+    public function reorderBlock(Request $request, $id, $key)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        $request->validate([
+            'serial' => 'required|integer|min:1',
+        ]);
+
+        $schema = $this->builder->moveBlock($form->schema ?? ['blocks' => []], $key, (int) $request->serial);
+
+        if ($schema === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Block not found in this form',
+            ], 404);
+        }
+
+        $form->schema = $schema;
+        $form->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Block reordered successfully',
+            'data' => $form,
+        ]);
+    }
+
+    /**
      * Move a schema field to a new position (1-based `serial`) within its
      * own section, renumbering the rest of that section to match. Fields
      * are identified by their `key` since they aren't separate rows.

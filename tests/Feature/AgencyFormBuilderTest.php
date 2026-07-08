@@ -254,6 +254,114 @@ class AgencyFormBuilderTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_agency_can_move_a_block_to_a_later_position_in_the_form(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiBlockForm($user)->json('data');
+        $personalKey = $form['schema']['blocks'][0]['key'];
+
+        // "Personal Information" (serial 1) -> serial 3, so it lands after
+        // "Professional Information" and "References", which both shift up by one.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$personalKey}/serial", [
+                'serial' => 3,
+            ]);
+
+        $response->assertOk();
+
+        $blocks = $response->json('data.schema.blocks');
+        $this->assertSame(
+            ['Professional Information', 'References', 'Personal Information'],
+            array_column($blocks, 'name')
+        );
+        $this->assertSame([1, 2, 3], array_column($blocks, 'serial'));
+    }
+
+    public function test_agency_can_move_a_block_to_an_earlier_position_in_the_form(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiBlockForm($user)->json('data');
+        $referencesKey = $form['schema']['blocks'][2]['key'];
+
+        // "References" (serial 3) -> serial 1.
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$referencesKey}/serial", [
+                'serial' => 1,
+            ]);
+
+        $response->assertOk();
+
+        $blocks = $response->json('data.schema.blocks');
+        $this->assertSame(
+            ['References', 'Personal Information', 'Professional Information'],
+            array_column($blocks, 'name')
+        );
+    }
+
+    public function test_reorder_block_clamps_a_serial_beyond_the_form_size(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiBlockForm($user)->json('data');
+        $personalKey = $form['schema']['blocks'][0]['key'];
+
+        $response = $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$personalKey}/serial", [
+                'serial' => 999,
+            ]);
+
+        $response->assertOk();
+
+        $blocks = $response->json('data.schema.blocks');
+        $this->assertSame(
+            ['Professional Information', 'References', 'Personal Information'],
+            array_column($blocks, 'name')
+        );
+    }
+
+    public function test_reorder_block_rejects_an_unknown_block_key(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $form = $this->createMultiBlockForm($user)->json('data');
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$form['id']}/blocks/not-a-real-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
+    public function test_reorder_block_is_scoped_to_the_authenticated_agency(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $otherAgency = Agency::create([
+            'name' => 'Other Agency',
+            'subdomain' => 'other-block-reorder.test',
+            'subdomain_prefix' => 'other-block-reorder',
+            'email' => fake()->unique()->safeEmail(),
+        ]);
+
+        $foreignForm = Form::create([
+            'agency_id' => $otherAgency->id,
+            'name' => 'Foreign Form',
+            'slug' => 'foreign-block-reorder-form',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'schema' => $this->registrationSchema(),
+        ]);
+
+        $this->actingAsAgency($user)
+            ->patchJson("/api/agency/forms/{$foreignForm->id}/blocks/any-key/serial", [
+                'serial' => 1,
+            ])
+            ->assertStatus(404);
+    }
+
     public function test_rejects_unsupported_short_term_job_posting(): void
     {
         [, $user] = $this->createAgencyScenario();
@@ -766,6 +874,46 @@ class AgencyFormBuilderTest extends TestCase
                         ],
                     ],
                 ]],
+            ],
+        ]);
+    }
+
+    private function createMultiBlockForm(User $user)
+    {
+        return $this->actingAsAgency($user)->postJson('/api/agency/forms', [
+            'name' => 'Candidate Registration',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'schema' => [
+                'blocks' => [
+                    [
+                        'name' => 'Personal Information',
+                        'sections' => [[
+                            'name' => 'Personal Information',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'First Name', 'name' => 'first_name'],
+                            ],
+                        ]],
+                    ],
+                    [
+                        'name' => 'Professional Information',
+                        'sections' => [[
+                            'name' => 'Professional Information',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'Years of Experience', 'name' => 'experience'],
+                            ],
+                        ]],
+                    ],
+                    [
+                        'name' => 'References',
+                        'sections' => [[
+                            'name' => 'References Information',
+                            'fields' => [
+                                ['type' => 'text_box', 'label' => 'Referer Name', 'name' => 'referer_name'],
+                            ],
+                        ]],
+                    ],
+                ],
             ],
         ]);
     }
