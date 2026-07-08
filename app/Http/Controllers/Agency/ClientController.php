@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\FormSubmissionResource;
 use App\Models\Agency;
 use App\Models\AgencyClientGlobalSetting;
 use App\Models\CheckList;
@@ -530,7 +531,7 @@ class ClientController extends Controller
         $agencyId = auth('api')->user()->agency_id;
 
         $client = Client::where('agency_id', $agencyId)
-            ->with(['submissions.values.field'])
+            ->with(['submissions.values.field', 'submissions.form'])
             ->findOrFail($id);
 
         $status = Status::where('agency_id', $agencyId)
@@ -564,7 +565,7 @@ class ClientController extends Controller
                 ] : null,
                 'status_changed_at' => $statusSince,
                 'status_duration_label' => $this->formatStatusDuration($statusSince),
-                'submissions' => $client->submissions,
+                'submissions' => FormSubmissionResource::collection($client->submissions),
             ],
         ]);
     }

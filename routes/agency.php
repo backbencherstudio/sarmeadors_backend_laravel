@@ -282,6 +282,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::get('/forms/{slug}', [FormController::class, 'show']);
     Route::put('/forms/{id}', [FormController::class, 'update']);
     Route::patch('/forms/{id}/status', [FormController::class, 'toggleStatus']);
+    Route::patch('/forms/{id}/blocks/{key}/serial', [FormController::class, 'reorderBlock']);
     Route::patch('/forms/{id}/fields/{key}/serial', [FormController::class, 'reorderField']);
     Route::patch('/forms/{id}/sections/{key}/serial', [FormController::class, 'reorderSection']);
     Route::post('/forms/{slug}/submit', [FormController::class, 'submit']);
@@ -349,7 +350,10 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
 
     // Candidate detail "Profile" tab
     Route::get('/candidates/{id}/profile', [CandidateProfileController::class, 'show']);
-    Route::patch('/candidates/{id}/profile', [CandidateProfileController::class, 'update']);
+    // POST is also accepted (not just PATCH): PHP only parses multipart/form-data
+    // bodies into $_FILES for POST, so an "image" upload via a real PATCH request
+    // is silently dropped. Postman/clients uploading a photo must use POST here.
+    Route::match(['patch', 'post'], '/candidates/{id}/profile', [CandidateProfileController::class, 'update']);
 
     // Candidate detail "Password" tab
     Route::get('/candidates/{id}/password', [CandidatePasswordController::class, 'show']);

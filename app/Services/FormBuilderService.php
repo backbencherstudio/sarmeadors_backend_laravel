@@ -228,6 +228,44 @@ class FormBuilderService
     }
 
     /**
+     * Move the block with the given key to 1-based position $targetSerial
+     * within the schema, shifting the blocks in between and renumbering the
+     * whole schema to match. Out-of-range positions clamp to the start/end
+     * of the schema instead of failing.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>|null null if no block with that key exists in the schema
+     */
+    public function moveBlock(array $schema, string $blockKey, int $targetSerial): ?array
+    {
+        $blocks = array_values($schema['blocks'] ?? []);
+
+        $currentIndex = null;
+
+        foreach ($blocks as $i => $block) {
+            if (($block['key'] ?? null) === $blockKey) {
+                $currentIndex = $i;
+                break;
+            }
+        }
+
+        if ($currentIndex === null) {
+            return null;
+        }
+
+        $block = $blocks[$currentIndex];
+        unset($blocks[$currentIndex]);
+        $blocks = array_values($blocks);
+
+        $insertAt = max(0, min($targetSerial - 1, count($blocks)));
+        array_splice($blocks, $insertAt, 0, [$block]);
+
+        $schema['blocks'] = $blocks;
+
+        return $this->normalizeSchema($schema);
+    }
+
+    /**
      * Move the section with the given key to 1-based position
      * $targetSerial within its own block, shifting the sections in between
      * and renumbering the whole schema to match. Out-of-range positions

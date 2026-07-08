@@ -7,6 +7,10 @@ use App\Models\AgencyClientGlobalSetting;
 use App\Models\Candidate;
 use App\Models\CheckList;
 use App\Models\Client;
+use App\Models\Form;
+use App\Models\FormField;
+use App\Models\FormFieldValue;
+use App\Models\FormSubmission;
 use App\Models\Location;
 use App\Models\Status;
 use App\Models\Tag;
@@ -312,6 +316,95 @@ class AgencyClientDashboardManagementTest extends TestCase
         $this->actingAsAgency($user)
             ->getJson("/api/agency/clients/{$foreignClient->id}")
             ->assertStatus(404);
+    }
+
+    public function test_client_show_labels_dynamic_form_submission_answers(): void
+    {
+        [$agency, $user] = $this->createAgencyScenario();
+
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Pristia', 'email' => 'pristia@example.com']);
+
+        // Legacy per-field submission: FormField + FormFieldValue rows.
+        $legacyForm = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Intake Form',
+            'slug' => 'client-intake-form',
+            'entity' => 'client',
+            'status' => true,
+        ]);
+
+        $careTypeField = FormField::create([
+            'form_id' => $legacyForm->id,
+            'label' => 'Care Type Needed',
+            'name' => 'care_type',
+            'type' => 'radio',
+            'options' => ['Full-Time', 'Part-Time'],
+            'placeholder' => null,
+            'is_required' => true,
+            'width' => 6,
+            'serial' => 1,
+        ]);
+
+        $legacySubmission = FormSubmission::create([
+            'form_id' => $legacyForm->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+        ]);
+
+        FormFieldValue::create([
+            'submission_id' => $legacySubmission->id,
+            'form_field_id' => $careTypeField->id,
+            'value' => 'Full-Time',
+        ]);
+
+        // Builder-based submission: JSON `data` payload resolved against the form's schema.
+        $builderForm = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Contact',
+                    'sections' => [[
+                        'name' => 'Contact Info',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Favorite Color', 'name' => 'favorite_color', 'placeholder' => 'e.g. Blue', 'is_required' => false, 'width' => 12],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $builderForm->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['favorite_color' => 'Blue'],
+        ]);
+
+        $response = $this->actingAsAgency($user)->getJson("/api/agency/clients/{$client->id}");
+
+        $response->assertOk();
+
+        $submissions = collect($response->json('data.submissions'));
+
+        $legacyAnswer = $submissions->firstWhere('form_id', $legacyForm->id)['answers'][0];
+        $this->assertSame('care_type', $legacyAnswer['key']);
+        $this->assertSame('Care Type Needed', $legacyAnswer['label']);
+        $this->assertSame('Full-Time', $legacyAnswer['value']);
+        $this->assertNull($legacyAnswer['placeholder']);
+        $this->assertTrue($legacyAnswer['is_required']);
+        $this->assertSame(6, $legacyAnswer['width']);
+
+        $builderAnswer = $submissions->firstWhere('form_id', $builderForm->id)['answers'][0];
+        $this->assertSame('favorite_color', $builderAnswer['key']);
+        $this->assertSame('Favorite Color', $builderAnswer['label']);
+        $this->assertSame('Blue', $builderAnswer['value']);
+        $this->assertSame('e.g. Blue', $builderAnswer['placeholder']);
+        $this->assertFalse($builderAnswer['is_required']);
+        $this->assertSame(12, $builderAnswer['width']);
     }
 
     public function test_client_update_status_records_status_changed_at(): void
