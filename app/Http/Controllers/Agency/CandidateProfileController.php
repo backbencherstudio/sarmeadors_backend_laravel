@@ -62,7 +62,7 @@ class CandidateProfileController extends Controller
                                 'placeholder' => $field['placeholder'] ?? null,
                                 'is_required' => (bool) ($field['is_required'] ?? false),
                                 'width' => $field['width'] ?? null,
-                                'value' => $answers[$field['name'] ?? ''] ?? null,
+                                'value' => $this->fieldValue($field, $answers[$field['name'] ?? ''] ?? null),
                             ])
                             ->values(),
                     ])
@@ -125,6 +125,9 @@ class CandidateProfileController extends Controller
 
         $basicData = array_intersect_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
         $dynamicData = array_diff_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
+        $dynamicData = $this->builder->storeDynamicFileAnswers(
+            $request, 'candidate', $schema, $dynamicData, (array) ($submission?->data ?? [])
+        );
 
         if ($request->hasFile('image')) {
             if ($candidate->image) {
@@ -165,6 +168,65 @@ class CandidateProfileController extends Controller
             'status' => true,
             'message' => 'Profile updated successfully',
         ]);
+    }
+
+    // DELETE /agency/candidates/{id}/profile/documents/{key}
+    public function destroyDocument(Request $request, $id, string $key)
+    {
+        $agencyId = auth('api')->user()->agency_id;
+
+        $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
+
+        $submission = $this->registrationSubmission($candidate, $agencyId);
+        $schema = $submission?->form?->schema ?? ['blocks' => []];
+
+        $field = collect($this->builder->flattenFields($schema))->firstWhere('name', $key);
+
+        if (! $field || ! in_array($field['type'] ?? null, ['file_upload', 'list_files'], true)) {
+            return response()->json(['status' => false, 'message' => 'Document field not found.'], 404);
+        }
+
+        $data = (array) ($submission?->data ?? []);
+        $current = $data[$key] ?? null;
+
+        if (! $current) {
+            return response()->json(['status' => false, 'message' => 'No file uploaded for this field.'], 404);
+        }
+
+        if ($field['type'] === 'list_files' && ($path = $request->input('path'))) {
+            Storage::disk('public')->delete($path);
+            $data[$key] = collect((array) $current)->reject(fn ($existing) => $existing === $path)->values()->all();
+        } else {
+            Storage::disk('public')->delete((array) $current);
+            $data[$key] = $field['type'] === 'list_files' ? [] : null;
+        }
+
+        $submission->data = $data;
+        $submission->save();
+
+        $columnUpdates = $this->builder->mapAnswersToColumns(Candidate::class, 'candidate', $schema, [$key => $data[$key]]);
+
+        if ($columnUpdates) {
+            $candidate->update($columnUpdates);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Document deleted successfully',
+        ]);
+    }
+
+    /**
+     * Resolve a schema field's display value, turning stored file path(s)
+     * into publicly accessible URLs for `file_upload`/`list_files` fields.
+     */
+    private function fieldValue(array $field, mixed $value): mixed
+    {
+        return match ($field['type'] ?? null) {
+            'file_upload' => $value ? asset('storage/'.$value) : null,
+            'list_files' => collect((array) $value)->filter()->map(fn ($path) => asset('storage/'.$path))->values()->all(),
+            default => $value,
+        };
     }
 
     /**
@@ -219,6 +281,14 @@ class CandidateProfileController extends Controller
                 case 'radio_table':
                     $fieldRules[] = 'array';
                     break;
+                case 'file_upload':
+                    $fieldRules[] = 'file';
+                    $fieldRules[] = 'mimes:pdf,jpg,jpeg,png,doc,docx';
+                    $fieldRules[] = 'max:5120';
+                    break;
+                case 'list_files':
+                    $fieldRules[] = 'array';
+                    break;
             }
 
             $custom = $field['validation_rules'] ?? null;
@@ -230,6 +300,10 @@ class CandidateProfileController extends Controller
             }
 
             $rules[$name] = 'sometimes|'.implode('|', array_values(array_unique($fieldRules)));
+
+            if (($field['type'] ?? null) === 'list_files') {
+                $rules["{$name}.*"] = 'sometimes|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120';
+            }
         }
 
         return $rules;

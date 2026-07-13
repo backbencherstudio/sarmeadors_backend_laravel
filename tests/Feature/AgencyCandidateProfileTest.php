@@ -104,6 +104,60 @@ class AgencyCandidateProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
     }
 
+    public function test_show_returns_full_urls_for_file_upload_and_list_files_answers(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'last_name' => 'Lee',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Documents',
+                    'sections' => [[
+                        'name' => 'Identity & Certification Documents',
+                        'fields' => [
+                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume'],
+                            ['type' => 'list_files', 'label' => 'Certificates', 'name' => 'certificates'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => [
+                'resume' => 'form-submissions/candidate/resume.pdf',
+                'certificates' => ['form-submissions/candidate/cert1.pdf', 'form-submissions/candidate/cert2.pdf'],
+            ],
+        ]);
+
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}/profile");
+
+        $fields = collect($response->json('data.blocks.1.sections.0.fields'))->keyBy('key');
+
+        $response->assertOk();
+        $this->assertSame(asset('storage/form-submissions/candidate/resume.pdf'), $fields['resume']['value']);
+        $this->assertSame([
+            asset('storage/form-submissions/candidate/cert1.pdf'),
+            asset('storage/form-submissions/candidate/cert2.pdf'),
+        ], $fields['certificates']['value']);
+    }
+
     public function test_update_changes_basic_information_fields(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
@@ -148,6 +202,190 @@ class AgencyCandidateProfileTest extends TestCase
         $path = $candidate->fresh()->image;
         $this->assertNotNull($path);
         Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_update_can_upload_a_dynamic_document_field(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Documents',
+                    'sections' => [[
+                        'name' => 'Identity & Certification Documents',
+                        'fields' => [
+                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['resume' => 'form-submissions/candidate/old-resume.pdf'],
+        ]);
+        Storage::disk('public')->put('form-submissions/candidate/old-resume.pdf', 'old contents');
+
+        $file = UploadedFile::fake()->create('resume.pdf', 128, 'application/pdf');
+
+        // Same PATCH-drops-files caveat as the profile-picture test above.
+        $this->actingAsAgency($admin)
+            ->post("/api/agency/candidates/{$candidate->id}/profile", ['resume' => $file], ['Content-Type' => 'multipart/form-data'])
+            ->assertOk();
+
+        $submission->refresh();
+        $this->assertNotNull($submission->data['resume']);
+        $this->assertNotSame('form-submissions/candidate/old-resume.pdf', $submission->data['resume']);
+        Storage::disk('public')->assertExists($submission->data['resume']);
+        Storage::disk('public')->assertMissing('form-submissions/candidate/old-resume.pdf');
+    }
+
+    public function test_admin_can_delete_a_candidates_uploaded_document(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Documents',
+                    'sections' => [[
+                        'name' => 'Identity & Certification Documents',
+                        'fields' => [
+                            ['type' => 'file_upload', 'label' => 'NID', 'name' => 'nid'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        Storage::disk('public')->put('form-submissions/candidate/nid.png', 'contents');
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['nid' => 'form-submissions/candidate/nid.png'],
+        ]);
+
+        $this->actingAsAgency($admin)
+            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/nid")
+            ->assertOk();
+
+        $submission->refresh();
+        $this->assertNull($submission->data['nid']);
+        Storage::disk('public')->assertMissing('form-submissions/candidate/nid.png');
+    }
+
+    public function test_deleting_a_document_returns_404_for_a_field_that_is_not_a_document(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Professional Information',
+                    'sections' => [[
+                        'name' => 'Professional Information',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['position' => 'Nanny'],
+        ]);
+
+        $this->actingAsAgency($admin)
+            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/position")
+            ->assertNotFound();
+    }
+
+    public function test_deleting_a_document_removes_only_the_requested_file_from_a_list_files_field(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Documents',
+                    'sections' => [[
+                        'name' => 'Identity & Certification Documents',
+                        'fields' => [
+                            ['type' => 'list_files', 'label' => 'Certificates', 'name' => 'certificates'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        Storage::disk('public')->put('form-submissions/candidate/cert1.pdf', 'contents');
+        Storage::disk('public')->put('form-submissions/candidate/cert2.pdf', 'contents');
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['certificates' => ['form-submissions/candidate/cert1.pdf', 'form-submissions/candidate/cert2.pdf']],
+        ]);
+
+        $this->actingAsAgency($admin)
+            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/certificates", [
+                'path' => 'form-submissions/candidate/cert1.pdf',
+            ])
+            ->assertOk();
+
+        $submission->refresh();
+        $this->assertSame(['form-submissions/candidate/cert2.pdf'], $submission->data['certificates']);
+        Storage::disk('public')->assertMissing('form-submissions/candidate/cert1.pdf');
+        Storage::disk('public')->assertExists('form-submissions/candidate/cert2.pdf');
     }
 
     public function test_update_writes_dynamic_answers_into_the_registration_submission(): void
