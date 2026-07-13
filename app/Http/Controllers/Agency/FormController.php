@@ -350,6 +350,7 @@ class FormController extends Controller
         $request->validate($rules);
 
         $answers = $request->input('answers', []);
+        $answers = $this->builder->storeFileAnswers($request, $entity, $schema, $answers);
 
         DB::beginTransaction();
 
@@ -436,6 +437,7 @@ class FormController extends Controller
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:clients,email',
                 'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.image' => 'nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
                 'answers.type_id' => 'nullable|array',
                 'answers.type_id.*' => [
                     'integer',
@@ -451,6 +453,7 @@ class FormController extends Controller
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:candidates,email',
                 'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.image' => 'nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
                 'answers.type_id' => 'nullable|array',
                 'answers.type_id.*' => [
                     'integer',

@@ -6,6 +6,10 @@ use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\LongTermJob;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FormBuilderService
@@ -364,6 +368,14 @@ class FormBuilderService
                 case 'radio_table':
                     $fieldRules[] = 'array';
                     break;
+                case 'file_upload':
+                    $fieldRules[] = 'file';
+                    $fieldRules[] = 'mimes:pdf,jpg,jpeg,png,doc,docx';
+                    $fieldRules[] = 'max:5120';
+                    break;
+                case 'list_files':
+                    $fieldRules[] = 'array';
+                    break;
             }
 
             $custom = $field['validation_rules'] ?? null;
@@ -375,6 +387,10 @@ class FormBuilderService
             }
 
             $rules["answers.{$name}"] = implode('|', array_values(array_unique($fieldRules)));
+
+            if (($field['type'] ?? null) === 'list_files') {
+                $rules["answers.{$name}.*"] = 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120';
+            }
         }
 
         return $rules;
@@ -418,6 +434,82 @@ class FormBuilderService
         $allowedKeys = array_intersect($fillable, $formFieldNames->all());
 
         return array_intersect_key($answers, array_flip($allowedKeys));
+    }
+
+    /**
+     * Field types whose answers arrive as uploaded files rather than plain
+     * values, mapped to whether the field accepts more than one file.
+     *
+     * @var array<string, bool>
+     */
+    private const FILE_FIELD_TYPES = [
+        'file_upload' => false,
+        'list_files' => true,
+    ];
+
+    /**
+     * Replace any uploaded files among a public registration submission's
+     * "answers" (base fields + schema fields, posted namespaced under
+     * "answers.*") with their saved storage path(s), so downstream code
+     * (column mapping, the submission's stored JSON) only ever deals with
+     * plain values instead of UploadedFile instances.
+     *
+     * @param  array<string, mixed>  $schema
+     * @param  array<string, mixed>  $answers
+     * @return array<string, mixed>
+     */
+    public function storeFileAnswers(Request $request, string $entity, array $schema, array $answers): array
+    {
+        $fields = collect($this->baseFields($entity))->merge($this->flattenFields($schema));
+
+        return $this->replaceUploadedFiles($request, $fields, $entity, $answers, 'answers.');
+    }
+
+    /**
+     * Replace any uploaded files among a schema's dynamic answers - posted
+     * flat, without an "answers." prefix, as by the agency-side profile
+     * update endpoints - with their saved storage path(s), deleting
+     * whatever file(s) previously occupied that field.
+     *
+     * @param  array<string, mixed>  $schema
+     * @param  array<string, mixed>  $answers
+     * @param  array<string, mixed>  $existingAnswers
+     * @return array<string, mixed>
+     */
+    public function storeDynamicFileAnswers(Request $request, string $entity, array $schema, array $answers, array $existingAnswers = []): array
+    {
+        return $this->replaceUploadedFiles($request, collect($this->flattenFields($schema)), $entity, $answers, '', $existingAnswers);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $fields
+     * @param  array<string, mixed>  $answers
+     * @param  array<string, mixed>  $existingAnswers
+     * @return array<string, mixed>
+     */
+    private function replaceUploadedFiles(Request $request, $fields, string $entity, array $answers, string $prefix, array $existingAnswers = []): array
+    {
+        $fileFields = $fields
+            ->filter(fn ($field) => array_key_exists($field['type'] ?? null, self::FILE_FIELD_TYPES))
+            ->pluck('type', 'name');
+
+        foreach ($fileFields as $name => $type) {
+            if (! $request->hasFile("{$prefix}{$name}")) {
+                continue;
+            }
+
+            $files = $request->file("{$prefix}{$name}");
+
+            $answers[$name] = self::FILE_FIELD_TYPES[$type]
+                ? collect(Arr::wrap($files))->map(fn ($file) => $file->store("form-submissions/{$entity}", 'public'))->all()
+                : $files->store("form-submissions/{$entity}", 'public');
+
+            if ($old = $existingAnswers[$name] ?? null) {
+                Storage::disk('public')->delete((array) $old);
+            }
+        }
+
+        return $answers;
     }
 
     /**
