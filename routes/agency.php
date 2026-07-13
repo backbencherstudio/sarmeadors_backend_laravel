@@ -354,6 +354,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     // bodies into $_FILES for POST, so an "image" upload via a real PATCH request
     // is silently dropped. Postman/clients uploading a photo must use POST here.
     Route::match(['patch', 'post'], '/candidates/{id}/profile', [CandidateProfileController::class, 'update']);
+    Route::delete('/candidates/{id}/profile/documents/{key}', [CandidateProfileController::class, 'destroyDocument']);
 
     // Candidate detail "Password" tab
     Route::get('/candidates/{id}/password', [CandidatePasswordController::class, 'show']);
