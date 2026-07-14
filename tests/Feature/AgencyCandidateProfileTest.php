@@ -158,6 +158,46 @@ class AgencyCandidateProfileTest extends TestCase
         ], $fields['certificates']['value']);
     }
 
+    public function test_candidate_detail_endpoint_returns_full_urls_for_uploaded_documents(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Documents',
+                    'sections' => [[
+                        'name' => 'Identity & Certification Documents',
+                        'fields' => [
+                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['resume' => 'form-submissions/candidate/resume.pdf'],
+        ]);
+
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}");
+
+        $response->assertOk();
+        $answers = collect($response->json('data.submissions.0.answers'))->keyBy('key');
+        $this->assertSame(asset('storage/form-submissions/candidate/resume.pdf'), $answers['resume']['value']);
+    }
+
     public function test_update_changes_basic_information_fields(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
