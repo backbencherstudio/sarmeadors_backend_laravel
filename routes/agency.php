@@ -23,6 +23,7 @@ use App\Http\Controllers\Agency\ClientDocumentController;
 use App\Http\Controllers\Agency\ClientGlobalSettingsController;
 use App\Http\Controllers\Agency\ClientNoteController;
 use App\Http\Controllers\Agency\ClientPasswordController;
+use App\Http\Controllers\Agency\ClientProfileController;
 use App\Http\Controllers\Agency\DocumentTemplateController;
 use App\Http\Controllers\Agency\FormController;
 use App\Http\Controllers\Agency\FormFieldController;
@@ -323,6 +324,16 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::patch('/clients/{id}/password', [ClientPasswordController::class, 'updatePassword']);
     Route::post('/clients/{id}/secondary-logins', [ClientPasswordController::class, 'storeSecondaryLogin']);
     Route::delete('/clients/{id}/secondary-logins/{loginId}', [ClientPasswordController::class, 'destroySecondaryLogin']);
+
+    // Client detail "Profile" tab: Basic Information + the client's dynamic
+    // registration-form answers, editable by the agency admin.
+    Route::get('/clients/{id}/profile', [ClientProfileController::class, 'show']);
+    // POST is also accepted (not just PATCH): PHP only parses multipart/form-data
+    // bodies into $_FILES for POST, so an "image"/document upload via a real
+    // PATCH request is silently dropped. Postman/clients uploading a file must
+    // use POST here.
+    Route::match(['patch', 'post'], '/clients/{id}/profile', [ClientProfileController::class, 'update']);
+    Route::delete('/clients/{id}/profile/documents/{key}', [ClientProfileController::class, 'destroyDocument']);
 
     Route::get('/candidates', [CandidateController::class, 'index']);
     Route::get('/candidates/status-statistics', [CandidateController::class, 'statusStatistics']);
