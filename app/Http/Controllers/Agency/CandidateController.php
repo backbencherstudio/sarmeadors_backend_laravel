@@ -461,7 +461,7 @@ class CandidateController extends Controller
                 ] : null,
                 'status_changed_at' => $statusSince,
                 'status_duration_label' => $this->formatStatusDuration($statusSince),
-                'submissions' => FormSubmissionResource::collection($candidate->submissions),
+                // 'submissions' => FormSubmissionResource::collection($candidate->submissions),
             ],
         ]);
     }

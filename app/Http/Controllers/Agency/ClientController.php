@@ -565,7 +565,7 @@ class ClientController extends Controller
                 ] : null,
                 'status_changed_at' => $statusSince,
                 'status_duration_label' => $this->formatStatusDuration($statusSince),
-                'submissions' => FormSubmissionResource::collection($client->submissions),
+                // 'submissions' => FormSubmissionResource::collection($client->submissions),
             ],
         ]);
     }
