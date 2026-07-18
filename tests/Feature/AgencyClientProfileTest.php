@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Agency;
-use App\Models\Candidate;
+use App\Models\Client;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use App\Models\Location;
@@ -16,22 +16,22 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
-class AgencyCandidateProfileTest extends TestCase
+class AgencyClientProfileTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_show_returns_basic_information_block_from_candidate_columns(): void
+    public function test_show_returns_basic_information_block_from_client_columns(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create([
+        $client = Client::create([
             'agency_id' => $agency->id,
             'first_name' => 'Jamie',
             'last_name' => 'Lee',
             'email' => 'jamie@example.com',
-            'image' => 'candidates/avatar.jpg',
+            'image' => 'clients/avatar.jpg',
         ]);
 
-        $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}/profile");
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/clients/{$client->id}/profile");
 
         $response->assertOk()
             ->assertJsonPath('data.form_id', null)
@@ -42,8 +42,8 @@ class AgencyCandidateProfileTest extends TestCase
 
         // The image field returns the full public URL, not the raw storage path.
         $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
-        $this->assertSame($candidate->image_url, $fields['image']['value']);
-        $this->assertStringContainsString('candidates/avatar.jpg', $fields['image']['value']);
+        $this->assertSame($client->image_url, $fields['image']['value']);
+        $this->assertStringContainsString('clients/avatar.jpg', $fields['image']['value']);
 
         // The password base field must never be exposed.
         $this->assertNotContains('password', $fields->keys());
@@ -52,7 +52,7 @@ class AgencyCandidateProfileTest extends TestCase
     public function test_show_returns_section_wise_registration_form_answers(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create([
+        $client = Client::create([
             'agency_id' => $agency->id,
             'first_name' => 'Jamie',
             'last_name' => 'Lee',
@@ -61,20 +61,20 @@ class AgencyCandidateProfileTest extends TestCase
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
-                    'name' => 'Reference',
+                    'name' => 'Household',
                     'sections' => [[
-                        'name' => 'Reference Details',
+                        'name' => 'Household Details',
                         'fields' => [
-                            ['type' => 'text_box', 'label' => 'Reference Name', 'name' => 'reference_name', 'is_required' => true],
-                            ['type' => 'text_box', 'label' => 'CPR Certified', 'name' => 'cpr'],
+                            ['type' => 'text_box', 'label' => 'Number of Children', 'name' => 'children_count', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'Care Type Needed', 'name' => 'care_type'],
                         ],
                     ]],
                 ]],
@@ -83,31 +83,31 @@ class AgencyCandidateProfileTest extends TestCase
 
         FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['reference_name' => 'John Doe', 'cpr' => 'Yes'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['children_count' => '2', 'care_type' => 'Full-Time'],
         ]);
 
-        $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}/profile");
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/clients/{$client->id}/profile");
 
         $response->assertOk()
             ->assertJsonPath('data.form_id', $form->id)
-            ->assertJsonPath('data.form_name', 'Candidate Registration')
+            ->assertJsonPath('data.form_name', 'Client Registration')
             ->assertJsonPath('data.blocks.0.name', 'Basic Information')
-            ->assertJsonPath('data.blocks.1.name', 'Reference')
-            ->assertJsonPath('data.blocks.1.sections.0.name', 'Reference Details')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.key', 'reference_name')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.label', 'Reference Name')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', 'John Doe')
+            ->assertJsonPath('data.blocks.1.name', 'Household')
+            ->assertJsonPath('data.blocks.1.sections.0.name', 'Household Details')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.key', 'children_count')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.label', 'Number of Children')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', '2')
             ->assertJsonPath('data.blocks.1.sections.0.fields.0.is_required', true)
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.key', 'cpr')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
+            ->assertJsonPath('data.blocks.1.sections.0.fields.1.key', 'care_type')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Full-Time');
     }
 
     public function test_show_returns_full_urls_for_file_upload_and_list_files_answers(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create([
+        $client = Client::create([
             'agency_id' => $agency->id,
             'first_name' => 'Jamie',
             'last_name' => 'Lee',
@@ -116,19 +116,19 @@ class AgencyCandidateProfileTest extends TestCase
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
                     'name' => 'Documents',
                     'sections' => [[
-                        'name' => 'Identity & Certification Documents',
+                        'name' => 'Identity Documents',
                         'fields' => [
-                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume'],
+                            ['type' => 'file_upload', 'label' => 'ID Proof', 'name' => 'id_proof'],
                             ['type' => 'list_files', 'label' => 'Certificates', 'name' => 'certificates'],
                         ],
                     ]],
@@ -138,46 +138,46 @@ class AgencyCandidateProfileTest extends TestCase
 
         FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
             'data' => [
-                'resume' => 'form-submissions/candidate/resume.pdf',
-                'certificates' => ['form-submissions/candidate/cert1.pdf', 'form-submissions/candidate/cert2.pdf'],
+                'id_proof' => 'form-submissions/client/id-proof.pdf',
+                'certificates' => ['form-submissions/client/cert1.pdf', 'form-submissions/client/cert2.pdf'],
             ],
         ]);
 
-        $response = $this->actingAsAgency($admin)->getJson("/api/agency/candidates/{$candidate->id}/profile");
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/clients/{$client->id}/profile");
 
         $fields = collect($response->json('data.blocks.1.sections.0.fields'))->keyBy('key');
 
         $response->assertOk();
-        $this->assertSame(asset('storage/form-submissions/candidate/resume.pdf'), $fields['resume']['value']);
+        $this->assertSame(asset('storage/form-submissions/client/id-proof.pdf'), $fields['id_proof']['value']);
         $this->assertSame([
-            asset('storage/form-submissions/candidate/cert1.pdf'),
-            asset('storage/form-submissions/candidate/cert2.pdf'),
+            asset('storage/form-submissions/client/cert1.pdf'),
+            asset('storage/form-submissions/client/cert2.pdf'),
         ], $fields['certificates']['value']);
     }
 
     public function test_update_changes_basic_information_fields(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $type = Type::create(['agency_id' => $agency->id, 'name' => 'Nanny', 'type' => 'candidate']);
+        $type = Type::create(['agency_id' => $agency->id, 'name' => 'Nanny', 'type' => 'client']);
         $location = Location::create(['agency_id' => $agency->id, 'location' => 'Chicago', 'status' => 1]);
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
         $linkedUser = User::where('agency_id', $agency->id)->where('email', 'jamie@example.com')->firstOrFail();
 
-        $this->actingAsAgency($admin)->patchJson("/api/agency/candidates/{$candidate->id}/profile", [
+        $this->actingAsAgency($admin)->patchJson("/api/agency/clients/{$client->id}/profile", [
             'first_name' => 'Kristin',
             'last_name' => 'Ben',
             'type_id' => [$type->id],
             'location_id' => [$location->id],
         ])->assertOk();
 
-        $candidate->refresh();
-        $this->assertSame('Kristin', $candidate->first_name);
-        $this->assertSame('Ben', $candidate->last_name);
-        $this->assertSame([$type->id], $candidate->type_id);
-        $this->assertSame([$location->id], $candidate->location_id);
+        $client->refresh();
+        $this->assertSame('Kristin', $client->first_name);
+        $this->assertSame('Ben', $client->last_name);
+        $this->assertSame([$type->id], $client->type_id);
+        $this->assertSame([$location->id], $client->location_id);
         $this->assertSame('Kristin', $linkedUser->fresh()->first_name);
     }
 
@@ -186,7 +186,7 @@ class AgencyCandidateProfileTest extends TestCase
         Storage::fake('public');
 
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $file = UploadedFile::fake()->image('avatar.jpg');
 
@@ -196,10 +196,10 @@ class AgencyCandidateProfileTest extends TestCase
         // client wouldn't catch that (it injects files without going through
         // PHP's request parsing).
         $this->actingAsAgency($admin)
-            ->post("/api/agency/candidates/{$candidate->id}/profile", ['image' => $file], ['Content-Type' => 'multipart/form-data'])
+            ->post("/api/agency/clients/{$client->id}/profile", ['image' => $file], ['Content-Type' => 'multipart/form-data'])
             ->assertOk();
 
-        $path = $candidate->fresh()->image;
+        $path = $client->fresh()->image;
         $this->assertNotNull($path);
         Storage::disk('public')->assertExists($path);
     }
@@ -209,23 +209,23 @@ class AgencyCandidateProfileTest extends TestCase
         Storage::fake('public');
 
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
                     'name' => 'Documents',
                     'sections' => [[
-                        'name' => 'Identity & Certification Documents',
+                        'name' => 'Identity Documents',
                         'fields' => [
-                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume'],
+                            ['type' => 'file_upload', 'label' => 'ID Proof', 'name' => 'id_proof'],
                         ],
                     ]],
                 ]],
@@ -234,92 +234,92 @@ class AgencyCandidateProfileTest extends TestCase
 
         $submission = FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['resume' => 'form-submissions/candidate/old-resume.pdf'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['id_proof' => 'form-submissions/client/old-id-proof.pdf'],
         ]);
-        Storage::disk('public')->put('form-submissions/candidate/old-resume.pdf', 'old contents');
+        Storage::disk('public')->put('form-submissions/client/old-id-proof.pdf', 'old contents');
 
-        $file = UploadedFile::fake()->create('resume.pdf', 128, 'application/pdf');
+        $file = UploadedFile::fake()->create('id-proof.pdf', 128, 'application/pdf');
 
         // Same PATCH-drops-files caveat as the profile-picture test above.
         $this->actingAsAgency($admin)
-            ->post("/api/agency/candidates/{$candidate->id}/profile", ['resume' => $file], ['Content-Type' => 'multipart/form-data'])
+            ->post("/api/agency/clients/{$client->id}/profile", ['id_proof' => $file], ['Content-Type' => 'multipart/form-data'])
             ->assertOk();
 
         $submission->refresh();
-        $this->assertNotNull($submission->data['resume']);
-        $this->assertNotSame('form-submissions/candidate/old-resume.pdf', $submission->data['resume']);
-        Storage::disk('public')->assertExists($submission->data['resume']);
-        Storage::disk('public')->assertMissing('form-submissions/candidate/old-resume.pdf');
+        $this->assertNotNull($submission->data['id_proof']);
+        $this->assertNotSame('form-submissions/client/old-id-proof.pdf', $submission->data['id_proof']);
+        Storage::disk('public')->assertExists($submission->data['id_proof']);
+        Storage::disk('public')->assertMissing('form-submissions/client/old-id-proof.pdf');
     }
 
-    public function test_admin_can_delete_a_candidates_uploaded_document(): void
+    public function test_admin_can_delete_a_clients_uploaded_document(): void
     {
         Storage::fake('public');
 
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
                     'name' => 'Documents',
                     'sections' => [[
-                        'name' => 'Identity & Certification Documents',
+                        'name' => 'Identity Documents',
                         'fields' => [
-                            ['type' => 'file_upload', 'label' => 'NID', 'name' => 'nid'],
+                            ['type' => 'file_upload', 'label' => 'ID Proof', 'name' => 'id_proof'],
                         ],
                     ]],
                 ]],
             ],
         ]);
 
-        Storage::disk('public')->put('form-submissions/candidate/nid.png', 'contents');
+        Storage::disk('public')->put('form-submissions/client/id-proof.png', 'contents');
 
         $submission = FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['nid' => 'form-submissions/candidate/nid.png'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['id_proof' => 'form-submissions/client/id-proof.png'],
         ]);
 
         $this->actingAsAgency($admin)
-            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/nid")
+            ->deleteJson("/api/agency/clients/{$client->id}/profile/documents/id_proof")
             ->assertOk();
 
         $submission->refresh();
-        $this->assertNull($submission->data['nid']);
-        Storage::disk('public')->assertMissing('form-submissions/candidate/nid.png');
+        $this->assertNull($submission->data['id_proof']);
+        Storage::disk('public')->assertMissing('form-submissions/client/id-proof.png');
     }
 
     public function test_deleting_a_document_returns_404_for_a_field_that_is_not_a_document(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
-                    'name' => 'Professional Information',
+                    'name' => 'Household',
                     'sections' => [[
-                        'name' => 'Professional Information',
+                        'name' => 'Household Details',
                         'fields' => [
-                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position'],
+                            ['type' => 'text_box', 'label' => 'Care Type Needed', 'name' => 'care_type'],
                         ],
                     ]],
                 ]],
@@ -328,13 +328,13 @@ class AgencyCandidateProfileTest extends TestCase
 
         FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['position' => 'Nanny'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Full-Time'],
         ]);
 
         $this->actingAsAgency($admin)
-            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/position")
+            ->deleteJson("/api/agency/clients/{$client->id}/profile/documents/care_type")
             ->assertNotFound();
     }
 
@@ -343,21 +343,21 @@ class AgencyCandidateProfileTest extends TestCase
         Storage::fake('public');
 
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
                     'name' => 'Documents',
                     'sections' => [[
-                        'name' => 'Identity & Certification Documents',
+                        'name' => 'Identity Documents',
                         'fields' => [
                             ['type' => 'list_files', 'label' => 'Certificates', 'name' => 'certificates'],
                         ],
@@ -366,51 +366,51 @@ class AgencyCandidateProfileTest extends TestCase
             ],
         ]);
 
-        Storage::disk('public')->put('form-submissions/candidate/cert1.pdf', 'contents');
-        Storage::disk('public')->put('form-submissions/candidate/cert2.pdf', 'contents');
+        Storage::disk('public')->put('form-submissions/client/cert1.pdf', 'contents');
+        Storage::disk('public')->put('form-submissions/client/cert2.pdf', 'contents');
 
         $submission = FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['certificates' => ['form-submissions/candidate/cert1.pdf', 'form-submissions/candidate/cert2.pdf']],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['certificates' => ['form-submissions/client/cert1.pdf', 'form-submissions/client/cert2.pdf']],
         ]);
 
         $this->actingAsAgency($admin)
-            ->deleteJson("/api/agency/candidates/{$candidate->id}/profile/documents/certificates", [
-                'path' => 'form-submissions/candidate/cert1.pdf',
+            ->deleteJson("/api/agency/clients/{$client->id}/profile/documents/certificates", [
+                'path' => 'form-submissions/client/cert1.pdf',
             ])
             ->assertOk();
 
         $submission->refresh();
-        $this->assertSame(['form-submissions/candidate/cert2.pdf'], $submission->data['certificates']);
-        Storage::disk('public')->assertMissing('form-submissions/candidate/cert1.pdf');
-        Storage::disk('public')->assertExists('form-submissions/candidate/cert2.pdf');
+        $this->assertSame(['form-submissions/client/cert2.pdf'], $submission->data['certificates']);
+        Storage::disk('public')->assertMissing('form-submissions/client/cert1.pdf');
+        Storage::disk('public')->assertExists('form-submissions/client/cert2.pdf');
     }
 
     public function test_update_writes_dynamic_answers_into_the_registration_submission(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
-                    'name' => 'Professional Information',
+                    'name' => 'Household',
                     'sections' => [[
-                        'name' => 'Professional Information',
+                        'name' => 'Household Details',
                         'fields' => [
-                            // Reuses a real `candidates` column name, so it should also land on the model.
-                            ['type' => 'text_box', 'label' => 'Hours per Week', 'name' => 'hours_per_week'],
+                            // Reuses a real `clients` column name, so it should also land on the model.
+                            ['type' => 'text_box', 'label' => 'Mobile', 'name' => 'mobile'],
                             // A purely agency-defined field with no matching column.
-                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'Care Type Needed', 'name' => 'care_type', 'is_required' => true],
                         ],
                     ]],
                 ]],
@@ -419,42 +419,42 @@ class AgencyCandidateProfileTest extends TestCase
 
         $submission = FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['hours_per_week' => '30', 'position' => 'Nanny'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['mobile' => '01710000000', 'care_type' => 'Full-Time'],
         ]);
 
-        $this->actingAsAgency($admin)->patchJson("/api/agency/candidates/{$candidate->id}/profile", [
-            'hours_per_week' => '40',
-            'position' => 'Housekeeper',
+        $this->actingAsAgency($admin)->patchJson("/api/agency/clients/{$client->id}/profile", [
+            'mobile' => '01720000000',
+            'care_type' => 'Part-Time',
         ])->assertOk();
 
         $submission->refresh();
-        $this->assertSame('40', $submission->data['hours_per_week']);
-        $this->assertSame('Housekeeper', $submission->data['position']);
-        $this->assertSame('40', $candidate->fresh()->hours_per_week);
+        $this->assertSame('01720000000', $submission->data['mobile']);
+        $this->assertSame('Part-Time', $submission->data['care_type']);
+        $this->assertSame('01720000000', $client->fresh()->mobile);
     }
 
     public function test_update_rejects_blanking_a_required_dynamic_field(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $form = Form::create([
             'agency_id' => $agency->id,
-            'name' => 'Candidate Registration',
-            'slug' => 'candidate-registration',
-            'entity' => 'candidate',
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
             'application_type' => 'registration',
-            'user_type' => 'candidate',
+            'user_type' => 'client',
             'status' => true,
             'schema' => [
                 'blocks' => [[
-                    'name' => 'Professional Information',
+                    'name' => 'Household',
                     'sections' => [[
-                        'name' => 'Professional Information',
+                        'name' => 'Household Details',
                         'fields' => [
-                            ['type' => 'text_box', 'label' => 'Position', 'name' => 'position', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'Care Type Needed', 'name' => 'care_type', 'is_required' => true],
                         ],
                     ]],
                 ]],
@@ -463,34 +463,34 @@ class AgencyCandidateProfileTest extends TestCase
 
         FormSubmission::create([
             'form_id' => $form->id,
-            'entity_id' => $candidate->id,
-            'entity_type' => 'candidate',
-            'data' => ['position' => 'Nanny'],
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Full-Time'],
         ]);
 
         $this->actingAsAgency($admin)
-            ->patchJson("/api/agency/candidates/{$candidate->id}/profile", ['position' => null])
+            ->patchJson("/api/agency/clients/{$client->id}/profile", ['care_type' => null])
             ->assertStatus(422);
     }
 
     public function test_update_rejects_duplicate_email(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
-        Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Other', 'email' => 'other@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        Client::create(['agency_id' => $agency->id, 'first_name' => 'Other', 'email' => 'other@example.com']);
 
         $this->actingAsAgency($admin)
-            ->patchJson("/api/agency/candidates/{$candidate->id}/profile", ['email' => 'other@example.com'])
+            ->patchJson("/api/agency/clients/{$client->id}/profile", ['email' => 'other@example.com'])
             ->assertStatus(422);
     }
 
-    public function test_update_accepts_same_email_for_same_candidate(): void
+    public function test_update_accepts_same_email_for_same_client(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();
-        $candidate = Candidate::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
+        $client = Client::create(['agency_id' => $agency->id, 'first_name' => 'Jamie', 'email' => 'jamie@example.com']);
 
         $this->actingAsAgency($admin)
-            ->patchJson("/api/agency/candidates/{$candidate->id}/profile", ['email' => 'jamie@example.com'])
+            ->patchJson("/api/agency/clients/{$client->id}/profile", ['email' => 'jamie@example.com'])
             ->assertOk();
     }
 
@@ -498,10 +498,10 @@ class AgencyCandidateProfileTest extends TestCase
     {
         [, $admin] = $this->createAgencyScenario();
         $otherAgency = Agency::create(['name' => 'Other', 'subdomain' => 'other.test', 'subdomain_prefix' => 'other', 'email' => fake()->unique()->safeEmail()]);
-        $foreignCandidate = Candidate::create(['agency_id' => $otherAgency->id, 'first_name' => 'Foreign', 'email' => 'foreign@example.com']);
+        $foreignClient = Client::create(['agency_id' => $otherAgency->id, 'first_name' => 'Foreign', 'email' => 'foreign@example.com']);
 
         $this->actingAsAgency($admin)
-            ->getJson("/api/agency/candidates/{$foreignCandidate->id}/profile")
+            ->getJson("/api/agency/clients/{$foreignClient->id}/profile")
             ->assertStatus(404);
     }
 

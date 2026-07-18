@@ -350,6 +350,7 @@ class FormController extends Controller
         $request->validate($rules);
 
         $answers = $request->input('answers', []);
+        $answers = $this->builder->storeFileAnswers($request, $entity, $schema, $answers);
 
         DB::beginTransaction();
 
@@ -436,6 +437,7 @@ class FormController extends Controller
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:clients,email',
                 'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.image' => 'nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
                 'answers.type_id' => 'nullable|array',
                 'answers.type_id.*' => [
                     'integer',
@@ -446,11 +448,19 @@ class FormController extends Controller
                     'integer',
                     Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
                 ],
+                'answers.mobile' => 'nullable|string|max:20',
+                'answers.nationality' => 'nullable|string|max:255',
+                'answers.street_address' => 'nullable|string|max:255',
+                'answers.city' => 'nullable|string|max:255',
+                'answers.province' => 'nullable|string|max:255',
+                'answers.postal_code' => 'nullable|string|max:20',
+                'answers.country' => 'nullable|string|max:255',
             ],
             'candidate' => [
                 'answers.first_name' => 'required|string|max:255',
                 'answers.email' => 'required|email|unique:candidates,email',
                 'answers.password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[a-zA-Z])(?=.*\d).+$/'],
+                'answers.image' => 'nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
                 'answers.type_id' => 'nullable|array',
                 'answers.type_id.*' => [
                     'integer',
@@ -461,6 +471,13 @@ class FormController extends Controller
                     'integer',
                     Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
                 ],
+                'answers.mobile' => 'nullable|string|max:20',
+                'answers.nationality' => 'nullable|string|max:255',
+                'answers.street_address' => 'nullable|string|max:255',
+                'answers.city' => 'nullable|string|max:255',
+                'answers.province' => 'nullable|string|max:255',
+                'answers.postal_code' => 'nullable|string|max:20',
+                'answers.country' => 'nullable|string|max:255',
             ],
             'long_term_job' => [
                 'client_id' => [

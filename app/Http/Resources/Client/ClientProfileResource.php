@@ -30,8 +30,14 @@ class ClientProfileResource extends JsonResource
             'last_name' => $this->last_name,
             'email' => $this->email,
             'mobile' => $this->mobile,
+            'nationality' => $this->nationality,
             'image_url' => $this->image_url,
             'locations' => $this->resolveLocations(),
+            'street_address' => $this->street_address,
+            'city' => $this->city,
+            'province' => $this->province,
+            'postal_code' => $this->postal_code,
+            'country' => $this->country,
         ];
     }
 

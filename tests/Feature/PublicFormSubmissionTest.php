@@ -12,7 +12,9 @@ use App\Models\Status;
 use App\Models\Type;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PublicFormSubmissionTest extends TestCase
@@ -33,7 +35,14 @@ class PublicFormSubmissionTest extends TestCase
             ->assertJsonPath('data.base_fields.3.name', 'password')
             ->assertJsonPath('data.base_fields.4.name', 'image')
             ->assertJsonPath('data.base_fields.5.name', 'type_id')
-            ->assertJsonPath('data.base_fields.6.name', 'location_id');
+            ->assertJsonPath('data.base_fields.6.name', 'location_id')
+            ->assertJsonPath('data.base_fields.7.name', 'mobile')
+            ->assertJsonPath('data.base_fields.8.name', 'nationality')
+            ->assertJsonPath('data.base_fields.9.name', 'street_address')
+            ->assertJsonPath('data.base_fields.10.name', 'city')
+            ->assertJsonPath('data.base_fields.11.name', 'province')
+            ->assertJsonPath('data.base_fields.12.name', 'postal_code')
+            ->assertJsonPath('data.base_fields.13.name', 'country');
     }
 
     public function test_public_form_schema_includes_agency_and_admin_details(): void
@@ -143,6 +152,65 @@ class PublicFormSubmissionTest extends TestCase
         $this->assertSame(['dob' => '1996-10-10'], $submission->data);
     }
 
+    public function test_visitor_can_upload_a_profile_image_and_a_document_on_self_registration(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $form] = $this->createAgencyAndForm();
+
+        $response = $this->withHeader('X-Subdomain', 'sarmeadors')
+            ->post("/api/forms/{$form->slug}/submit", [
+                'answers' => [
+                    'first_name' => 'Jane',
+                    'email' => fake()->unique()->safeEmail(),
+                    'dob' => '1996-10-10',
+                    'image' => UploadedFile::fake()->image('headshot.jpg'),
+                    'resume' => UploadedFile::fake()->create('resume.pdf', 128, 'application/pdf'),
+                ],
+            ]);
+
+        $response->assertCreated();
+
+        $client = Client::where('agency_id', $agency->id)->where('first_name', 'Jane')->firstOrFail();
+        $this->assertNotNull($client->image);
+        Storage::disk('public')->assertExists($client->image);
+
+        $submission = FormSubmission::where('entity_id', $client->id)->where('entity_type', 'client')->firstOrFail();
+        Storage::disk('public')->assertExists($submission->data['resume']);
+    }
+
+    public function test_visitor_can_submit_their_address_on_client_self_registration(): void
+    {
+        [$agency, $form] = $this->createAgencyAndForm();
+
+        $response = $this->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/forms/{$form->slug}/submit", [
+                'answers' => [
+                    'first_name' => 'Jane',
+                    'email' => fake()->unique()->safeEmail(),
+                    'dob' => '1996-10-10',
+                    'mobile' => '+14842918883',
+                    'nationality' => 'Americans',
+                    'street_address' => '26 Berkshire Ave.',
+                    'city' => 'Atlantic City',
+                    'province' => 'NJ',
+                    'postal_code' => '08401',
+                    'country' => 'USA',
+                ],
+            ]);
+
+        $response->assertCreated();
+
+        $client = Client::where('agency_id', $agency->id)->where('first_name', 'Jane')->firstOrFail();
+        $this->assertSame('+14842918883', $client->mobile);
+        $this->assertSame('Americans', $client->nationality);
+        $this->assertSame('26 Berkshire Ave.', $client->street_address);
+        $this->assertSame('Atlantic City', $client->city);
+        $this->assertSame('NJ', $client->province);
+        $this->assertSame('08401', $client->postal_code);
+        $this->assertSame('USA', $client->country);
+    }
+
     public function test_public_submission_rejects_type_id_and_location_id_from_another_agency(): void
     {
         [, $form] = $this->createAgencyAndForm();
@@ -250,7 +318,14 @@ class PublicFormSubmissionTest extends TestCase
             ->assertJsonPath('data.base_fields.3.name', 'password')
             ->assertJsonPath('data.base_fields.4.name', 'image')
             ->assertJsonPath('data.base_fields.5.name', 'type_id')
-            ->assertJsonPath('data.base_fields.6.name', 'location_id');
+            ->assertJsonPath('data.base_fields.6.name', 'location_id')
+            ->assertJsonPath('data.base_fields.7.name', 'mobile')
+            ->assertJsonPath('data.base_fields.8.name', 'nationality')
+            ->assertJsonPath('data.base_fields.9.name', 'street_address')
+            ->assertJsonPath('data.base_fields.10.name', 'city')
+            ->assertJsonPath('data.base_fields.11.name', 'province')
+            ->assertJsonPath('data.base_fields.12.name', 'postal_code')
+            ->assertJsonPath('data.base_fields.13.name', 'country');
     }
 
     public function test_visitor_can_self_register_as_a_candidate_without_authentication(): void
@@ -318,6 +393,65 @@ class PublicFormSubmissionTest extends TestCase
         $this->assertTrue(Hash::check('Sup3rSecret', $candidate->user->password));
     }
 
+    public function test_candidate_can_upload_a_profile_image_and_a_document_on_self_registration(): void
+    {
+        Storage::fake('public');
+
+        [$agency, $form] = $this->createCandidateAgencyAndForm();
+
+        $response = $this->withHeader('X-Subdomain', 'sarmeadors')
+            ->post("/api/forms/{$form->slug}/submit", [
+                'answers' => [
+                    'first_name' => 'Jane',
+                    'email' => fake()->unique()->safeEmail(),
+                    'dob' => '1996-10-10',
+                    'image' => UploadedFile::fake()->image('headshot.jpg'),
+                    'resume' => UploadedFile::fake()->create('resume.pdf', 128, 'application/pdf'),
+                ],
+            ]);
+
+        $response->assertCreated();
+
+        $candidate = Candidate::where('agency_id', $agency->id)->where('first_name', 'Jane')->firstOrFail();
+        $this->assertNotNull($candidate->image);
+        Storage::disk('public')->assertExists($candidate->image);
+
+        $submission = FormSubmission::where('entity_id', $candidate->id)->where('entity_type', 'candidate')->firstOrFail();
+        Storage::disk('public')->assertExists($submission->data['resume']);
+    }
+
+    public function test_candidate_can_submit_their_address_on_self_registration(): void
+    {
+        [$agency, $form] = $this->createCandidateAgencyAndForm();
+
+        $response = $this->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson("/api/forms/{$form->slug}/submit", [
+                'answers' => [
+                    'first_name' => 'Jane',
+                    'email' => fake()->unique()->safeEmail(),
+                    'dob' => '1996-10-10',
+                    'mobile' => '+14842918883',
+                    'nationality' => 'Americans',
+                    'street_address' => '26 Berkshire Ave.',
+                    'city' => 'Atlantic City',
+                    'province' => 'NJ',
+                    'postal_code' => '08401',
+                    'country' => 'USA',
+                ],
+            ]);
+
+        $response->assertCreated();
+
+        $candidate = Candidate::where('agency_id', $agency->id)->where('first_name', 'Jane')->firstOrFail();
+        $this->assertSame('+14842918883', $candidate->mobile);
+        $this->assertSame('Americans', $candidate->nationality);
+        $this->assertSame('26 Berkshire Ave.', $candidate->street_address);
+        $this->assertSame('Atlantic City', $candidate->city);
+        $this->assertSame('NJ', $candidate->province);
+        $this->assertSame('08401', $candidate->postal_code);
+        $this->assertSame('USA', $candidate->country);
+    }
+
     public function test_candidate_public_submission_rejects_type_id_from_another_agency(): void
     {
         [, $form] = $this->createCandidateAgencyAndForm();
@@ -371,6 +505,7 @@ class PublicFormSubmissionTest extends TestCase
                         'fields' => [
                             ['type' => 'date_picker', 'label' => 'Date of Birth', 'name' => 'dob', 'is_required' => true],
                             ['type' => 'text_box', 'label' => 'NID', 'name' => 'nid', 'is_required' => false],
+                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume', 'is_required' => false],
                         ],
                     ]],
                 ]],
@@ -407,6 +542,7 @@ class PublicFormSubmissionTest extends TestCase
                         'fields' => [
                             ['type' => 'date_picker', 'label' => 'Date of Birth', 'name' => 'dob', 'is_required' => true],
                             ['type' => 'text_box', 'label' => 'NID', 'name' => 'nid', 'is_required' => false],
+                            ['type' => 'file_upload', 'label' => 'Resume', 'name' => 'resume', 'is_required' => false],
                         ],
                     ]],
                 ]],

@@ -72,6 +72,34 @@ class ClientProfileTest extends TestCase
         Storage::disk('public')->assertExists($client->fresh()->image);
     }
 
+    public function test_client_can_update_profile_with_address(): void
+    {
+        [, $user, $client] = $this->createClientScenario();
+
+        $response = $this
+            ->actingAs($user, 'api')
+            ->withHeader('X-Subdomain', 'sarmeadors')
+            ->postJson('/api/client/profile', [
+                'nationality' => 'Americans',
+                'street_address' => '26 Berkshire Ave.',
+                'city' => 'Atlantic City',
+                'province' => 'NJ',
+                'postal_code' => '08401',
+                'country' => 'USA',
+            ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.nationality', 'Americans')
+            ->assertJsonPath('data.street_address', '26 Berkshire Ave.')
+            ->assertJsonPath('data.city', 'Atlantic City')
+            ->assertJsonPath('data.province', 'NJ')
+            ->assertJsonPath('data.postal_code', '08401')
+            ->assertJsonPath('data.country', 'USA');
+
+        $this->assertSame('Atlantic City', $client->fresh()->city);
+    }
+
     public function test_profile_update_rejects_locations_from_another_agency(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();

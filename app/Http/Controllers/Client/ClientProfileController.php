@@ -48,7 +48,13 @@ class ClientProfileController extends Controller
         }
 
         $user->update(collect($validated)->only(['first_name', 'last_name', 'mobile'])->toArray());
-        $client->update(collect($validated)->only(['first_name', 'last_name', 'mobile', 'location_id'])->toArray());
+
+        $clientFields = [
+            'first_name', 'last_name', 'mobile', 'nationality', 'location_id',
+            'street_address', 'city', 'province', 'postal_code', 'country',
+        ];
+
+        $client->update(collect($validated)->only($clientFields)->toArray());
 
         return $this->sendResponse(
             new ClientProfileResource($client->fresh(), $user->fresh()),

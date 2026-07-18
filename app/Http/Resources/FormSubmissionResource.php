@@ -33,7 +33,7 @@ class FormSubmissionResource extends JsonResource
                 'key' => $value->field->name ?? (string) $value->field->id,
                 'label' => $value->field->label,
                 'type' => $value->field->type,
-                'value' => $value->value,
+                'value' => $this->resolveValue($value->field->type, $value->value),
                 'placeholder' => $value->field->placeholder,
                 'is_required' => $value->field->is_required,
                 'width' => $value->field->width,
@@ -47,7 +47,7 @@ class FormSubmissionResource extends JsonResource
                 'key' => $key,
                 'label' => $field['label'] ?? Str::headline($key),
                 'type' => $field['type'] ?? null,
-                'value' => $value,
+                'value' => $this->resolveValue($field['type'] ?? null, $value),
                 'placeholder' => $field['placeholder'] ?? null,
                 'is_required' => (bool) ($field['is_required'] ?? false),
                 'width' => $field['width'] ?? null,
@@ -61,5 +61,19 @@ class FormSubmissionResource extends JsonResource
             'submitted_at' => $this->created_at,
             'answers' => $answers->values(),
         ];
+    }
+
+    /**
+     * Turn a stored file path (or list of paths) into publicly accessible
+     * URL(s) for `file_upload`/`list_files` answers; every other field type
+     * passes through unchanged.
+     */
+    private function resolveValue(?string $type, mixed $value): mixed
+    {
+        return match ($type) {
+            'file_upload' => $value ? asset('storage/'.$value) : null,
+            'list_files' => collect((array) $value)->filter()->map(fn ($path) => asset('storage/'.$path))->values()->all(),
+            default => $value,
+        };
     }
 }

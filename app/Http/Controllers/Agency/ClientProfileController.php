@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
-use App\Models\Candidate;
+use App\Models\Client;
 use App\Models\FormSubmission;
 use App\Models\User;
 use App\Services\FormBuilderService;
@@ -11,12 +11,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
-class CandidateProfileController extends Controller
+class ClientProfileController extends Controller
 {
     /**
-     * Base field keys handled as direct `candidates` table columns rather
+     * Base field keys handled as direct `clients` table columns rather
      * than dynamic schema answers - kept in sync with
-     * FormBuilderService::baseFields('candidate'), minus `password`.
+     * FormBuilderService::baseFields('client'), minus `password`.
      *
      * @var array<int, string>
      */
@@ -24,26 +24,26 @@ class CandidateProfileController extends Controller
 
     public function __construct(private FormBuilderService $builder) {}
 
-    // GET /agency/candidates/{id}/profile
+    // GET /agency/clients/{id}/profile
     public function show($id)
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($candidate, $agencyId);
+        $submission = $this->registrationSubmission($client, $agencyId);
 
         $answers = (array) ($submission?->data ?? []);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
-        $basicInformationFields = collect($this->builder->baseFields('candidate'))
+        $basicInformationFields = collect($this->builder->baseFields('client'))
             ->reject(fn ($field) => $field['name'] === 'password')
             ->map(fn ($field) => [
                 'key' => $field['name'],
                 'label' => $field['label'],
                 'type' => $field['type'],
                 'is_required' => $field['is_required'],
-                'value' => $field['name'] === 'image' ? $candidate->image_url : $candidate->{$field['name']},
+                'value' => $field['name'] === 'image' ? $client->image_url : $client->{$field['name']},
             ])
             ->values();
 
@@ -82,7 +82,7 @@ class CandidateProfileController extends Controller
         return response()->json([
             'status' => true,
             'data' => [
-                'id' => $candidate->id,
+                'id' => $client->id,
                 'form_id' => $submission?->form_id,
                 'form_name' => $submission?->form?->name,
                 'blocks' => $blocks,
@@ -90,25 +90,25 @@ class CandidateProfileController extends Controller
         ]);
     }
 
-    // PATCH /agency/candidates/{id}/profile
+    // PATCH /agency/clients/{id}/profile
     public function update(Request $request, $id)
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($candidate, $agencyId);
+        $submission = $this->registrationSubmission($client, $agencyId);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
         $basicRules = [
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|nullable|string|max:255',
-            'email' => ['sometimes', 'required', 'email', Rule::unique('candidates', 'email')->ignore($candidate->id)],
+            'email' => ['sometimes', 'required', 'email', Rule::unique('clients', 'email')->ignore($client->id)],
             'image' => 'sometimes|nullable|file|mimes:jpeg,jpg,png,gif|max:10240',
             'type_id' => 'sometimes|nullable|array',
             'type_id.*' => [
                 'integer',
-                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'candidate')),
+                Rule::exists('types', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)->where('type', 'client')),
             ],
             'location_id' => 'sometimes|nullable|array',
             'location_id.*' => [
@@ -126,34 +126,34 @@ class CandidateProfileController extends Controller
         $basicData = array_intersect_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
         $dynamicData = array_diff_key($data, array_flip(self::BASIC_INFORMATION_KEYS));
         $dynamicData = $this->builder->storeDynamicFileAnswers(
-            $request, 'candidate', $schema, $dynamicData, (array) ($submission?->data ?? [])
+            $request, 'client', $schema, $dynamicData, (array) ($submission?->data ?? [])
         );
 
         if ($request->hasFile('image')) {
-            if ($candidate->image) {
-                Storage::disk('public')->delete($candidate->image);
+            if ($client->image) {
+                Storage::disk('public')->delete($client->image);
             }
 
-            $basicData['image'] = $request->file('image')->store('candidates', 'public');
+            $basicData['image'] = $request->file('image')->store('clients', 'public');
         } else {
             unset($basicData['image']);
         }
 
         // Capture old email before the update so we can find the linked user
-        $oldEmail = $candidate->email;
+        $oldEmail = $client->email;
 
         if ($basicData) {
-            $candidate->update($basicData);
+            $client->update($basicData);
         }
 
         if ($submission && $dynamicData) {
             $submission->data = array_merge((array) $submission->data, $dynamicData);
             $submission->save();
 
-            $columnUpdates = $this->builder->mapAnswersToColumns(Candidate::class, 'candidate', $schema, $dynamicData);
+            $columnUpdates = $this->builder->mapAnswersToColumns(Client::class, 'client', $schema, $dynamicData);
 
             if ($columnUpdates) {
-                $candidate->update($columnUpdates);
+                $client->update($columnUpdates);
             }
         }
 
@@ -170,14 +170,14 @@ class CandidateProfileController extends Controller
         ]);
     }
 
-    // DELETE /agency/candidates/{id}/profile/documents/{key}
+    // DELETE /agency/clients/{id}/profile/documents/{key}
     public function destroyDocument(Request $request, $id, string $key)
     {
         $agencyId = auth('api')->user()->agency_id;
 
-        $candidate = Candidate::where('agency_id', $agencyId)->findOrFail($id);
+        $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($candidate, $agencyId);
+        $submission = $this->registrationSubmission($client, $agencyId);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
         $field = collect($this->builder->flattenFields($schema))->firstWhere('name', $key);
@@ -204,10 +204,10 @@ class CandidateProfileController extends Controller
         $submission->data = $data;
         $submission->save();
 
-        $columnUpdates = $this->builder->mapAnswersToColumns(Candidate::class, 'candidate', $schema, [$key => $data[$key]]);
+        $columnUpdates = $this->builder->mapAnswersToColumns(Client::class, 'client', $schema, [$key => $data[$key]]);
 
         if ($columnUpdates) {
-            $candidate->update($columnUpdates);
+            $client->update($columnUpdates);
         }
 
         return response()->json([
@@ -230,16 +230,16 @@ class CandidateProfileController extends Controller
     }
 
     /**
-     * The candidate's most recent registration-form submission, whose
+     * The client's most recent registration-form submission, whose
      * schema and answers drive both the profile display and its updates.
      */
-    private function registrationSubmission(Candidate $candidate, int $agencyId): ?FormSubmission
+    private function registrationSubmission(Client $client, int $agencyId): ?FormSubmission
     {
-        return FormSubmission::where('entity_type', 'candidate')
-            ->where('entity_id', $candidate->id)
+        return FormSubmission::where('entity_type', 'client')
+            ->where('entity_id', $client->id)
             ->whereHas('form', fn ($q) => $q->where('agency_id', $agencyId)
                 ->where('application_type', 'registration')
-                ->where('user_type', 'candidate'))
+                ->where('user_type', 'client'))
             ->with('form')
             ->latest()
             ->first();

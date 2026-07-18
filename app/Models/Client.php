@@ -17,9 +17,17 @@ class Client extends Model
         'email',
         'stripe_customer_id',
         'mobile',
+        'nationality',
         'image',
         'hear_about_us',
         'payment_status',
+
+        // Address
+        'street_address',
+        'city',
+        'province',
+        'postal_code',
+        'country',
 
         'type_id',
         'location_id',
