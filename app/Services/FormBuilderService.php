@@ -71,6 +71,13 @@ class FormBuilderService
             ['name' => 'image', 'type' => 'file_upload', 'label' => 'Profile Image', 'is_required' => false],
             ['name' => 'type_id', 'type' => 'multi_select_checkbox', 'label' => 'User Type', 'is_required' => false],
             ['name' => 'location_id', 'type' => 'multi_select_checkbox', 'label' => 'Location', 'is_required' => false],
+            ['name' => 'mobile', 'type' => 'text_box', 'label' => 'Phone Number', 'is_required' => false],
+            ['name' => 'nationality', 'type' => 'text_box', 'label' => 'Nationality', 'is_required' => false],
+            ['name' => 'street_address', 'type' => 'text_box', 'label' => 'Street Address', 'is_required' => false],
+            ['name' => 'city', 'type' => 'text_box', 'label' => 'City', 'is_required' => false],
+            ['name' => 'province', 'type' => 'text_box', 'label' => 'Province/State', 'is_required' => false],
+            ['name' => 'postal_code', 'type' => 'text_box', 'label' => 'Postal Code', 'is_required' => false],
+            ['name' => 'country', 'type' => 'text_box', 'label' => 'Country', 'is_required' => false],
         ],
         'candidate' => [
             ['name' => 'first_name', 'type' => 'text_box', 'label' => 'First Name', 'is_required' => true],
@@ -80,6 +87,13 @@ class FormBuilderService
             ['name' => 'image', 'type' => 'file_upload', 'label' => 'Profile Image', 'is_required' => false],
             ['name' => 'type_id', 'type' => 'multi_select_checkbox', 'label' => 'Candidate Type', 'is_required' => false],
             ['name' => 'location_id', 'type' => 'multi_select_checkbox', 'label' => 'Location', 'is_required' => false],
+            ['name' => 'mobile', 'type' => 'text_box', 'label' => 'Phone Number', 'is_required' => false],
+            ['name' => 'nationality', 'type' => 'text_box', 'label' => 'Nationality', 'is_required' => false],
+            ['name' => 'street_address', 'type' => 'text_box', 'label' => 'Street Address', 'is_required' => false],
+            ['name' => 'city', 'type' => 'text_box', 'label' => 'City', 'is_required' => false],
+            ['name' => 'province', 'type' => 'text_box', 'label' => 'Province/State', 'is_required' => false],
+            ['name' => 'postal_code', 'type' => 'text_box', 'label' => 'Postal Code', 'is_required' => false],
+            ['name' => 'country', 'type' => 'text_box', 'label' => 'Country', 'is_required' => false],
         ],
     ];
 

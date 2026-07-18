@@ -448,6 +448,13 @@ class FormController extends Controller
                     'integer',
                     Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
                 ],
+                'answers.mobile' => 'nullable|string|max:20',
+                'answers.nationality' => 'nullable|string|max:255',
+                'answers.street_address' => 'nullable|string|max:255',
+                'answers.city' => 'nullable|string|max:255',
+                'answers.province' => 'nullable|string|max:255',
+                'answers.postal_code' => 'nullable|string|max:20',
+                'answers.country' => 'nullable|string|max:255',
             ],
             'candidate' => [
                 'answers.first_name' => 'required|string|max:255',
@@ -464,6 +471,13 @@ class FormController extends Controller
                     'integer',
                     Rule::exists('locations', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
                 ],
+                'answers.mobile' => 'nullable|string|max:20',
+                'answers.nationality' => 'nullable|string|max:255',
+                'answers.street_address' => 'nullable|string|max:255',
+                'answers.city' => 'nullable|string|max:255',
+                'answers.province' => 'nullable|string|max:255',
+                'answers.postal_code' => 'nullable|string|max:20',
+                'answers.country' => 'nullable|string|max:255',
             ],
             'long_term_job' => [
                 'client_id' => [
