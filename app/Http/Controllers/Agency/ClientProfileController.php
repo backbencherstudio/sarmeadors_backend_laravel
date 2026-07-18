@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Agency;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\FormSubmission;
 use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
@@ -31,54 +30,7 @@ class ClientProfileController extends Controller
 
         $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($client, $agencyId);
-
-        $answers = (array) ($submission?->data ?? []);
-        $schema = $submission?->form?->schema ?? ['blocks' => []];
-
-        $basicInformationFields = collect($this->builder->baseFields('client'))
-            ->reject(fn ($field) => $field['name'] === 'password')
-            ->map(fn ($field) => [
-                'key' => $field['name'],
-                'label' => $field['label'],
-                'type' => $field['type'],
-                'is_required' => $field['is_required'],
-                'value' => $field['name'] === 'image' ? $client->image_url : $client->{$field['name']},
-            ])
-            ->values();
-
-        $blocks = collect($schema['blocks'] ?? [])
-            ->map(fn ($block) => [
-                'name' => $block['name'] ?? null,
-                'description' => $block['description'] ?? null,
-                'sections' => collect($block['sections'] ?? [])
-                    ->map(fn ($section) => [
-                        'name' => $section['name'] ?? null,
-                        'fields' => collect($section['fields'] ?? [])
-                            ->map(fn ($field) => [
-                                'key' => $field['name'] ?? null,
-                                'label' => $field['label'] ?? null,
-                                'type' => $field['type'] ?? null,
-                                'placeholder' => $field['placeholder'] ?? null,
-                                'is_required' => (bool) ($field['is_required'] ?? false),
-                                'width' => $field['width'] ?? null,
-                                'options' => $field['options'] ?? null,
-                                'value' => $this->fieldValue($field, $answers[$field['name'] ?? ''] ?? null),
-                            ])
-                            ->values(),
-                    ])
-                    ->values(),
-            ])
-            ->values();
-
-        $blocks->prepend([
-            'name' => 'Basic Information',
-            'description' => null,
-            'sections' => [[
-                'name' => 'Basic Information',
-                'fields' => $basicInformationFields,
-            ]],
-        ]);
+        $submission = $this->builder->registrationSubmissionFor('client', $client->id, $agencyId);
 
         return response()->json([
             'status' => true,
@@ -86,7 +38,7 @@ class ClientProfileController extends Controller
                 'id' => $client->id,
                 'form_id' => $submission?->form_id,
                 'form_name' => $submission?->form?->name,
-                'blocks' => $blocks,
+                'blocks' => $this->builder->profileBlocks('client', $client, $submission),
             ],
         ]);
     }
@@ -98,7 +50,7 @@ class ClientProfileController extends Controller
 
         $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($client, $agencyId);
+        $submission = $this->builder->registrationSubmissionFor('client', $client->id, $agencyId);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
         $basicRules = [
@@ -118,7 +70,7 @@ class ClientProfileController extends Controller
             ],
         ];
 
-        $dynamicRules = $this->dynamicValidationRules($schema);
+        $dynamicRules = $this->builder->dynamicValidationRules($schema);
 
         // Hard-coded basic-information rules win if a schema field happens
         // to reuse one of those reserved names.
@@ -178,7 +130,7 @@ class ClientProfileController extends Controller
 
         $client = Client::where('agency_id', $agencyId)->findOrFail($id);
 
-        $submission = $this->registrationSubmission($client, $agencyId);
+        $submission = $this->builder->registrationSubmissionFor('client', $client->id, $agencyId);
         $schema = $submission?->form?->schema ?? ['blocks' => []];
 
         $field = collect($this->builder->flattenFields($schema))->firstWhere('name', $key);
@@ -215,98 +167,5 @@ class ClientProfileController extends Controller
             'status' => true,
             'message' => 'Document deleted successfully',
         ]);
-    }
-
-    /**
-     * Resolve a schema field's display value, turning stored file path(s)
-     * into publicly accessible URLs for `file_upload`/`list_files` fields.
-     */
-    private function fieldValue(array $field, mixed $value): mixed
-    {
-        return match ($field['type'] ?? null) {
-            'file_upload' => $value ? asset('storage/'.$value) : null,
-            'list_files' => collect((array) $value)->filter()->map(fn ($path) => asset('storage/'.$path))->values()->all(),
-            default => $value,
-        };
-    }
-
-    /**
-     * The client's most recent registration-form submission, whose
-     * schema and answers drive both the profile display and its updates.
-     */
-    private function registrationSubmission(Client $client, int $agencyId): ?FormSubmission
-    {
-        return FormSubmission::where('entity_type', 'client')
-            ->where('entity_id', $client->id)
-            ->whereHas('form', fn ($q) => $q->where('agency_id', $agencyId)
-                ->where('application_type', 'registration')
-                ->where('user_type', 'client'))
-            ->with('form')
-            ->latest()
-            ->first();
-    }
-
-    /**
-     * Validation rules for a partial update of the schema's dynamic answers:
-     * "sometimes" so unmentioned fields are left alone, but a required
-     * field can't be blanked out once it is mentioned.
-     *
-     * @param  array<string, mixed>  $schema
-     * @return array<string, string>
-     */
-    private function dynamicValidationRules(array $schema): array
-    {
-        $rules = [];
-
-        foreach ($this->builder->flattenFields($schema) as $field) {
-            $name = $field['name'] ?? null;
-
-            if (! $name) {
-                continue;
-            }
-
-            $fieldRules = [($field['is_required'] ?? false) ? 'required' : 'nullable'];
-
-            switch ($field['type'] ?? null) {
-                case 'email':
-                    $fieldRules[] = 'email';
-                    break;
-                case 'date_picker':
-                case 'month_picker':
-                case 'year_picker':
-                    $fieldRules[] = 'date';
-                    break;
-                case 'salary_range':
-                case 'multi_select_checkbox':
-                case 'checkbox_table':
-                case 'radio_table':
-                    $fieldRules[] = 'array';
-                    break;
-                case 'file_upload':
-                    $fieldRules[] = 'file';
-                    $fieldRules[] = 'mimes:pdf,jpg,jpeg,png,doc,docx';
-                    $fieldRules[] = 'max:5120';
-                    break;
-                case 'list_files':
-                    $fieldRules[] = 'array';
-                    break;
-            }
-
-            $custom = $field['validation_rules'] ?? null;
-
-            if (is_string($custom) && $custom !== '') {
-                $fieldRules = array_merge($fieldRules, explode('|', $custom));
-            } elseif (is_array($custom)) {
-                $fieldRules = array_merge($fieldRules, $custom);
-            }
-
-            $rules[$name] = 'sometimes|'.implode('|', array_values(array_unique($fieldRules)));
-
-            if (($field['type'] ?? null) === 'list_files') {
-                $rules["{$name}.*"] = 'sometimes|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120';
-            }
-        }
-
-        return $rules;
     }
 }

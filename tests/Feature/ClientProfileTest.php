@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Agency;
 use App\Models\Client;
+use App\Models\Form;
+use App\Models\FormSubmission;
 use App\Models\Location;
+use App\Models\Type;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -18,27 +21,68 @@ class ClientProfileTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_client_profile_show_returns_screen_ready_payload(): void
+    public function test_show_returns_basic_information_block_from_client_columns(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();
 
-        $location = Location::create(['agency_id' => $agency->id, 'location' => 'Manhattan']);
-        $client->update(['location_id' => [$location->id]]);
+        $response = $this->actingAsClient($user)->getJson('/api/client/profile');
 
-        $response = $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->getJson('/api/client/profile');
+        $response->assertOk()
+            ->assertJsonPath('data.id', $client->id)
+            ->assertJsonPath('data.form_id', null)
+            ->assertJsonPath('data.blocks.0.name', 'Basic Information')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'first_name')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jenny')
+            ->assertJsonCount(1, 'data.blocks');
 
-        $response
-            ->assertOk()
-            ->assertJsonPath('data.user_id', $user->id)
-            ->assertJsonPath('data.client_id', $client->id)
-            ->assertJsonPath('data.first_name', 'Jenny')
-            ->assertJsonPath('data.last_name', 'Wilson')
-            ->assertJsonPath('data.email', $user->email)
-            ->assertJsonPath('data.mobile', '+1433467689')
-            ->assertJsonPath('data.locations.0.name', 'Manhattan');
+        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
+        $this->assertNotContains('password', $fields->keys());
+    }
+
+    public function test_show_returns_section_wise_registration_form_answers(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Care Preferences',
+                    'sections' => [[
+                        'name' => 'Care Preferences',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Care Type', 'name' => 'care_type', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'Notes', 'name' => 'notes'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Full-Time', 'notes' => 'Two toddlers'],
+        ]);
+
+        $response = $this->actingAsClient($user)->getJson('/api/client/profile');
+
+        $response->assertOk()
+            ->assertJsonPath('data.form_id', $form->id)
+            ->assertJsonPath('data.form_name', 'Client Registration')
+            ->assertJsonPath('data.blocks.0.name', 'Basic Information')
+            ->assertJsonPath('data.blocks.1.name', 'Care Preferences')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.key', 'care_type')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', 'Full-Time')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.1.key', 'notes')
+            ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Two toddlers');
     }
 
     public function test_client_can_update_profile_with_image_and_locations(): void
@@ -46,27 +90,24 @@ class ClientProfileTest extends TestCase
         Storage::fake('public');
 
         [$agency, $user, $client] = $this->createClientScenario();
-
         $location = Location::create(['agency_id' => $agency->id, 'location' => 'Manhattan']);
 
-        $response = $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->put('/api/client/profile', [
+        $response = $this->actingAsClient($user)
+            ->post('/api/client/profile', [
                 'first_name' => 'Jennifer',
                 'last_name' => 'Wilson',
                 'mobile' => '+15550001111',
                 'location_id' => [$location->id],
                 'image' => UploadedFile::fake()->image('avatar.png'),
-            ]);
+            ], ['Content-Type' => 'multipart/form-data']);
 
-        $response
-            ->assertOk()
-            ->assertJsonPath('data.first_name', 'Jennifer')
-            ->assertJsonPath('data.mobile', '+15550001111')
-            ->assertJsonPath('data.locations.0.id', $location->id);
+        $response->assertOk()
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jennifer');
 
-        $this->assertNotNull($response->json('data.image_url'));
+        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
+        $this->assertNotNull($fields['image']['value']);
+        $this->assertSame([$location->id], $fields['location_id']['value']);
+
         $this->assertSame('Jennifer', $user->fresh()->first_name);
         $this->assertSame('Jennifer', $client->fresh()->first_name);
         Storage::disk('public')->assertExists($client->fresh()->image);
@@ -76,28 +117,49 @@ class ClientProfileTest extends TestCase
     {
         [, $user, $client] = $this->createClientScenario();
 
-        $response = $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->postJson('/api/client/profile', [
-                'nationality' => 'Americans',
-                'street_address' => '26 Berkshire Ave.',
-                'city' => 'Atlantic City',
-                'province' => 'NJ',
-                'postal_code' => '08401',
-                'country' => 'USA',
-            ]);
+        $response = $this->actingAsClient($user)->postJson('/api/client/profile', [
+            'nationality' => 'Americans',
+            'street_address' => '26 Berkshire Ave.',
+            'city' => 'Atlantic City',
+            'province' => 'NJ',
+            'postal_code' => '08401',
+            'country' => 'USA',
+        ]);
 
-        $response
-            ->assertOk()
-            ->assertJsonPath('data.nationality', 'Americans')
-            ->assertJsonPath('data.street_address', '26 Berkshire Ave.')
-            ->assertJsonPath('data.city', 'Atlantic City')
-            ->assertJsonPath('data.province', 'NJ')
-            ->assertJsonPath('data.postal_code', '08401')
-            ->assertJsonPath('data.country', 'USA');
+        $response->assertOk();
 
-        $this->assertSame('Atlantic City', $client->fresh()->city);
+        $client->refresh();
+        $this->assertSame('Americans', $client->nationality);
+        $this->assertSame('26 Berkshire Ave.', $client->street_address);
+        $this->assertSame('Atlantic City', $client->city);
+        $this->assertSame('NJ', $client->province);
+        $this->assertSame('08401', $client->postal_code);
+        $this->assertSame('USA', $client->country);
+    }
+
+    public function test_update_supports_the_type_id_base_field(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+        $type = Type::create(['agency_id' => $agency->id, 'name' => 'Full-Time', 'type' => 'client']);
+
+        $this->actingAsClient($user)->postJson('/api/client/profile', [
+            'type_id' => [$type->id],
+        ])->assertOk();
+
+        $this->assertSame([$type->id], $client->fresh()->type_id);
+    }
+
+    public function test_update_does_not_change_the_login_email(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $this->actingAsClient($user)->postJson('/api/client/profile', [
+            'first_name' => 'Jennifer',
+            'email' => 'someone-else@example.com',
+        ])->assertOk();
+
+        $this->assertSame($user->email, $client->fresh()->email);
+        $this->assertSame($user->email, $user->fresh()->email);
     }
 
     public function test_profile_update_rejects_locations_from_another_agency(): void
@@ -113,55 +175,112 @@ class ClientProfileTest extends TestCase
 
         $foreignLocation = Location::create(['agency_id' => $otherAgency->id, 'location' => 'Foreign']);
 
-        $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->putJson('/api/client/profile', [
-                'location_id' => [$foreignLocation->id],
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Validation failed');
+        $this->actingAsClient($user)
+            ->postJson('/api/client/profile', ['location_id' => [$foreignLocation->id]])
+            ->assertStatus(422);
+    }
+
+    public function test_update_writes_dynamic_answers_into_the_registration_submission(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Care Preferences',
+                    'sections' => [[
+                        'name' => 'Care Preferences',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Care Type', 'name' => 'care_type', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Part-Time'],
+        ]);
+
+        $response = $this->actingAsClient($user)->postJson('/api/client/profile', [
+            'care_type' => 'Full-Time',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', 'Full-Time');
+
+        $submission->refresh();
+        $this->assertSame('Full-Time', $submission->data['care_type']);
+    }
+
+    public function test_update_rejects_blanking_a_required_dynamic_field(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Care Preferences',
+                    'sections' => [[
+                        'name' => 'Care Preferences',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Care Type', 'name' => 'care_type', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Full-Time'],
+        ]);
+
+        $this->actingAsClient($user)
+            ->postJson('/api/client/profile', ['care_type' => null])
+            ->assertStatus(422);
     }
 
     public function test_client_can_update_password_with_valid_rules(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();
 
-        $wrongCurrent = $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->putJson('/api/client/profile/password', [
-                'current_password' => 'not-the-password',
-                'password' => 'newpass123',
-                'password_confirmation' => 'newpass123',
-            ]);
+        $this->actingAsClient($user)->putJson('/api/client/profile/password', [
+            'current_password' => 'not-the-password',
+            'password' => 'newpass123',
+            'password_confirmation' => 'newpass123',
+        ])->assertStatus(422)->assertJsonPath('message', 'Current password is incorrect.');
 
-        $wrongCurrent
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Current password is incorrect.');
+        $this->actingAsClient($user)->putJson('/api/client/profile/password', [
+            'current_password' => 'password',
+            'password' => 'onlyletters',
+            'password_confirmation' => 'onlyletters',
+        ])->assertStatus(422);
 
-        $weakPassword = $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->putJson('/api/client/profile/password', [
-                'current_password' => 'password',
-                'password' => 'onlyletters',
-                'password_confirmation' => 'onlyletters',
-            ]);
-
-        $weakPassword
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Validation failed');
-
-        $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->putJson('/api/client/profile/password', [
-                'current_password' => 'password',
-                'password' => 'newpass123',
-                'password_confirmation' => 'newpass123',
-            ])
-            ->assertOk();
+        $this->actingAsClient($user)->putJson('/api/client/profile/password', [
+            'current_password' => 'password',
+            'password' => 'newpass123',
+            'password_confirmation' => 'newpass123',
+        ])->assertOk();
 
         $this->assertTrue(Hash::check('newpass123', $user->fresh()->password));
     }
@@ -170,23 +289,13 @@ class ClientProfileTest extends TestCase
     {
         [$agency, $user, $client] = $this->createClientScenario();
 
-        $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->deleteJson('/api/client/profile', [
-                'password' => 'wrong-password',
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Password is incorrect.');
+        $this->actingAsClient($user)->deleteJson('/api/client/profile', [
+            'password' => 'wrong-password',
+        ])->assertStatus(422)->assertJsonPath('message', 'Password is incorrect.');
 
-        $this
-            ->actingAs($user, 'api')
-            ->withHeader('X-Subdomain', 'sarmeadors')
-            ->deleteJson('/api/client/profile', [
-                'password' => 'password',
-            ])
-            ->assertOk()
-            ->assertJsonPath('message', 'Account deleted successfully.');
+        $this->actingAsClient($user)->deleteJson('/api/client/profile', [
+            'password' => 'password',
+        ])->assertOk()->assertJsonPath('message', 'Account deleted successfully.');
 
         $this->assertDatabaseMissing('users', ['id' => $user->id]);
         $this->assertDatabaseMissing('clients', ['id' => $client->id]);
@@ -211,12 +320,8 @@ class ClientProfileTest extends TestCase
             'password' => Hash::make('password'),
         ]);
 
-        Role::create([
-            'name' => 'client',
-            'guard_name' => 'web',
-        ]);
-
-        $user->assignRole('client');
+        Role::findOrCreate('client', 'api');
+        $user->assignRole(Role::where('name', 'client')->where('guard_name', 'api')->first());
 
         $client = Client::create([
             'agency_id' => $agency->id,
@@ -227,5 +332,10 @@ class ClientProfileTest extends TestCase
         ]);
 
         return [$agency, $user, $client];
+    }
+
+    private function actingAsClient(User $user)
+    {
+        return $this->actingAs($user, 'api')->withHeader('X-Subdomain', 'sarmeadors');
     }
 }
