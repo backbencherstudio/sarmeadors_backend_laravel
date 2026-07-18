@@ -37,6 +37,7 @@ class FormSubmissionResource extends JsonResource
                 'placeholder' => $value->field->placeholder,
                 'is_required' => $value->field->is_required,
                 'width' => $value->field->width,
+                'options' => $value->field->options,
             ])
             ->values();
 
@@ -51,6 +52,7 @@ class FormSubmissionResource extends JsonResource
                 'placeholder' => $field['placeholder'] ?? null,
                 'is_required' => (bool) ($field['is_required'] ?? false),
                 'width' => $field['width'] ?? null,
+                'options' => $field['options'] ?? null,
             ]);
         }
 
