@@ -104,6 +104,60 @@ class AgencyClientProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Full-Time');
     }
 
+    public function test_show_returns_the_full_option_list_alongside_a_choice_fields_answer(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $client = Client::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'last_name' => 'Lee',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Preferences',
+                    'sections' => [[
+                        'name' => 'Preference Details',
+                        'fields' => [
+                            [
+                                'type' => 'radio',
+                                'label' => 'Years of Experience',
+                                'name' => 'years_of_experience',
+                                'options' => ['2-5 years', '5-10 years', '10 plus years'],
+                            ],
+                            ['type' => 'text_box', 'label' => 'Care Type Needed', 'name' => 'care_type'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['years_of_experience' => '5-10 years', 'care_type' => 'Full-Time'],
+        ]);
+
+        $response = $this->actingAsAgency($admin)->getJson("/api/agency/clients/{$client->id}/profile");
+
+        $fields = collect($response->json('data.blocks.1.sections.0.fields'))->keyBy('key');
+
+        $response->assertOk();
+        $this->assertSame('5-10 years', $fields['years_of_experience']['value']);
+        $this->assertSame(['2-5 years', '5-10 years', '10 plus years'], $fields['years_of_experience']['options']);
+        $this->assertNull($fields['care_type']['options']);
+    }
+
     public function test_show_returns_full_urls_for_file_upload_and_list_files_answers(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();

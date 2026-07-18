@@ -62,6 +62,7 @@ class CandidateProfileController extends Controller
                                 'placeholder' => $field['placeholder'] ?? null,
                                 'is_required' => (bool) ($field['is_required'] ?? false),
                                 'width' => $field['width'] ?? null,
+                                'options' => $field['options'] ?? null,
                                 'value' => $this->fieldValue($field, $answers[$field['name'] ?? ''] ?? null),
                             ])
                             ->values(),
