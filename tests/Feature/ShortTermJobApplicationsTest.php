@@ -118,8 +118,8 @@ class ShortTermJobApplicationsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.candidate.header.id', $candidateOne->id)
             ->assertJsonPath('data.candidate.header.name', 'Emily Stone')
-            ->assertJsonPath('data.candidate.personal_information.first_name', 'Emily')
-            ->assertJsonPath('data.candidate.personal_information.last_name', 'Stone')
+            ->assertJsonPath('data.candidate.blocks.0.sections.0.fields.0.key', 'first_name')
+            ->assertJsonPath('data.candidate.blocks.0.sections.0.fields.0.value', 'Emily')
             ->assertJsonMissingPath('data.candidate.user_id')
             ->assertJsonPath('data.assigned_candidate.id', $candidateOne->id);
 
@@ -229,15 +229,14 @@ class ShortTermJobApplicationsTest extends TestCase
             ->assertJsonPath('data.reviews.count', 1)
             ->assertJsonPath('data.reviews.items.0.rating', 4)
             ->assertJsonPath('data.reviews.my_review.rating', 4)
-            ->assertJsonPath('data.candidate.personal_information.first_name', 'Emily')
+            ->assertJsonPath('data.candidate.blocks.0.sections.0.fields.0.value', 'Emily')
             ->assertJsonStructure([
                 'data' => [
                     'candidate' => [
                         'header',
-                        'personal_information',
-                        'professional_information',
-                        'reference',
-                        'additional_information',
+                        'form_id',
+                        'form_name',
+                        'blocks',
                         'documents',
                     ],
                     'reviews' => ['average', 'count', 'my_review', 'items'],

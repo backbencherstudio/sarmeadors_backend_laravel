@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Location;
 use App\Models\LongTermJobReview;
 use App\Models\ShortTermJobReview;
+use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,17 +22,18 @@ class ClientDetailResource extends JsonResource
     {
         $client = $this->resource;
         $agencyId = $request->current_agency->id;
+        $builder = app(FormBuilderService::class);
+        $submission = $builder->registrationSubmissionFor('client', $client->id, $agencyId);
 
         return [
             'id' => $client->id,
             'name' => trim($client->first_name.' '.$client->last_name),
-            'first_name' => $client->first_name,
-            'last_name' => $client->last_name,
-            'email' => $client->email,
-            'mobile' => $client->mobile,
             'image_url' => $client->image_url,
             'area' => $this->resolveArea($client),
             'rating' => $this->ratingSummary($client, $agencyId),
+            'form_id' => $submission?->form_id,
+            'form_name' => $submission?->form?->name,
+            'blocks' => $builder->profileBlocks('client', $client, $submission),
         ];
     }
 

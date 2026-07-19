@@ -7,6 +7,8 @@ use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\ClientCandidate;
 use App\Models\ClientPaymentMethod;
+use App\Models\Form;
+use App\Models\FormSubmission;
 use App\Models\LongTermJob;
 use App\Models\LongTermJobApplication;
 use App\Models\LongTermJobInterview;
@@ -117,8 +119,35 @@ class ClientCandidatesTest extends TestCase
             'last_name' => 'Ben',
             'email' => 'kristin@example.com',
             'nationality' => 'American',
-            'hours_per_week' => '40',
-            'years_of_experience' => '10+',
+        ]);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Professional Information',
+                    'sections' => [[
+                        'name' => 'Professional Information',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Hours per Week', 'name' => 'hours_per_week'],
+                            ['type' => 'text_box', 'label' => 'Years of Experience', 'name' => 'years_of_experience'],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['hours_per_week' => '40', 'years_of_experience' => '10+'],
         ]);
 
         $job = $this->createLongTermJob($agency, $client, $candidate, 'completed');
@@ -142,9 +171,11 @@ class ClientCandidatesTest extends TestCase
             ->assertJsonPath('data.candidate.header.name', 'Kristin Ben')
             ->assertJsonPath('data.candidate.header.rating.average', 5)
             ->assertJsonPath('data.candidate.header.rating.count', 1)
-            ->assertJsonPath('data.candidate.personal_information.first_name', 'Kristin')
-            ->assertJsonPath('data.candidate.professional_information.hours_per_week', '40')
-            ->assertJsonPath('data.candidate.additional_information.years_of_experience', '10+')
+            ->assertJsonPath('data.candidate.blocks.0.name', 'Basic Information')
+            ->assertJsonPath('data.candidate.blocks.0.sections.0.fields.0.key', 'first_name')
+            ->assertJsonPath('data.candidate.blocks.0.sections.0.fields.0.value', 'Kristin')
+            ->assertJsonPath('data.candidate.blocks.1.sections.0.fields.0.value', '40')
+            ->assertJsonPath('data.candidate.blocks.1.sections.0.fields.1.value', '10+')
             ->assertJsonPath('data.reviews.count', 1)
             ->assertJsonPath('data.reviews.my_review.rating', 5)
             ->assertJsonPath('data.actions.can_hire_request', true);
