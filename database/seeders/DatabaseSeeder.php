@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
         $this->call(TemplateSeeder::class);
         $this->call(MessageTemplateSeeder::class);
         $this->call(FormSeeder::class);
+        $this->call(CandidateFormSubmissionSeeder::class);
 
         // $admin=User::factory()->create([
         //     'first_name' => 'Admin',
