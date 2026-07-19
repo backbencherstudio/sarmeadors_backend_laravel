@@ -104,6 +104,68 @@ class AgencyCandidateProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
     }
 
+    public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'last_name' => 'Lee',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Reference',
+                    'sections' => [[
+                        'name' => 'Reference Details',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Reference Name', 'name' => 'reference_name', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['reference_name' => 'John Doe'],
+        ]);
+
+        $response = $this->actingAsAgency($admin)
+            ->getJson("/api/agency/candidates/{$candidate->id}/profile?slug=reference");
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.name', 'Reference')
+            ->assertJsonPath('data.blocks.0.slug', 'reference');
+    }
+
+    public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $candidate = Candidate::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $response = $this->actingAsAgency($admin)
+            ->getJson("/api/agency/candidates/{$candidate->id}/profile?slug=does-not-exist");
+
+        $response->assertOk()->assertJsonCount(0, 'data.blocks');
+    }
+
     public function test_show_returns_the_full_option_list_alongside_a_choice_fields_answer(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();

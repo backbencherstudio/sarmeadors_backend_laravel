@@ -594,6 +594,7 @@ class FormBuilderService
         $blocks = collect($schema['blocks'] ?? [])
             ->map(fn ($block) => [
                 'name' => $block['name'] ?? null,
+                'slug' => Str::slug($block['name'] ?? ''),
                 'description' => $block['description'] ?? null,
                 'sections' => collect($block['sections'] ?? [])
                     ->map(fn ($section) => [
@@ -617,6 +618,7 @@ class FormBuilderService
 
         $blocks->prepend([
             'name' => 'Basic Information',
+            'slug' => 'basic-information',
             'description' => null,
             'sections' => [[
                 'name' => 'Basic Information',

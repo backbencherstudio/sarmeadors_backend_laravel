@@ -104,6 +104,68 @@ class AgencyClientProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Full-Time');
     }
 
+    public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $client = Client::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'last_name' => 'Lee',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Household',
+                    'sections' => [[
+                        'name' => 'Household Details',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Number of Children', 'name' => 'children_count', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['children_count' => '2'],
+        ]);
+
+        $response = $this->actingAsAgency($admin)
+            ->getJson("/api/agency/clients/{$client->id}/profile?slug=household");
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.name', 'Household')
+            ->assertJsonPath('data.blocks.0.slug', 'household');
+    }
+
+    public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void
+    {
+        [$agency, $admin] = $this->createAgencyScenario();
+        $client = Client::create([
+            'agency_id' => $agency->id,
+            'first_name' => 'Jamie',
+            'email' => 'jamie@example.com',
+        ]);
+
+        $response = $this->actingAsAgency($admin)
+            ->getJson("/api/agency/clients/{$client->id}/profile?slug=does-not-exist");
+
+        $response->assertOk()->assertJsonCount(0, 'data.blocks');
+    }
+
     public function test_show_returns_the_full_option_list_alongside_a_choice_fields_answer(): void
     {
         [$agency, $admin] = $this->createAgencyScenario();

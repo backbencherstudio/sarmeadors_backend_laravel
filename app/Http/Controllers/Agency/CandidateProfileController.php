@@ -24,7 +24,7 @@ class CandidateProfileController extends Controller
     public function __construct(private FormBuilderService $builder) {}
 
     // GET /agency/candidates/{id}/profile
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $agencyId = auth('api')->user()->agency_id;
 
@@ -32,13 +32,19 @@ class CandidateProfileController extends Controller
 
         $submission = $this->builder->registrationSubmissionFor('candidate', $candidate->id, $agencyId);
 
+        $blocks = $this->builder->profileBlocks('candidate', $candidate, $submission);
+
+        if ($slug = $request->query('slug')) {
+            $blocks = collect($blocks)->where('slug', $slug)->values()->all();
+        }
+
         return response()->json([
             'status' => true,
             'data' => [
                 'id' => $candidate->id,
                 'form_id' => $submission?->form_id,
                 'form_name' => $submission?->form?->name,
-                'blocks' => $this->builder->profileBlocks('candidate', $candidate, $submission),
+                'blocks' => $blocks,
             ],
         ]);
     }
