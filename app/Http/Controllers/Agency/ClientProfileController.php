@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ClientProfileController extends Controller
@@ -25,7 +26,7 @@ class ClientProfileController extends Controller
     public function __construct(private FormBuilderService $builder) {}
 
     // GET /agency/clients/{id}/profile
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $agencyId = auth('api')->user()->agency_id;
 
@@ -50,6 +51,7 @@ class ClientProfileController extends Controller
         $blocks = collect($schema['blocks'] ?? [])
             ->map(fn ($block) => [
                 'name' => $block['name'] ?? null,
+                'slug' => Str::slug($block['name'] ?? ''),
                 'description' => $block['description'] ?? null,
                 'sections' => collect($block['sections'] ?? [])
                     ->map(fn ($section) => [
@@ -73,12 +75,17 @@ class ClientProfileController extends Controller
 
         $blocks->prepend([
             'name' => 'Basic Information',
+            'slug' => 'basic-information',
             'description' => null,
             'sections' => [[
                 'name' => 'Basic Information',
                 'fields' => $basicInformationFields,
             ]],
         ]);
+
+        if ($slug = $request->query('slug')) {
+            $blocks = $blocks->where('slug', $slug)->values();
+        }
 
         return response()->json([
             'status' => true,
