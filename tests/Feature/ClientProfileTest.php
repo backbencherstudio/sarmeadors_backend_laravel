@@ -21,7 +21,7 @@ class ClientProfileTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_show_returns_basic_information_block_from_client_columns(): void
+    public function test_show_returns_the_basic_information_block_header_without_sections(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();
 
@@ -30,16 +30,15 @@ class ClientProfileTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.id', $client->id)
             ->assertJsonPath('data.form_id', null)
+            ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Basic Information')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'first_name')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jenny')
-            ->assertJsonCount(1, 'data.blocks');
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.description', null);
 
-        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
-        $this->assertNotContains('password', $fields->keys());
+        $this->assertArrayNotHasKey('sections', $response->json('data.blocks.0'));
     }
 
-    public function test_show_returns_section_wise_registration_form_answers(): void
+    public function test_show_lists_every_block_header_without_sections(): void
     {
         [$agency, $user, $client] = $this->createClientScenario();
 
@@ -77,12 +76,15 @@ class ClientProfileTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.form_id', $form->id)
             ->assertJsonPath('data.form_name', 'Client Registration')
+            ->assertJsonCount(2, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Basic Information')
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
             ->assertJsonPath('data.blocks.1.name', 'Care Preferences')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.key', 'care_type')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', 'Full-Time')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.key', 'notes')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Two toddlers');
+            ->assertJsonPath('data.blocks.1.slug', 'care-preferences');
+
+        foreach ($response->json('data.blocks') as $block) {
+            $this->assertSame(['name', 'slug', 'description'], array_keys($block));
+        }
     }
 
     public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
@@ -104,6 +106,7 @@ class ClientProfileTest extends TestCase
                         'name' => 'Care Preferences',
                         'fields' => [
                             ['type' => 'text_box', 'label' => 'Care Type', 'name' => 'care_type', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'Notes', 'name' => 'notes'],
                         ],
                     ]],
                 ]],
@@ -114,7 +117,7 @@ class ClientProfileTest extends TestCase
             'form_id' => $form->id,
             'entity_id' => $client->id,
             'entity_type' => 'client',
-            'data' => ['care_type' => 'Full-Time'],
+            'data' => ['care_type' => 'Full-Time', 'notes' => 'Two toddlers'],
         ]);
 
         $response = $this->actingAsClient($user)->getJson('/api/client/profile?slug=care-preferences');
@@ -123,7 +126,11 @@ class ClientProfileTest extends TestCase
             ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Care Preferences')
             ->assertJsonPath('data.blocks.0.slug', 'care-preferences')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Full-Time');
+            ->assertJsonPath('data.blocks.0.sections.0.name', 'Care Preferences')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'care_type')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Full-Time')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.1.key', 'notes')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.1.value', 'Two toddlers');
     }
 
     public function test_show_filters_to_the_basic_information_block_by_slug(): void
@@ -135,7 +142,11 @@ class ClientProfileTest extends TestCase
         $response->assertOk()
             ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'first_name')
             ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jenny');
+
+        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
+        $this->assertNotContains('password', $fields->keys());
     }
 
     public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void

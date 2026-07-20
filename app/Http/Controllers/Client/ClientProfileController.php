@@ -40,19 +40,15 @@ class ClientProfileController extends Controller
 
         $submission = $this->builder->registrationSubmissionFor('client', $client->id, $request->current_agency->id);
 
-        $blocks = collect($this->builder->profileBlocks('client', $client, $submission));
-
-        if ($slug = $request->query('slug')) {
-            $blocks = $blocks->where('slug', $slug)->values();
-        }
-
         return response()->json([
             'status' => true,
             'data' => [
                 'id' => $client->id,
                 'form_id' => $submission?->form_id,
                 'form_name' => $submission?->form?->name,
-                'blocks' => $blocks->all(),
+                'blocks' => $this->builder->profileBlockSummaries(
+                    'client', $client, $submission, $request->query('slug')
+                ),
             ],
         ]);
     }

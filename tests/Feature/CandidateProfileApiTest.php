@@ -18,7 +18,7 @@ class CandidateProfileApiTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_show_returns_basic_information_block_from_candidate_columns(): void
+    public function test_show_returns_the_basic_information_block_header_without_sections(): void
     {
         [$agency, $user, $candidate] = $this->createCandidateScenario();
 
@@ -27,16 +27,15 @@ class CandidateProfileApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.id', $candidate->id)
             ->assertJsonPath('data.form_id', null)
+            ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Basic Information')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'first_name')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Alex')
-            ->assertJsonCount(1, 'data.blocks');
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.description', null);
 
-        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
-        $this->assertNotContains('password', $fields->keys());
+        $this->assertArrayNotHasKey('sections', $response->json('data.blocks.0'));
     }
 
-    public function test_show_returns_section_wise_registration_form_answers(): void
+    public function test_show_lists_every_block_header_without_sections(): void
     {
         [$agency, $user, $candidate] = $this->createCandidateScenario();
 
@@ -74,12 +73,15 @@ class CandidateProfileApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.form_id', $form->id)
             ->assertJsonPath('data.form_name', 'Candidate Registration')
+            ->assertJsonCount(2, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Basic Information')
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
             ->assertJsonPath('data.blocks.1.name', 'Reference')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.key', 'reference_name')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.0.value', 'John Doe')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.key', 'cpr')
-            ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
+            ->assertJsonPath('data.blocks.1.slug', 'reference');
+
+        foreach ($response->json('data.blocks') as $block) {
+            $this->assertSame(['name', 'slug', 'description'], array_keys($block));
+        }
     }
 
     public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
@@ -101,6 +103,7 @@ class CandidateProfileApiTest extends TestCase
                         'name' => 'Reference Details',
                         'fields' => [
                             ['type' => 'text_box', 'label' => 'Reference Name', 'name' => 'reference_name', 'is_required' => true],
+                            ['type' => 'text_box', 'label' => 'CPR Certified', 'name' => 'cpr'],
                         ],
                     ]],
                 ]],
@@ -111,7 +114,7 @@ class CandidateProfileApiTest extends TestCase
             'form_id' => $form->id,
             'entity_id' => $candidate->id,
             'entity_type' => 'candidate',
-            'data' => ['reference_name' => 'John Doe'],
+            'data' => ['reference_name' => 'John Doe', 'cpr' => 'Yes'],
         ]);
 
         $response = $this->actingAsCandidate($user)->getJson('/api/candidate/profile?slug=reference');
@@ -120,7 +123,11 @@ class CandidateProfileApiTest extends TestCase
             ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.name', 'Reference')
             ->assertJsonPath('data.blocks.0.slug', 'reference')
-            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'John Doe');
+            ->assertJsonPath('data.blocks.0.sections.0.name', 'Reference Details')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'reference_name')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'John Doe')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.1.key', 'cpr')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.1.value', 'Yes');
     }
 
     public function test_show_filters_to_the_basic_information_block_by_slug(): void
@@ -132,7 +139,11 @@ class CandidateProfileApiTest extends TestCase
         $response->assertOk()
             ->assertJsonCount(1, 'data.blocks')
             ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.key', 'first_name')
             ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Alex');
+
+        $fields = collect($response->json('data.blocks.0.sections.0.fields'))->keyBy('key');
+        $this->assertNotContains('password', $fields->keys());
     }
 
     public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void

@@ -630,6 +630,28 @@ class FormBuilderService
     }
 
     /**
+     * Profile blocks shaped for a `?slug=` drill-down contract: without a
+     * slug only each block's header (name/slug/description) is returned so
+     * a client can render the block list cheaply; with a slug the matching
+     * block is returned in full, sections and answers included.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function profileBlockSummaries(string $entity, Model $record, ?FormSubmission $submission, ?string $slug = null): array
+    {
+        $blocks = collect($this->profileBlocks($entity, $record, $submission));
+
+        if ($slug) {
+            return $blocks->where('slug', $slug)->values()->all();
+        }
+
+        return $blocks
+            ->map(fn ($block) => Arr::only($block, ['name', 'slug', 'description']))
+            ->values()
+            ->all();
+    }
+
+    /**
      * Resolve a schema field's display value, turning stored file path(s)
      * into publicly accessible URLs for `file_upload`/`list_files` fields.
      */
