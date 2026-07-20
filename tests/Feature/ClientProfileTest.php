@@ -85,6 +85,69 @@ class ClientProfileTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Two toddlers');
     }
 
+    public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Client Registration',
+            'slug' => 'client-registration',
+            'entity' => 'client',
+            'application_type' => 'registration',
+            'user_type' => 'client',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Care Preferences',
+                    'sections' => [[
+                        'name' => 'Care Preferences',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Care Type', 'name' => 'care_type', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $client->id,
+            'entity_type' => 'client',
+            'data' => ['care_type' => 'Full-Time'],
+        ]);
+
+        $response = $this->actingAsClient($user)->getJson('/api/client/profile?slug=care-preferences');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.name', 'Care Preferences')
+            ->assertJsonPath('data.blocks.0.slug', 'care-preferences')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Full-Time');
+    }
+
+    public function test_show_filters_to_the_basic_information_block_by_slug(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $response = $this->actingAsClient($user)->getJson('/api/client/profile?slug=basic-information');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Jenny');
+    }
+
+    public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void
+    {
+        [$agency, $user, $client] = $this->createClientScenario();
+
+        $this->actingAsClient($user)
+            ->getJson('/api/client/profile?slug=does-not-exist')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.blocks');
+    }
+
     public function test_client_can_update_profile_with_image_and_locations(): void
     {
         Storage::fake('public');

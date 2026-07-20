@@ -82,6 +82,69 @@ class CandidateProfileApiTest extends TestCase
             ->assertJsonPath('data.blocks.1.sections.0.fields.1.value', 'Yes');
     }
 
+    public function test_show_filters_to_a_single_block_when_a_slug_is_given(): void
+    {
+        [$agency, $user, $candidate] = $this->createCandidateScenario();
+
+        $form = Form::create([
+            'agency_id' => $agency->id,
+            'name' => 'Candidate Registration',
+            'slug' => 'candidate-registration',
+            'entity' => 'candidate',
+            'application_type' => 'registration',
+            'user_type' => 'candidate',
+            'status' => true,
+            'schema' => [
+                'blocks' => [[
+                    'name' => 'Reference',
+                    'sections' => [[
+                        'name' => 'Reference Details',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Reference Name', 'name' => 'reference_name', 'is_required' => true],
+                        ],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        FormSubmission::create([
+            'form_id' => $form->id,
+            'entity_id' => $candidate->id,
+            'entity_type' => 'candidate',
+            'data' => ['reference_name' => 'John Doe'],
+        ]);
+
+        $response = $this->actingAsCandidate($user)->getJson('/api/candidate/profile?slug=reference');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.name', 'Reference')
+            ->assertJsonPath('data.blocks.0.slug', 'reference')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'John Doe');
+    }
+
+    public function test_show_filters_to_the_basic_information_block_by_slug(): void
+    {
+        [$agency, $user, $candidate] = $this->createCandidateScenario();
+
+        $response = $this->actingAsCandidate($user)->getJson('/api/candidate/profile?slug=basic-information');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.blocks')
+            ->assertJsonPath('data.blocks.0.slug', 'basic-information')
+            ->assertJsonPath('data.blocks.0.sections.0.fields.0.value', 'Alex');
+    }
+
+    public function test_show_returns_an_empty_blocks_list_for_an_unknown_slug(): void
+    {
+        [$agency, $user, $candidate] = $this->createCandidateScenario();
+
+        $this->actingAsCandidate($user)
+            ->getJson('/api/candidate/profile?slug=does-not-exist')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.blocks');
+    }
+
     public function test_update_changes_basic_information_fields(): void
     {
         [$agency, $user, $candidate] = $this->createCandidateScenario();

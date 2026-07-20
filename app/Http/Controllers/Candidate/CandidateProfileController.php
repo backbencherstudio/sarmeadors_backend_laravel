@@ -40,13 +40,19 @@ class CandidateProfileController extends Controller
 
         $submission = $this->builder->registrationSubmissionFor('candidate', $candidate->id, $request->current_agency->id);
 
+        $blocks = collect($this->builder->profileBlocks('candidate', $candidate, $submission));
+
+        if ($slug = $request->query('slug')) {
+            $blocks = $blocks->where('slug', $slug)->values();
+        }
+
         return response()->json([
             'status' => true,
             'data' => [
                 'id' => $candidate->id,
                 'form_id' => $submission?->form_id,
                 'form_name' => $submission?->form?->name,
-                'blocks' => $this->builder->profileBlocks('candidate', $candidate, $submission),
+                'blocks' => $blocks->all(),
             ],
         ]);
     }
