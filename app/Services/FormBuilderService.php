@@ -190,9 +190,11 @@ class FormBuilderService
 
             $blocks[] = [
                 'key' => $block['key'] ?? (string) Str::uuid(),
+                'type' => $block['type'] ?? 'standard',
                 'name' => $block['name'] ?? 'Untitled Block',
                 'description' => $block['description'] ?? null,
                 'serial' => $blockIndex + 1,
+                'config' => $block['config'] ?? null,
                 'sections' => $sections,
             ];
         }
