@@ -238,7 +238,8 @@ class ClientGlobalSettingsController extends Controller
 
         $existingSettings = $existingRecord ? $existingRecord->settings : $this->defaultSettings();
 
-        $incomingSettings = $request->input('settings', []);
+        // $incomingSettings = $request->input('settings', []);
+        $incomingSettings = $validator->validated()['settings'] ?? [];
 
         $mergedSettings = array_replace_recursive($existingSettings, $incomingSettings);
 
