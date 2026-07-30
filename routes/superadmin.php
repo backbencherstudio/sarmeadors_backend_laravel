@@ -25,4 +25,6 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->pr
     Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
     Route::post('/agency-update/{id}', [AgencyController::class, 'update']);
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
+
+    Route::patch('/agency-suspends/{id}', [AgencyController::class, 'suspends']);
 });

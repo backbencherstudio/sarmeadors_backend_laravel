@@ -321,6 +321,31 @@ class AgencyController extends Controller
         ]);
     }
 
+    public function suspends($id)
+    {
+        $agency = Agency::find($id);
+
+        if (! $agency) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Agency not found',
+            ], 404);
+        }
+
+        $agency->update([
+            'status' => $agency->status === 'suspended' ? 'active' : 'suspended',
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => $agency->status === 'suspended' ? 'Agency suspended successfully' : 'Agency unsuspended successfully',
+            'data' => [
+                'id' => $agency->id,
+                'status' => $agency->status,
+            ],
+        ]);
+    }
+
     public function infoUpdate(Request $request, $id)
     {
         $authUser = auth('api')->user();
