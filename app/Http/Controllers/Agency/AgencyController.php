@@ -15,14 +15,41 @@ use Illuminate\Validation\Rule;
 
 class AgencyController extends Controller
 {
-    public function data()
+    public function data(Request $request)
     {
-        $agencies = Agency::all();
+        $perPage = $request->get('per_page', 10);
+        $search = $request->get('search');
+        $status = $request->get('status');
+
+        $query = Agency::query();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('subdomain_prefix', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status && in_array($status, ['active', 'inactive', 'suspended'])) {
+            $query->where('status', $status);
+        }
+
+        $agencies = $query->latest('id')->paginate($perPage);
 
         return response()->json([
             'status' => true,
             'message' => 'Agencies retrieved successfully',
-            'data' => $agencies,
+            'data' => $agencies->items(),
+            'pagination' => [
+                'current_page' => $agencies->currentPage(),
+                'per_page' => $agencies->perPage(),
+                'total' => $agencies->total(),
+                'last_page' => $agencies->lastPage(),
+            ],
+            'total_agencies' => Agency::count(),
+            'active_agencies' => Agency::where('status', 'active')->count(),
+            'suspended_agencies' => Agency::where('status', 'suspended')->count(),
         ], 200);
     }
 
