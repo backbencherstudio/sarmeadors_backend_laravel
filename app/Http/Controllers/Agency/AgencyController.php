@@ -83,7 +83,7 @@ class AgencyController extends Controller
 
             $data = $validator->validated();
             $prefix = strtolower($data['subdomain_prefix']);
-            $fullSubdomain = $prefix . '.staffhaus.io';
+            $fullSubdomain = $prefix.'.staffhaus.io';
 
             $agency = Agency::create([
                 'name' => $data['name'],
@@ -234,7 +234,7 @@ class AgencyController extends Controller
             $data = $validator->validated();
 
             $prefix = strtolower($data['subdomain_prefix']);
-            $fullSubdomain = $prefix . '.staffhaus.io';
+            $fullSubdomain = $prefix.'.staffhaus.io';
             $agency->update([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -483,15 +483,15 @@ class AgencyController extends Controller
                 'language' => $agency->language,
 
                 'stripe_publishable_key' => $agency->stripe_publishable_key
-                    ? substr($agency->stripe_publishable_key, 0, 10) . '...'
+                    ? substr($agency->stripe_publishable_key, 0, 10).'...'
                     : null,
 
                 'stripe_secret_key' => $agency->stripe_secret_key
-                    ? substr($agency->stripe_secret_key, 0, 10) . '...'
+                    ? substr($agency->stripe_secret_key, 0, 10).'...'
                     : null,
 
                 'stripe_webhook_secret' => $agency->stripe_webhook_secret
-                    ? substr($agency->stripe_webhook_secret, 0, 10) . '...'
+                    ? substr($agency->stripe_webhook_secret, 0, 10).'...'
                     : null,
 
                 'subdomain' => $agency->subdomain,
