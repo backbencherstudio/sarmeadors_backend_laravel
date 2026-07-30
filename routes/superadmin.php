@@ -22,7 +22,7 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->pr
     // Agency
     Route::get('/agencies', [AgencyController::class, 'data']);
     Route::post('/agency-store', [AgencyController::class, 'store']);
-    Route::get('/agency-edit/{id}', [AgencyController::class, 'edit']);
+    Route::get('/agency-show/{id}', [AgencyController::class, 'show']);
     Route::post('/agency-update/{id}', [AgencyController::class, 'update']);
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 
