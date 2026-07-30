@@ -307,58 +307,18 @@ class AgencyController extends Controller
         $agency = Agency::find($id);
 
         if (! $agency) {
-
             return response()->json([
                 'status' => false,
                 'message' => 'Agency not found',
             ], 404);
         }
 
-        if ($agency->total_clients > 0 || $agency->total_candidates > 0) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Cannot delete agency with existing clients or candidates',
-            ], 400);
-        }
+        $agency->delete();
 
-        DB::beginTransaction();
-
-        try {
-
-            $users = User::where('agency_id', $agency->id)->get();
-
-            foreach ($users as $user) {
-
-                $user->syncRoles([]);
-                $user->delete();
-            }
-
-            $agency->delete();
-
-            DB::commit();
-
-            return response()->json([
-
-                'status' => true,
-
-                'message' => 'Agency deleted successfully',
-
-            ]);
-
-        } catch (\Throwable $e) {
-
-            DB::rollBack();
-
-            return response()->json([
-
-                'status' => false,
-
-                'message' => 'Agency deletion failed',
-
-                'error' => $e->getMessage(),
-
-            ], 500);
-        }
+        return response()->json([
+            'status' => true,
+            'message' => 'Agency deleted successfully',
+        ]);
     }
 
     public function infoUpdate(Request $request, $id)
