@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Agency\AgencyController;
 use Illuminate\Support\Facades\Route;
@@ -27,4 +28,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:super_admin|admin_staff'])->pr
     Route::delete('/agency-delete/{id}', [AgencyController::class, 'destroy']);
 
     Route::patch('/agency-suspends/{id}', [AgencyController::class, 'suspends']);
+
+    // Profile
+    Route::post('/update-profile', [ProfileController::class, 'updateProfile']);
+    Route::post('/update-password', [ProfileController::class, 'updatePassword']);
 });
