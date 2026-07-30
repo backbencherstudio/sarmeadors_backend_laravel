@@ -170,7 +170,6 @@ class CandidateGlobalSettingsController extends Controller
         ]);
     }
 
-
     public function updateCandidateGlobalSettings(Request $request)
     {
         $agency_id = auth('api')->user()->agency_id;
@@ -253,7 +252,7 @@ class CandidateGlobalSettingsController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Candidate global settings updated successfully',
-            'data' => $mergedSettings
+            'data' => $mergedSettings,
         ]);
     }
 
