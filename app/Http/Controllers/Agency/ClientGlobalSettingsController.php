@@ -258,7 +258,7 @@ class ClientGlobalSettingsController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Client global settings updated successfully',
-            'data' => $mergedSettings
+            'data' => $mergedSettings,
         ]);
     }
 
