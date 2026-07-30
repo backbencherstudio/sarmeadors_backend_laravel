@@ -46,7 +46,7 @@ Route::middleware('auth:api')->group(function () {
 | Role-scoped route files
 |--------------------------------------------------------------------------
 */
-require __DIR__ . '/superadmin.php';
-require __DIR__ . '/agency.php';
-require __DIR__ . '/client.php';
-require __DIR__ . '/candidate.php';
+require __DIR__.'/superadmin.php';
+require __DIR__.'/agency.php';
+require __DIR__.'/client.php';
+require __DIR__.'/candidate.php';
