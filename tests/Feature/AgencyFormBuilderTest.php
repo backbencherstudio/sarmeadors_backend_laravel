@@ -31,12 +31,16 @@ class AgencyFormBuilderTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.entity', 'client')
             ->assertJsonPath('data.application_type', 'registration')
-            ->assertJsonPath('data.schema.blocks.0.name', 'Contact & Address')
-            ->assertJsonPath('data.schema.blocks.0.sections.0.fields.0.name', 'first_name');
+            ->assertJsonPath('data.schema.blocks.0.name', 'Introduction')
+            ->assertJsonPath('data.schema.blocks.0.type', 'introduction')
+            ->assertJsonPath('data.schema.blocks.0.config.title', 'Client Registration')
+            ->assertJsonPath('data.schema.blocks.1.name', 'Contact & Address')
+            ->assertJsonPath('data.schema.blocks.1.sections.0.fields.0.name', 'first_name');
 
         // serials & keys get backfilled during normalization
         $this->assertNotEmpty($response->json('data.schema.blocks.0.key'));
         $this->assertSame(1, $response->json('data.schema.blocks.0.serial'));
+        $this->assertSame(2, $response->json('data.schema.blocks.1.serial'));
 
         $this->assertDatabaseHas('forms', [
             'agency_id' => $agency->id,
@@ -46,12 +50,73 @@ class AgencyFormBuilderTest extends TestCase
         ]);
     }
 
+    public function test_new_form_without_schema_starts_with_introduction_block(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $response = $this->actingAsAgency($user)
+            ->postJson('/api/agency/forms', [
+                'name' => 'Family Form - Nanny',
+                'application_type' => 'registration',
+                'user_type' => 'client',
+            ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonCount(1, 'data.schema.blocks')
+            ->assertJsonPath('data.schema.blocks.0.name', 'Introduction')
+            ->assertJsonPath('data.schema.blocks.0.type', 'introduction')
+            ->assertJsonPath('data.schema.blocks.0.description', null)
+            ->assertJsonPath('data.schema.blocks.0.config.title', 'Family Form - Nanny')
+            ->assertJsonPath('data.schema.blocks.0.config.logo_url', null)
+            ->assertJsonPath('data.schema.blocks.0.config.button_label', null)
+            ->assertJsonPath('data.schema.blocks.0.config.button_link', null)
+            ->assertJsonPath('data.schema.blocks.0.sections', []);
+
+        $this->assertNotEmpty($response->json('data.schema.blocks.0.key'));
+        $this->assertSame(1, $response->json('data.schema.blocks.0.serial'));
+    }
+
+    public function test_form_create_does_not_duplicate_an_existing_introduction_block(): void
+    {
+        [, $user] = $this->createAgencyScenario();
+
+        $response = $this->actingAsAgency($user)
+            ->postJson('/api/agency/forms', [
+                'name' => 'Client Registration',
+                'application_type' => 'registration',
+                'user_type' => 'client',
+                'schema' => [
+                    'blocks' => [[
+                        'name' => 'Introduction',
+                        'type' => 'introduction',
+                        'description' => 'Not sure if you are ready to go ahead?',
+                        'config' => [
+                            'title' => 'Family Form - Nanny',
+                            'logo_url' => null,
+                            'button_label' => 'Book a call with us',
+                            'button_link' => 'https://calendly.com/example',
+                        ],
+                        'sections' => [],
+                    ]],
+                ],
+            ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonCount(1, 'data.schema.blocks')
+            ->assertJsonPath('data.schema.blocks.0.type', 'introduction')
+            ->assertJsonPath('data.schema.blocks.0.config.title', 'Family Form - Nanny')
+            ->assertJsonPath('data.schema.blocks.0.config.button_label', 'Book a call with us')
+            ->assertJsonPath('data.schema.blocks.0.description', 'Not sure if you are ready to go ahead?');
+    }
+
     public function test_agency_can_move_a_field_to_a_later_position_in_its_section(): void
     {
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createForm($user)->json('data');
-        $firstNameKey = $form['schema']['blocks'][0]['sections'][0]['fields'][0]['key'];
+        $firstNameKey = $form['schema']['blocks'][1]['sections'][0]['fields'][0]['key'];
 
         // "first_name" (serial 1) -> serial 3, so it lands after "email" and
         // "favorite_color", which both shift up by one.
@@ -62,7 +127,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $fields = $response->json('data.schema.blocks.1.sections.0.fields');
         $this->assertSame(['email', 'favorite_color', 'first_name'], array_column($fields, 'name'));
         $this->assertSame([1, 2, 3], array_column($fields, 'serial'));
     }
@@ -72,7 +137,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createForm($user)->json('data');
-        $favoriteColorKey = $form['schema']['blocks'][0]['sections'][0]['fields'][2]['key'];
+        $favoriteColorKey = $form['schema']['blocks'][1]['sections'][0]['fields'][2]['key'];
 
         // "favorite_color" (serial 3) -> serial 1.
         $response = $this->actingAsAgency($user)
@@ -82,7 +147,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $fields = $response->json('data.schema.blocks.1.sections.0.fields');
         $this->assertSame(['favorite_color', 'first_name', 'email'], array_column($fields, 'name'));
     }
 
@@ -91,7 +156,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createForm($user)->json('data');
-        $firstNameKey = $form['schema']['blocks'][0]['sections'][0]['fields'][0]['key'];
+        $firstNameKey = $form['schema']['blocks'][1]['sections'][0]['fields'][0]['key'];
 
         $response = $this->actingAsAgency($user)
             ->patchJson("/api/agency/forms/{$form['id']}/fields/{$firstNameKey}/serial", [
@@ -100,7 +165,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $fields = $response->json('data.schema.blocks.0.sections.0.fields');
+        $fields = $response->json('data.schema.blocks.1.sections.0.fields');
         $this->assertSame(['email', 'favorite_color', 'first_name'], array_column($fields, 'name'));
     }
 
@@ -150,7 +215,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiSectionForm($user)->json('data');
-        $contactKey = $form['schema']['blocks'][0]['sections'][0]['key'];
+        $contactKey = $form['schema']['blocks'][1]['sections'][0]['key'];
 
         // "Contact and Personal Info" (serial 1) -> serial 3, so it lands
         // after "Professional Info" and "Additional Info", which both shift
@@ -162,7 +227,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $sections = $response->json('data.schema.blocks.0.sections');
+        $sections = $response->json('data.schema.blocks.1.sections');
         $this->assertSame(
             ['Professional Info', 'Additional Info', 'Contact and Personal Info'],
             array_column($sections, 'name')
@@ -175,7 +240,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiSectionForm($user)->json('data');
-        $additionalKey = $form['schema']['blocks'][0]['sections'][2]['key'];
+        $additionalKey = $form['schema']['blocks'][1]['sections'][2]['key'];
 
         // "Additional Info" (serial 3) -> serial 1.
         $response = $this->actingAsAgency($user)
@@ -185,7 +250,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $sections = $response->json('data.schema.blocks.0.sections');
+        $sections = $response->json('data.schema.blocks.1.sections');
         $this->assertSame(
             ['Additional Info', 'Contact and Personal Info', 'Professional Info'],
             array_column($sections, 'name')
@@ -197,7 +262,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiSectionForm($user)->json('data');
-        $contactKey = $form['schema']['blocks'][0]['sections'][0]['key'];
+        $contactKey = $form['schema']['blocks'][1]['sections'][0]['key'];
 
         $response = $this->actingAsAgency($user)
             ->patchJson("/api/agency/forms/{$form['id']}/sections/{$contactKey}/serial", [
@@ -206,7 +271,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $response->assertOk();
 
-        $sections = $response->json('data.schema.blocks.0.sections');
+        $sections = $response->json('data.schema.blocks.1.sections');
         $this->assertSame(
             ['Professional Info', 'Additional Info', 'Contact and Personal Info'],
             array_column($sections, 'name')
@@ -259,23 +324,23 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiBlockForm($user)->json('data');
-        $personalKey = $form['schema']['blocks'][0]['key'];
+        $personalKey = $form['schema']['blocks'][1]['key'];
 
-        // "Personal Information" (serial 1) -> serial 3, so it lands after
+        // "Personal Information" (serial 2) -> serial 4, so it lands after
         // "Professional Information" and "References", which both shift up by one.
         $response = $this->actingAsAgency($user)
             ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$personalKey}/serial", [
-                'serial' => 3,
+                'serial' => 4,
             ]);
 
         $response->assertOk();
 
         $blocks = $response->json('data.schema.blocks');
         $this->assertSame(
-            ['Professional Information', 'References', 'Personal Information'],
+            ['Introduction', 'Professional Information', 'References', 'Personal Information'],
             array_column($blocks, 'name')
         );
-        $this->assertSame([1, 2, 3], array_column($blocks, 'serial'));
+        $this->assertSame([1, 2, 3, 4], array_column($blocks, 'serial'));
     }
 
     public function test_agency_can_move_a_block_to_an_earlier_position_in_the_form(): void
@@ -283,19 +348,19 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiBlockForm($user)->json('data');
-        $referencesKey = $form['schema']['blocks'][2]['key'];
+        $referencesKey = $form['schema']['blocks'][3]['key'];
 
-        // "References" (serial 3) -> serial 1.
+        // "References" (serial 4) -> serial 2 (right after Introduction).
         $response = $this->actingAsAgency($user)
             ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$referencesKey}/serial", [
-                'serial' => 1,
+                'serial' => 2,
             ]);
 
         $response->assertOk();
 
         $blocks = $response->json('data.schema.blocks');
         $this->assertSame(
-            ['References', 'Personal Information', 'Professional Information'],
+            ['Introduction', 'References', 'Personal Information', 'Professional Information'],
             array_column($blocks, 'name')
         );
     }
@@ -305,7 +370,7 @@ class AgencyFormBuilderTest extends TestCase
         [, $user] = $this->createAgencyScenario();
 
         $form = $this->createMultiBlockForm($user)->json('data');
-        $personalKey = $form['schema']['blocks'][0]['key'];
+        $personalKey = $form['schema']['blocks'][1]['key'];
 
         $response = $this->actingAsAgency($user)
             ->patchJson("/api/agency/forms/{$form['id']}/blocks/{$personalKey}/serial", [
@@ -316,7 +381,7 @@ class AgencyFormBuilderTest extends TestCase
 
         $blocks = $response->json('data.schema.blocks');
         $this->assertSame(
-            ['Professional Information', 'References', 'Personal Information'],
+            ['Introduction', 'Professional Information', 'References', 'Personal Information'],
             array_column($blocks, 'name')
         );
     }
@@ -390,7 +455,7 @@ class AgencyFormBuilderTest extends TestCase
             ->getJson("/api/agency/forms/{$slug}")
             ->assertOk()
             ->assertJsonPath('data.slug', $slug)
-            ->assertJsonPath('data.schema.blocks.0.sections.0.fields.1.name', 'email');
+            ->assertJsonPath('data.schema.blocks.1.sections.0.fields.1.name', 'email');
     }
 
     public function test_client_registration_submission_creates_client(): void

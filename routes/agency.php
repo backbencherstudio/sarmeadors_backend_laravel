@@ -282,6 +282,8 @@ Route::middleware(['subdomain', 'auth:api', 'role:agency_admin|agency_staff'])->
     Route::post('/forms', [FormController::class, 'store']);
     Route::get('/forms/{slug}', [FormController::class, 'show']);
     Route::put('/forms/{id}', [FormController::class, 'update']);
+    Route::post('/forms/{id}/introduction/logo', [FormController::class, 'uploadIntroductionLogo']);
+    Route::delete('/forms/{id}/introduction/logo', [FormController::class, 'deleteIntroductionLogo']);
     Route::patch('/forms/{id}/status', [FormController::class, 'toggleStatus']);
     Route::patch('/forms/{id}/blocks/{key}/serial', [FormController::class, 'reorderBlock']);
     Route::patch('/forms/{id}/fields/{key}/serial', [FormController::class, 'reorderField']);

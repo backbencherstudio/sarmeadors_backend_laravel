@@ -9,7 +9,9 @@ use App\Models\FormSubmission;
 use App\Models\User;
 use App\Services\FormBuilderService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -52,15 +54,25 @@ class FormController extends Controller
             $query->where('status', $request->boolean('status'));
         }
 
-        return $this->sendResponse($query->latest()->get(), 'Forms retrieved successfully');
+        return $this->sendResponse(
+            $this->presentForm($query->latest()->get()),
+            'Forms retrieved successfully'
+        );
     }
 
     /**
      * Create a dynamic builder form (client/candidate registration or long-term job posting).
+     * Optional multipart `logo` attaches the Introduction block image in the same request.
      */
     public function store(Request $request)
     {
         $agencyId = auth('api')->user()->agency_id;
+
+        if (is_string($request->input('schema'))) {
+            $request->merge([
+                'schema' => json_decode($request->input('schema'), true),
+            ]);
+        }
 
         $request->validate(array_merge([
             'name' => 'required|string|max:255',
@@ -68,6 +80,7 @@ class FormController extends Controller
             'user_type' => 'required_if:application_type,registration|in:client,candidate',
             'job_type' => 'required_if:application_type,job_posting|in:long_term',
             'schema' => 'nullable|array',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ], $this->schemaRules()));
 
         $entity = $this->builder->resolveEntity(
@@ -80,6 +93,20 @@ class FormController extends Controller
             return $this->sendError('Unsupported form type', [], 422);
         }
 
+        $schema = $this->builder->ensureIntroductionBlock(
+            $request->input('schema', ['blocks' => []]),
+            $request->name,
+        );
+
+        if ($request->hasFile('logo')) {
+            $path = $request->file('logo')->store(
+                'forms/logos/'.$agencyId,
+                'public'
+            );
+
+            $schema = $this->builder->setIntroductionLogo($schema, $path, $request->name);
+        }
+
         $form = Form::create([
             'agency_id' => $agencyId,
             'name' => $request->name,
@@ -88,10 +115,10 @@ class FormController extends Controller
             'application_type' => $request->application_type,
             'user_type' => $request->application_type === 'registration' ? $request->user_type : null,
             'job_type' => $request->application_type === 'job_posting' ? $request->job_type : null,
-            'schema' => $this->builder->normalizeSchema($request->input('schema', ['blocks' => []])),
+            'schema' => $this->builder->normalizeSchema($schema),
         ]);
 
-        return $this->sendResponse($form, 'Form created successfully', 201);
+        return $this->sendResponse($this->presentForm($form), 'Form created successfully', 201);
     }
 
     /**
@@ -106,7 +133,7 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Form retrieved successfully',
-            'data' => $form,
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -128,7 +155,7 @@ class FormController extends Controller
             ->where('is_owner', 1)
             ->first();
 
-        $data = $form->toArray();
+        $data = $this->presentForm($form);
         $data['base_fields'] = $this->builder->baseFields($form->entity);
         $data['agency'] = [
             'id' => $agency->id,
@@ -180,7 +207,69 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Form updated successfully',
-            'data' => $form,
+            'data' => $this->presentForm($form),
+        ]);
+    }
+
+    /**
+     * Upload (or replace) the Introduction block logo for a form.
+     */
+    public function uploadIntroductionLogo(Request $request, $id)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        $request->validate([
+            'logo' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        $schema = $form->schema ?? ['blocks' => []];
+        $previous = $this->builder->introductionLogoPath($schema);
+
+        $path = $request->file('logo')->store(
+            'forms/logos/'.$form->agency_id,
+            'public'
+        );
+
+        $form->schema = $this->builder->normalizeSchema(
+            $this->builder->setIntroductionLogo($schema, $path, $form->name)
+        );
+        $form->save();
+
+        if ($previous && $previous !== $path) {
+            Storage::disk('public')->delete($previous);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Introduction logo uploaded successfully',
+            'data' => $this->presentForm($form),
+        ]);
+    }
+
+    /**
+     * Remove the Introduction block logo for a form.
+     */
+    public function deleteIntroductionLogo($id)
+    {
+        $form = Form::where('id', $id)
+            ->where('agency_id', auth('api')->user()->agency_id)
+            ->firstOrFail();
+
+        [$schema, $previous] = $this->builder->clearIntroductionLogo($form->schema ?? ['blocks' => []]);
+
+        $form->schema = $this->builder->normalizeSchema($schema);
+        $form->save();
+
+        if ($previous) {
+            Storage::disk('public')->delete($previous);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Introduction logo deleted successfully',
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -214,7 +303,7 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Block reordered successfully',
-            'data' => $form,
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -248,7 +337,7 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Field reordered successfully',
-            'data' => $form,
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -282,7 +371,7 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Section reordered successfully',
-            'data' => $form,
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -309,7 +398,7 @@ class FormController extends Controller
         return response()->json([
             'status' => true,
             'message' => $form->status ? 'Form enabled' : 'Form disabled',
-            'data' => $form,
+            'data' => $this->presentForm($form),
         ]);
     }
 
@@ -488,6 +577,29 @@ class FormController extends Controller
             ],
             default => [],
         };
+    }
+
+    /**
+     * Return form data with Introduction logo paths resolved to public URLs.
+     *
+     * @param  Form|Collection<int, Form>  $forms
+     * @return array<string, mixed>|Collection<int, array<string, mixed>>
+     */
+    private function presentForm(Form|Collection $forms): array|Collection
+    {
+        if ($forms instanceof Form) {
+            $data = $forms->toArray();
+            $data['schema'] = $this->builder->presentSchema($data['schema'] ?? ['blocks' => []]);
+
+            return $data;
+        }
+
+        return $forms->map(function (Form $form) {
+            $data = $form->toArray();
+            $data['schema'] = $this->builder->presentSchema($data['schema'] ?? ['blocks' => []]);
+
+            return $data;
+        });
     }
 
     /**

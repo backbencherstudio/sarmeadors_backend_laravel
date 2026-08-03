@@ -145,6 +145,163 @@ class FormBuilderService
     }
 
     /**
+     * The Introduction block every new form starts with — logo, title,
+     * description and CTA button live in `config`, with no sections/fields.
+     *
+     * @return array<string, mixed>
+     */
+    public function defaultIntroductionBlock(?string $title = null): array
+    {
+        return [
+            'name' => 'Introduction',
+            'type' => 'introduction',
+            'description' => null,
+            'config' => [
+                'title' => $title,
+                'logo_url' => null,
+                'button_label' => null,
+                'button_link' => null,
+            ],
+            'sections' => [],
+        ];
+    }
+
+    /**
+     * Guarantee an Introduction block sits at serial 1. Used on form create
+     * so the builder always opens with the logo/title screen from the UI.
+     * Existing Introduction blocks (matched by `type`) are left alone.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    public function ensureIntroductionBlock(array $schema, ?string $title = null): array
+    {
+        $blocks = array_values($schema['blocks'] ?? []);
+
+        $hasIntroduction = collect($blocks)->contains(
+            fn (array $block): bool => ($block['type'] ?? null) === 'introduction'
+        );
+
+        if (! $hasIntroduction) {
+            array_unshift($blocks, $this->defaultIntroductionBlock($title));
+        }
+
+        $schema['blocks'] = $blocks;
+
+        return $schema;
+    }
+
+    /**
+     * Relative storage path of the Introduction logo, or null when unset.
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    public function introductionLogoPath(array $schema): ?string
+    {
+        foreach ($schema['blocks'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'introduction') {
+                $path = $block['config']['logo_url'] ?? null;
+
+                return is_string($path) && $path !== '' ? $path : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Persist a newly uploaded Introduction logo path on the schema,
+     * ensuring an Introduction block exists first.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    public function setIntroductionLogo(array $schema, string $path, ?string $title = null): array
+    {
+        $schema = $this->ensureIntroductionBlock($schema, $title);
+
+        foreach ($schema['blocks'] as $index => $block) {
+            if (($block['type'] ?? null) !== 'introduction') {
+                continue;
+            }
+
+            $config = $block['config'] ?? [];
+            $config['logo_url'] = $path;
+            $schema['blocks'][$index]['config'] = $config;
+
+            break;
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Clear the Introduction logo path from the schema. Returns the previous
+     * relative path (if any) so the caller can delete the file from disk.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array{0: array<string, mixed>, 1: string|null}
+     */
+    public function clearIntroductionLogo(array $schema): array
+    {
+        $previous = $this->introductionLogoPath($schema);
+
+        foreach ($schema['blocks'] ?? [] as $index => $block) {
+            if (($block['type'] ?? null) !== 'introduction') {
+                continue;
+            }
+
+            $config = $block['config'] ?? [];
+            $config['logo_url'] = null;
+            $schema['blocks'][$index]['config'] = $config;
+
+            break;
+        }
+
+        return [$schema, $previous];
+    }
+
+    /**
+     * Turn stored Introduction logo paths into public URLs for API responses.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    public function presentSchema(array $schema): array
+    {
+        foreach ($schema['blocks'] ?? [] as $index => $block) {
+            if (($block['type'] ?? null) !== 'introduction') {
+                continue;
+            }
+
+            $path = $block['config']['logo_url'] ?? null;
+
+            if (is_string($path) && $path !== '' && ! str_starts_with($path, 'http')) {
+                $schema['blocks'][$index]['config']['logo_url'] = asset('storage/'.$path);
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Keep a relative storage path when the frontend echoes back a full
+     * /storage/... URL from a previous presentSchema response.
+     */
+    public function normalizeIntroductionLogoPath(mixed $logoUrl): ?string
+    {
+        if (! is_string($logoUrl) || $logoUrl === '') {
+            return null;
+        }
+
+        if (preg_match('#/storage/(.+)$#', $logoUrl, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return $logoUrl;
+    }
+
+    /**
      * Normalize an incoming builder definition into a predictable
      * blocks -> sections -> fields tree with stable keys, machine names and serials.
      *
@@ -188,13 +345,24 @@ class FormBuilderService
                 ];
             }
 
+            $config = $block['config'] ?? null;
+
+            if (($block['type'] ?? 'standard') === 'introduction') {
+                $config = [
+                    'title' => $config['title'] ?? null,
+                    'logo_url' => $this->normalizeIntroductionLogoPath($config['logo_url'] ?? null),
+                    'button_label' => $config['button_label'] ?? null,
+                    'button_link' => $config['button_link'] ?? null,
+                ];
+            }
+
             $blocks[] = [
                 'key' => $block['key'] ?? (string) Str::uuid(),
                 'type' => $block['type'] ?? 'standard',
                 'name' => $block['name'] ?? 'Untitled Block',
                 'description' => $block['description'] ?? null,
                 'serial' => $blockIndex + 1,
-                'config' => $block['config'] ?? null,
+                'config' => $config,
                 'sections' => $sections,
             ];
         }
@@ -594,6 +762,7 @@ class FormBuilderService
             ->values();
 
         $blocks = collect($schema['blocks'] ?? [])
+            ->reject(fn ($block) => ($block['type'] ?? null) === 'introduction')
             ->map(fn ($block) => [
                 'name' => $block['name'] ?? null,
                 'slug' => Str::slug($block['name'] ?? ''),
