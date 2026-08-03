@@ -14,6 +14,7 @@ class FormBuilderIntroductionBlockTest extends TestCase
         $this->assertSame('Introduction', $block['name']);
         $this->assertSame('introduction', $block['type']);
         $this->assertNull($block['description']);
+        $this->assertNull($block['service_id']);
         $this->assertSame([], $block['sections']);
         $this->assertSame([
             'title' => 'Family Form - Nanny',
@@ -149,5 +150,107 @@ class FormBuilderIntroductionBlockTest extends TestCase
             $builder->normalizeIntroductionLogoPath('forms/logos/1/logo.png')
         );
         $this->assertNull($builder->normalizeIntroductionLogoPath(null));
+    }
+
+    public function test_normalize_schema_preserves_agency_service_id_on_blocks(): void
+    {
+        $schema = (new FormBuilderService)->normalizeSchema([
+            'blocks' => [
+                [
+                    'name' => 'Introduction',
+                    'type' => 'introduction',
+                    'service_id' => 99,
+                    'sections' => [],
+                ],
+                [
+                    'name' => 'Nanny Details',
+                    'type' => 'standard',
+                    'service_id' => '5',
+                    'sections' => [],
+                ],
+                [
+                    'name' => 'Job Details',
+                    'type' => 'standard',
+                    'service_id' => null,
+                    'sections' => [],
+                ],
+            ],
+        ]);
+
+        $this->assertNull($schema['blocks'][0]['service_id']);
+        $this->assertSame(5, $schema['blocks'][1]['service_id']);
+        $this->assertNull($schema['blocks'][2]['service_id']);
+    }
+
+    public function test_normalize_block_service_id_casts_empty_to_null(): void
+    {
+        $builder = new FormBuilderService;
+
+        $this->assertNull($builder->normalizeBlockServiceId(null));
+        $this->assertNull($builder->normalizeBlockServiceId(''));
+        $this->assertSame(12, $builder->normalizeBlockServiceId('12'));
+    }
+
+    public function test_normalize_schema_stores_options_source_without_snapshotting_options(): void
+    {
+        $schema = (new FormBuilderService)->normalizeSchema([
+            'blocks' => [[
+                'name' => 'Select Services',
+                'sections' => [[
+                    'name' => 'Services',
+                    'fields' => [[
+                        'type' => 'multi_select_checkbox',
+                        'label' => 'Which services do you need?',
+                        'name' => 'selected_services',
+                        'options_source' => 'agency_services',
+                        'allowed_service_ids' => ['7', 3, 3, ''],
+                        'options' => ['Stale Name'],
+                    ]],
+                ]],
+            ]],
+        ]);
+
+        $field = $schema['blocks'][0]['sections'][0]['fields'][0];
+
+        $this->assertSame('agency_services', $field['options_source']);
+        $this->assertNull($field['options']);
+        $this->assertSame([7, 3], $field['allowed_service_ids']);
+    }
+
+    public function test_normalize_allowed_service_ids_defaults_to_empty_array(): void
+    {
+        $builder = new FormBuilderService;
+
+        $this->assertSame([], $builder->normalizeAllowedServiceIds(null));
+        $this->assertSame([1, 3], $builder->normalizeAllowedServiceIds([1, '3', 1]));
+    }
+
+    public function test_agency_service_options_returns_empty_when_allow_list_empty(): void
+    {
+        $this->assertSame([], (new FormBuilderService)->agencyServiceOptions(1, []));
+        $this->assertSame([], (new FormBuilderService)->agencyServiceOptions(1, null));
+    }
+
+    public function test_normalize_schema_rejects_unknown_options_source(): void
+    {
+        $schema = (new FormBuilderService)->normalizeSchema([
+            'blocks' => [[
+                'name' => 'Select Services',
+                'sections' => [[
+                    'fields' => [[
+                        'type' => 'multi_select_checkbox',
+                        'label' => 'Services',
+                        'name' => 'selected_services',
+                        'options_source' => 'not_a_real_source',
+                        'options' => ['A', 'B'],
+                    ]],
+                ]],
+            ]],
+        ]);
+
+        $field = $schema['blocks'][0]['sections'][0]['fields'][0];
+
+        $this->assertNull($field['options_source']);
+        $this->assertSame(['A', 'B'], $field['options']);
     }
 }

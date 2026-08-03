@@ -6,15 +6,27 @@ use App\Models\Candidate;
 use App\Models\Client;
 use App\Models\FormSubmission;
 use App\Models\LongTermJob;
+use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class FormBuilderService
 {
+    /**
+     * Field option data sources the builder can bind instead of a static
+     * options array. Values are resolved live when the schema is presented.
+     *
+     * @var array<int, string>
+     */
+    private const OPTIONS_SOURCES = [
+        'agency_services',
+    ];
+
     /**
      * Target entity keys mapped to their Eloquent models.
      *
@@ -109,6 +121,16 @@ class FormBuilderService
     }
 
     /**
+     * Dynamic option sources a field may bind to instead of a static options list.
+     *
+     * @return array<int, string>
+     */
+    public function allowedOptionsSources(): array
+    {
+        return self::OPTIONS_SOURCES;
+    }
+
+    /**
      * The standard, always-present fields for an entity's registration form.
      *
      * @return array<int, array<string, mixed>>
@@ -156,6 +178,7 @@ class FormBuilderService
             'name' => 'Introduction',
             'type' => 'introduction',
             'description' => null,
+            'service_id' => null,
             'config' => [
                 'title' => $title,
                 'logo_url' => null,
@@ -262,26 +285,79 @@ class FormBuilderService
     }
 
     /**
-     * Turn stored Introduction logo paths into public URLs for API responses.
+     * Turn stored Introduction logo paths into public URLs and hydrate any
+     * fields bound to a dynamic options_source (e.g. live agency services).
      *
      * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
-    public function presentSchema(array $schema): array
+    public function presentSchema(array $schema, ?int $agencyId = null): array
     {
-        foreach ($schema['blocks'] ?? [] as $index => $block) {
-            if (($block['type'] ?? null) !== 'introduction') {
-                continue;
+        foreach ($schema['blocks'] ?? [] as $blockIndex => $block) {
+            if (($block['type'] ?? null) === 'introduction') {
+                $path = $block['config']['logo_url'] ?? null;
+
+                if (is_string($path) && $path !== '' && ! str_starts_with($path, 'http')) {
+                    $schema['blocks'][$blockIndex]['config']['logo_url'] = asset('storage/'.$path);
+                }
             }
 
-            $path = $block['config']['logo_url'] ?? null;
+            foreach ($block['sections'] ?? [] as $sectionIndex => $section) {
+                foreach ($section['fields'] ?? [] as $fieldIndex => $field) {
+                    if (($field['options_source'] ?? null) !== 'agency_services' || ! $agencyId) {
+                        continue;
+                    }
 
-            if (is_string($path) && $path !== '' && ! str_starts_with($path, 'http')) {
-                $schema['blocks'][$index]['config']['logo_url'] = asset('storage/'.$path);
+                    $schema['blocks'][$blockIndex]['sections'][$sectionIndex]['fields'][$fieldIndex]['options'] = $this->agencyServiceOptions(
+                        $agencyId,
+                        $field['allowed_service_ids'] ?? [],
+                    );
+                }
             }
         }
 
         return $schema;
+    }
+
+    /**
+     * Active agency services as checkbox options, limited to the form's
+     * allowed_service_ids. Empty/null allow-list → no options (admin must opt in).
+     *
+     * @param  array<int, int>|null  $allowedServiceIds
+     * @return array<int, array{value: int, label: string}>
+     */
+    public function agencyServiceOptions(int $agencyId, ?array $allowedServiceIds = null): array
+    {
+        $allowedServiceIds = array_values(array_unique(array_map('intval', $allowedServiceIds ?? [])));
+
+        if ($allowedServiceIds === []) {
+            return [];
+        }
+
+        $services = Service::query()
+            ->where('agency_id', $agencyId)
+            ->where('status', true)
+            ->whereIn('id', $allowedServiceIds)
+            ->get(['id', 'service_name'])
+            ->keyBy('id');
+
+        // Preserve the admin's allow-list order.
+        return collect($allowedServiceIds)
+            ->map(function (int $id) use ($services): ?array {
+                $service = $services->get($id);
+
+                if (! $service) {
+                    return null;
+                }
+
+                return [
+                    'value' => $service->id,
+                    'label' => $service->service_name,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -320,6 +396,9 @@ class FormBuilderService
 
                 foreach (array_values($section['fields'] ?? []) as $fieldIndex => $field) {
                     $label = $field['label'] ?? 'Untitled Field';
+                    $optionsSource = in_array($field['options_source'] ?? null, self::OPTIONS_SOURCES, true)
+                        ? $field['options_source']
+                        : null;
 
                     $fields[] = [
                         'key' => $field['key'] ?? (string) Str::uuid(),
@@ -331,7 +410,12 @@ class FormBuilderService
                         'is_required' => (bool) ($field['is_required'] ?? false),
                         'width' => (int) ($field['width'] ?? 12),
                         'serial' => $fieldIndex + 1,
-                        'options' => $field['options'] ?? null,
+                        'options_source' => $optionsSource,
+                        'allowed_service_ids' => $optionsSource === 'agency_services'
+                            ? $this->normalizeAllowedServiceIds($field['allowed_service_ids'] ?? null)
+                            : null,
+                        // Dynamic sources are resolved at present-time — never snapshot names into JSON.
+                        'options' => $optionsSource ? null : ($field['options'] ?? null),
                         'validation_rules' => $field['validation_rules'] ?? null,
                         'config' => $field['config'] ?? null,
                     ];
@@ -345,9 +429,10 @@ class FormBuilderService
                 ];
             }
 
+            $type = $block['type'] ?? 'standard';
             $config = $block['config'] ?? null;
 
-            if (($block['type'] ?? 'standard') === 'introduction') {
+            if ($type === 'introduction') {
                 $config = [
                     'title' => $config['title'] ?? null,
                     'logo_url' => $this->normalizeIntroductionLogoPath($config['logo_url'] ?? null),
@@ -358,9 +443,12 @@ class FormBuilderService
 
             $blocks[] = [
                 'key' => $block['key'] ?? (string) Str::uuid(),
-                'type' => $block['type'] ?? 'standard',
+                'type' => $type,
                 'name' => $block['name'] ?? 'Untitled Block',
                 'description' => $block['description'] ?? null,
+                'service_id' => $type === 'introduction'
+                    ? null
+                    : $this->normalizeBlockServiceId($block['service_id'] ?? null),
                 'serial' => $blockIndex + 1,
                 'config' => $config,
                 'sections' => $sections,
@@ -370,6 +458,35 @@ class FormBuilderService
         $schema['blocks'] = $blocks;
 
         return $schema;
+    }
+
+    /**
+     * Cast a block's service_id to int, or null for common (all-services) blocks.
+     */
+    public function normalizeBlockServiceId(mixed $serviceId): ?int
+    {
+        if ($serviceId === null || $serviceId === '') {
+            return null;
+        }
+
+        return (int) $serviceId;
+    }
+
+    /**
+     * Normalize the admin-selected service allow-list for an agency_services field.
+     *
+     * @return array<int, int>
+     */
+    public function normalizeAllowedServiceIds(mixed $ids): array
+    {
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map(
+            'intval',
+            array_filter($ids, fn ($id) => $id !== null && $id !== '')
+        )));
     }
 
     /**
@@ -521,9 +638,9 @@ class FormBuilderService
      * Build Laravel validation rules for an "answers" payload from the schema.
      *
      * @param  array<string, mixed>  $schema
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
-    public function validationRules(array $schema): array
+    public function validationRules(array $schema, ?int $agencyId = null): array
     {
         $rules = [];
 
@@ -571,10 +688,22 @@ class FormBuilderService
                 $fieldRules = array_merge($fieldRules, $custom);
             }
 
-            $rules["answers.{$name}"] = implode('|', array_values(array_unique($fieldRules)));
+            $rules["answers.{$name}"] = array_values(array_unique($fieldRules));
 
             if (($field['type'] ?? null) === 'list_files') {
-                $rules["answers.{$name}.*"] = 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120';
+                $rules["answers.{$name}.*"] = ['file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'];
+            }
+
+            if (($field['options_source'] ?? null) === 'agency_services' && $agencyId) {
+                $allowedServiceIds = $this->normalizeAllowedServiceIds($field['allowed_service_ids'] ?? null);
+
+                $rules["answers.{$name}.*"] = [
+                    'integer',
+                    Rule::in($allowedServiceIds),
+                    Rule::exists('services', 'id')->where(
+                        fn ($q) => $q->where('agency_id', $agencyId)->where('status', true)
+                    ),
+                ];
             }
         }
 

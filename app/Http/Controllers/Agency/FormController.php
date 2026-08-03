@@ -81,7 +81,7 @@ class FormController extends Controller
             'job_type' => 'required_if:application_type,job_posting|in:long_term',
             'schema' => 'nullable|array',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ], $this->schemaRules()));
+        ], $this->schemaRules($agencyId)));
 
         $entity = $this->builder->resolveEntity(
             $request->application_type,
@@ -187,7 +187,7 @@ class FormController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'schema' => 'sometimes|array',
             'status' => 'sometimes|boolean',
-        ], $this->schemaRules()));
+        ], $this->schemaRules($form->agency_id)));
 
         if ($request->filled('name')) {
             $form->name = $request->name;
@@ -433,7 +433,7 @@ class FormController extends Controller
 
         $schema = $form->schema ?? ['blocks' => []];
 
-        $rules = $this->builder->validationRules($schema);
+        $rules = $this->builder->validationRules($schema, $agencyId);
         $rules = array_merge($rules, $this->baseRules($entity, $agencyId));
 
         $request->validate($rules);
@@ -580,7 +580,8 @@ class FormController extends Controller
     }
 
     /**
-     * Return form data with Introduction logo paths resolved to public URLs.
+     * Return form data with Introduction logo paths resolved to public URLs
+     * and dynamic field options (e.g. agency services) hydrated from the DB.
      *
      * @param  Form|Collection<int, Form>  $forms
      * @return array<string, mixed>|Collection<int, array<string, mixed>>
@@ -589,14 +590,20 @@ class FormController extends Controller
     {
         if ($forms instanceof Form) {
             $data = $forms->toArray();
-            $data['schema'] = $this->builder->presentSchema($data['schema'] ?? ['blocks' => []]);
+            $data['schema'] = $this->builder->presentSchema(
+                $data['schema'] ?? ['blocks' => []],
+                $forms->agency_id,
+            );
 
             return $data;
         }
 
         return $forms->map(function (Form $form) {
             $data = $form->toArray();
-            $data['schema'] = $this->builder->presentSchema($data['schema'] ?? ['blocks' => []]);
+            $data['schema'] = $this->builder->presentSchema(
+                $data['schema'] ?? ['blocks' => []],
+                $form->agency_id,
+            );
 
             return $data;
         });
@@ -628,14 +635,22 @@ class FormController extends Controller
      * Field "type" and "label" are required (mirroring the required markers in the builder UI),
      * and the type must be one the builder supports.
      *
+     * Block `service_id` must be null (common block) or a service that belongs
+     * to the same agency as the form — never another agency's service.
+     *
      * @return array<string, mixed>
      */
-    private function schemaRules(): array
+    private function schemaRules(int $agencyId): array
     {
         return [
             'schema.blocks' => 'sometimes|array',
             'schema.blocks.*.name' => 'required|string|max:255',
             'schema.blocks.*.description' => 'nullable|string',
+            'schema.blocks.*.service_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('services', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
             'schema.blocks.*.sections' => 'nullable|array',
             'schema.blocks.*.sections.*.name' => 'nullable|string|max:255',
             'schema.blocks.*.sections.*.fields' => 'nullable|array',
@@ -646,6 +661,16 @@ class FormController extends Controller
             'schema.blocks.*.sections.*.fields.*.is_required' => 'sometimes|boolean',
             'schema.blocks.*.sections.*.fields.*.width' => 'sometimes|integer|min:1|max:12',
             'schema.blocks.*.sections.*.fields.*.options' => 'nullable|array',
+            'schema.blocks.*.sections.*.fields.*.options_source' => [
+                'nullable',
+                'string',
+                Rule::in($this->builder->allowedOptionsSources()),
+            ],
+            'schema.blocks.*.sections.*.fields.*.allowed_service_ids' => 'nullable|array',
+            'schema.blocks.*.sections.*.fields.*.allowed_service_ids.*' => [
+                'integer',
+                Rule::exists('services', 'id')->where(fn ($q) => $q->where('agency_id', $agencyId)),
+            ],
         ];
     }
 }
