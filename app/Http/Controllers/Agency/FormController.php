@@ -469,6 +469,8 @@ class FormController extends Controller
 
             if ($entity === 'long_term_job') {
                 $attributes['client_id'] = $request->input('client_id');
+                $attributes['status'] = 'pending_approval';
+                $attributes['rejection_reason'] = null;
             }
 
             $record = $modelClass::create($attributes);

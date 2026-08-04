@@ -5,6 +5,7 @@ use App\Http\Controllers\Client\CandidateMessageController as ClientCandidateMes
 use App\Http\Controllers\Client\ClientCandidateController;
 use App\Http\Controllers\Client\ClientDashboardController;
 use App\Http\Controllers\Client\ClientDocumentController;
+use App\Http\Controllers\Client\ClientFormController;
 use App\Http\Controllers\Client\ClientInterviewController;
 use App\Http\Controllers\Client\ClientLocationController;
 use App\Http\Controllers\Client\ClientMessageInboxController;
@@ -125,6 +126,11 @@ Route::middleware(['subdomain', 'auth:api', 'role:client'])->prefix('client')->g
     Route::get('jobs/short-term/{shortTermJob}/messages', [ShortTermJobMessageController::class, 'index']);
     Route::post('jobs/short-term/{shortTermJob}/messages', [ShortTermJobMessageController::class, 'store']);
     Route::get('jobs/short-term/{shortTermJob}/messages/unread-counts', [ShortTermJobMessageController::class, 'unreadCounts']);
+
+    // Agency-built long-term job application forms
+    Route::get('forms', [ClientFormController::class, 'index']);
+    Route::get('forms/{slug}', [ClientFormController::class, 'show']);
+    Route::post('forms/{slug}/submit', [ClientFormController::class, 'submit']);
 
     // Long-term jobs
     Route::get('jobs/long-term', [LongTermJobController::class, 'index']);
