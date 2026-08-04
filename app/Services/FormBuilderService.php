@@ -952,6 +952,106 @@ class FormBuilderService
     }
 
     /**
+     * Build a read-only review tree from a submitted form: schema blocks with
+     * each field's answered value attached. Common blocks (service_id null)
+     * always appear; service-specific blocks only when their service was
+     * selected. Introduction is omitted (display-only marketing screen).
+     *
+     * @param  array<string, mixed>  $schema
+     * @param  array<string, mixed>  $answers
+     * @return array<int, array<string, mixed>>
+     */
+    public function submissionBlocks(array $schema, array $answers, ?int $agencyId = null): array
+    {
+        $schema = $this->presentSchema($schema, $agencyId);
+        $selectedServiceIds = collect($answers['selected_services'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return collect($schema['blocks'] ?? [])
+            ->reject(fn ($block) => ($block['type'] ?? null) === 'introduction')
+            ->filter(function ($block) use ($selectedServiceIds) {
+                $serviceId = $block['service_id'] ?? null;
+
+                if ($serviceId === null) {
+                    return true;
+                }
+
+                return in_array((int) $serviceId, $selectedServiceIds, true);
+            })
+            ->map(fn ($block) => [
+                'key' => $block['key'] ?? null,
+                'name' => $block['name'] ?? null,
+                'slug' => Str::slug($block['name'] ?? ''),
+                'description' => $block['description'] ?? null,
+                'service_id' => $block['service_id'] ?? null,
+                'serial' => $block['serial'] ?? null,
+                'sections' => collect($block['sections'] ?? [])
+                    ->map(fn ($section) => [
+                        'key' => $section['key'] ?? null,
+                        'name' => $section['name'] ?? null,
+                        'serial' => $section['serial'] ?? null,
+                        'fields' => collect($section['fields'] ?? [])
+                            ->map(function ($field) use ($answers) {
+                                $name = $field['name'] ?? null;
+                                $raw = $name !== null ? ($answers[$name] ?? null) : null;
+
+                                return [
+                                    'key' => $field['key'] ?? $name,
+                                    'name' => $name,
+                                    'label' => $field['label'] ?? null,
+                                    'type' => $field['type'] ?? null,
+                                    'is_required' => (bool) ($field['is_required'] ?? false),
+                                    'width' => $field['width'] ?? null,
+                                    'options' => $field['options'] ?? null,
+                                    'value' => $this->profileFieldValue($field, $raw),
+                                    'display_value' => $this->submissionDisplayValue($field, $raw),
+                                ];
+                            })
+                            ->values(),
+                    ])
+                    ->values(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Human-readable value for admin review UIs (labels for service IDs, etc.).
+     */
+    private function submissionDisplayValue(array $field, mixed $value): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (($field['options_source'] ?? null) === 'agency_services' && is_array($value)) {
+            $options = collect($field['options'] ?? [])->keyBy('value');
+
+            return collect($value)
+                ->map(fn ($id) => $options->get((int) $id)['label'] ?? $id)
+                ->values()
+                ->all();
+        }
+
+        if (($field['type'] ?? null) === 'single_checkbox') {
+            return (bool) $value ? 'Yes' : 'No';
+        }
+
+        if (($field['type'] ?? null) === 'salary_range' && is_array($value)) {
+            $min = $value['min'] ?? null;
+            $max = $value['max'] ?? null;
+            $currency = $value['currency'] ?? '';
+
+            if ($min !== null && $max !== null) {
+                return trim("{$currency} {$min} - {$max}");
+            }
+        }
+
+        return $this->profileFieldValue($field, $value);
+    }
+
+    /**
      * Resolve a schema field's display value, turning stored file path(s)
      * into publicly accessible URLs for `file_upload`/`list_files` fields.
      */

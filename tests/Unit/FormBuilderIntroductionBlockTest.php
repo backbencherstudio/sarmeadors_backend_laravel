@@ -253,4 +253,67 @@ class FormBuilderIntroductionBlockTest extends TestCase
         $this->assertNull($field['options_source']);
         $this->assertSame(['A', 'B'], $field['options']);
     }
+
+    public function test_submission_blocks_attach_answers_and_filter_by_selected_services(): void
+    {
+        $schema = [
+            'blocks' => [
+                [
+                    'name' => 'Introduction',
+                    'type' => 'introduction',
+                    'service_id' => null,
+                    'sections' => [],
+                ],
+                [
+                    'name' => 'Contact & Address',
+                    'type' => 'standard',
+                    'service_id' => null,
+                    'sections' => [[
+                        'name' => 'Parent',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Title', 'name' => 'title'],
+                            ['type' => 'single_checkbox', 'label' => 'Agree', 'name' => 'agree'],
+                        ],
+                    ]],
+                ],
+                [
+                    'name' => 'Nanny Only',
+                    'type' => 'standard',
+                    'service_id' => 7,
+                    'sections' => [[
+                        'name' => 'Extra',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Hours', 'name' => 'hours'],
+                        ],
+                    ]],
+                ],
+                [
+                    'name' => 'Chef Only',
+                    'type' => 'standard',
+                    'service_id' => 3,
+                    'sections' => [[
+                        'name' => 'Extra',
+                        'fields' => [
+                            ['type' => 'text_box', 'label' => 'Meals', 'name' => 'meals'],
+                        ],
+                    ]],
+                ],
+            ],
+        ];
+
+        $blocks = (new FormBuilderService)->submissionBlocks($schema, [
+            'title' => 'After School Nanny',
+            'agree' => true,
+            'hours' => '20',
+            'meals' => 'ignored',
+            'selected_services' => [7],
+        ]);
+
+        $this->assertCount(2, $blocks);
+        $this->assertSame('contact-address', $blocks[0]['slug']);
+        $this->assertSame('After School Nanny', $blocks[0]['sections'][0]['fields'][0]['value']);
+        $this->assertSame('Yes', $blocks[0]['sections'][0]['fields'][1]['display_value']);
+        $this->assertSame('nanny-only', $blocks[1]['slug']);
+        $this->assertSame('20', $blocks[1]['sections'][0]['fields'][0]['value']);
+    }
 }
