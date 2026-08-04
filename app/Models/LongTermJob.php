@@ -143,6 +143,13 @@ class LongTermJob extends Model
         return $this->hasOne(LongTermJobRefundRequest::class);
     }
 
+    public function formSubmission()
+    {
+        return $this->hasOne(FormSubmission::class, 'entity_id')
+            ->where('entity_type', 'long_term_job')
+            ->latestOfMany();
+    }
+
     public function review()
     {
         return $this->hasOne(LongTermJobReview::class);
